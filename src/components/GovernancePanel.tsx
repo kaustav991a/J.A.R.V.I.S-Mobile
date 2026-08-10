@@ -66,6 +66,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   locked: { opacity: 0.35 },
-  btnText: { ...TYPE.statusLabel, fontSize: 11, letterSpacing: 2 },
+  btnText: { ...TYPE.panelTitle },
   sending: { ...TYPE.dataLabel, color: COLOR.dim, marginTop: SPACE.xs },
 });
