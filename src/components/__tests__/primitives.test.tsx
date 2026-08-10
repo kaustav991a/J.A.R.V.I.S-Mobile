@@ -2,7 +2,6 @@ import { render } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { Panel } from '../Panel';
 import { TransportPill } from '../TransportPill';
-import { Scanline } from '../Scanline';
 import { COLOR } from '../../theme/tokens';
 
 describe('Panel', () => {
@@ -16,10 +15,10 @@ describe('Panel', () => {
     expect(getByText('CPU 34%')).toBeTruthy();
   });
 
-  it('uses the cyan accent by default and honours an override', async () => {
+  it('uses the blue accent by default and honours an override', async () => {
     const a = await render(<Panel title="a" testID="p" />);
     expect(a.getByTestId('p-title').props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ color: COLOR.cyan })])
+      expect.arrayContaining([expect.objectContaining({ color: COLOR.blue })])
     );
     const b = await render(<Panel title="b" testID="q" accent={COLOR.gold} />);
     expect(b.getByTestId('q-title').props.style).toEqual(
@@ -56,12 +55,5 @@ describe('TransportPill', () => {
     expect(getByTestId('transport-pill-label').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: COLOR.gold })])
     );
-  });
-});
-
-describe('Scanline', () => {
-  it('renders without crashing', async () => {
-    const { toJSON } = await render(<Scanline height={600} />);
-    expect(toJSON()).toBeTruthy();
   });
 });

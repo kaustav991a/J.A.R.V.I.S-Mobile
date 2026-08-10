@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { COLOR, SPACE, TYPE } from '../theme/tokens';
+import { COLOR, SPACE, TYPE, glowBox } from '../theme/tokens';
+import { MicIcon } from './MicIcon';
 
 export type CommandBarProps = {
   onSubmit: (text: string) => void;
+  /** tapping the mic. Voice capture itself is not wired up yet. */
+  onVoice?: () => void;
+  /** tints the mic and lights its capsule while capture is running */
+  listening?: boolean;
   disabled?: boolean;
   placeholder?: string;
 };
 
-export function CommandBar({ onSubmit, disabled = false, placeholder = 'speak or type…' }: CommandBarProps) {
+export function CommandBar({
+  onSubmit,
+  onVoice,
+  listening = false,
+  disabled = false,
+  placeholder = 'Speak or type…',
+}: CommandBarProps) {
   const [text, setText] = useState('');
+  const hasText = text.trim().length > 0;
 
   const submit = () => {
     const trimmed = text.trim();
@@ -18,9 +30,10 @@ export function CommandBar({ onSubmit, disabled = false, placeholder = 'speak or
     setText('');
   };
 
+  const micColor = listening ? COLOR.green : COLOR.blue;
+
   return (
     <View style={[styles.bar, disabled && styles.disabled]}>
-      <Text style={styles.caret}>▸</Text>
       <TextInput
         testID="command-input"
         style={styles.input}
@@ -33,9 +46,30 @@ export function CommandBar({ onSubmit, disabled = false, placeholder = 'speak or
         returnKeyType="send"
         autoCapitalize="none"
         autoCorrect={false}
+        selectionColor={COLOR.blue}
       />
-      <Pressable testID="command-send" onPress={submit} disabled={disabled} hitSlop={8}>
-        <Text style={styles.send}>SEND</Text>
+
+      <Pressable
+        testID="command-voice"
+        accessibilityRole="button"
+        accessibilityLabel="Voice command"
+        onPress={onVoice}
+        disabled={disabled}
+        hitSlop={10}
+        style={[styles.mic, listening && { borderColor: COLOR.green }, listening && glowBox(COLOR.green, 10)]}
+      >
+        <MicIcon color={micColor} active={listening} />
+      </Pressable>
+
+      <Pressable
+        testID="command-send"
+        accessibilityRole="button"
+        accessibilityLabel="Send command"
+        onPress={submit}
+        disabled={disabled}
+        hitSlop={10}
+      >
+        <Text style={[styles.send, !hasText && styles.sendIdle]}>SEND</Text>
       </Pressable>
     </View>
   );
@@ -45,15 +79,32 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACE.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: COLOR.cyan,
+    gap: SPACE.md,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLOR.line,
     backgroundColor: COLOR.panel,
-    paddingHorizontal: SPACE.md,
+    paddingLeft: SPACE.lg,
+    paddingRight: SPACE.md,
     paddingVertical: SPACE.sm,
   },
   disabled: { opacity: 0.4 },
-  caret: { ...TYPE.dataValue, color: COLOR.cyan },
-  input: { flex: 1, ...TYPE.dataValue, color: COLOR.cyan, paddingVertical: SPACE.xs },
-  send: { ...TYPE.panelTitle, color: COLOR.cyan },
+  input: {
+    flex: 1,
+    ...TYPE.dataValue,
+    color: COLOR.white,
+    paddingVertical: SPACE.xs,
+  },
+  mic: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLOR.line,
+    backgroundColor: COLOR.blueDim,
+  },
+  send: { ...TYPE.panelTitle, color: COLOR.blue },
+  sendIdle: { color: COLOR.dim },
 });

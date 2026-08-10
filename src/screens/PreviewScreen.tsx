@@ -1,20 +1,26 @@
 /**
  * PreviewScreen — TEMPORARY fixture harness.
  *
- * This is not part of the plan. It exists only so the HUD built so far
- * can be seen running on a real phone in Expo Go, ahead of the real screen.
- * Task 14 of the plan replaces `App.tsx` with the real `HudScreen`, which
- * renders live reducer state instead of these hardcoded fixtures. Delete
- * this file once `HudScreen` exists.
+ * This is not part of the plan. It exists only so the HUD can be judged on a
+ * real phone in Expo Go, ahead of the real screen. Task 14 of the plan
+ * replaces `App.tsx` with the real `HudScreen`, which renders live reducer
+ * state instead of these hardcoded fixtures, in this same layout.
  */
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLOR, SCRIM, SPACE, TYPE, glowText } from '../theme/tokens';
-import { Scanline } from '../components/Scanline';
-import { TransportPill } from '../components/TransportPill';
-import { Reticle } from '../components/Reticle';
-import { StatusOrb, statusColor } from '../components/StatusOrb';
+import { ArcReactor } from '../components/ArcReactor';
+import { StatusStrip } from '../components/StatusStrip';
+import { Sheet } from '../components/Sheet';
 import { VitalsPanel } from '../components/VitalsPanel';
 import { GovernancePanel } from '../components/GovernancePanel';
 import { TracePanel } from '../components/TracePanel';
@@ -23,7 +29,7 @@ import type { LinkMode, LinkStatus } from '../link/config';
 import type { TelemetryData } from '../ws/frames';
 import type { ParkedAction, TraceEntry } from '../state/types';
 
-/** cycles every 2500ms so status colour + reticle/orb animation are visible on device */
+/** cycles every 2500ms so status colour + reactor animation are visible on device */
 const STATUS_CYCLE = ['online', 'thinking', 'speaking', 'alert'] as const;
 
 /** cycles every 3000ms so all three transport tints are visible on device */
@@ -32,6 +38,13 @@ const TRANSPORT_CYCLE: ReadonlyArray<{ mode: LinkMode; status: LinkStatus }> = [
   { mode: 'cloud', status: 'open' },
   { mode: 'offline', status: 'closed' },
 ];
+
+const ACTIVITY: Record<string, string> = {
+  online: 'idle',
+  thinking: 'working',
+  speaking: 'replying',
+  alert: 'approval',
+};
 
 const FIXTURE_TELEMETRY: TelemetryData = { cpu: 34, mem: 61, disk: 48, gpu: 12 };
 
@@ -56,7 +69,8 @@ const FIXTURE_PARKED: ParkedAction[] = [
 const DECISION_LATENCY_MS = 900;
 
 export function PreviewScreen() {
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [statusIndex, setStatusIndex] = useState(0);
   const [transportIndex, setTransportIndex] = useState(0);
   const [parked, setParked] = useState<ParkedAction[]>(FIXTURE_PARKED);
@@ -97,57 +111,56 @@ export function PreviewScreen() {
     }, DECISION_LATENCY_MS);
   };
 
+  const reactorSize = Math.min(width * 0.68, 300);
+  const sheetHeight = Math.round(height * 0.6);
+
   return (
     <View style={styles.root}>
-      <LinearGradient colors={[SCRIM[0], SCRIM[1]]} style={StyleSheet.absoluteFill} />
-      <Scanline height={height} />
+      <LinearGradient colors={[...SCRIM]} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
 
-      <ScrollView contentContainerStyle={styles.scrollBody}>
-        <View style={styles.header}>
-          <Text style={styles.brand}>{'◦ J.A.R.V.I.S'}</Text>
-          <TransportPill mode={transport.mode} status={transport.status} />
-        </View>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <View style={[styles.stage, { paddingTop: insets.top + SPACE.md }]}>
+          <Text style={styles.brand}>J.A.R.V.I.S</Text>
 
-        <View style={styles.reticleWrap}>
-          <Reticle size={200} status={status} />
-          <View style={styles.orbWrap}>
-            <StatusOrb status={status} />
+          <View style={styles.reactorSlot}>
+            <ArcReactor size={reactorSize} status={status} />
           </View>
+
+          <Sheet expandedHeight={sheetHeight}>
+            <VitalsPanel telemetry={FIXTURE_TELEMETRY} />
+            <GovernancePanel parked={parked} onDecide={handleDecide} />
+            <TracePanel trace={FIXTURE_TRACE} />
+          </Sheet>
         </View>
 
-        <Text style={[styles.statusLabel, { color: statusColor(status) }, glowText(statusColor(status), 6)]}>
-          {status.toUpperCase()}
-        </Text>
-
-        <Text style={styles.message}>Systems nominal, sir.</Text>
-
-        <VitalsPanel telemetry={FIXTURE_TELEMETRY} />
-        <GovernancePanel parked={parked} onDecide={handleDecide} />
-        <TracePanel trace={FIXTURE_TRACE} />
-      </ScrollView>
-
-      <CommandBar onSubmit={() => {}} />
+        <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, SPACE.md) }]}>
+          <StatusStrip
+            status={status}
+            activity={ACTIVITY[status] ?? 'idle'}
+            mode={transport.mode}
+            linkStatus={transport.status}
+          />
+          <CommandBar onSubmit={() => {}} onVoice={() => {}} />
+        </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLOR.bg },
-  scrollBody: { paddingHorizontal: SPACE.md, paddingTop: SPACE.xl + SPACE.lg, paddingBottom: SPACE.xl },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACE.md,
-  },
-  brand: { ...TYPE.brand, color: COLOR.cyan, ...glowText(COLOR.cyan, 8) },
-  reticleWrap: { alignItems: 'center', justifyContent: 'center', height: 220, marginBottom: SPACE.sm },
-  orbWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  statusLabel: { ...TYPE.statusLabel, textAlign: 'center', marginBottom: SPACE.md },
-  message: {
-    ...TYPE.meta,
-    color: COLOR.cyan,
+  stage: { flex: 1, paddingHorizontal: SPACE.lg },
+  brand: {
+    ...TYPE.brand,
+    color: COLOR.blue,
+    opacity: 0.75,
     textAlign: 'center',
-    marginBottom: SPACE.md,
+    ...glowText(COLOR.blue, 8),
   },
+  reactorSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  dock: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.xs },
 });

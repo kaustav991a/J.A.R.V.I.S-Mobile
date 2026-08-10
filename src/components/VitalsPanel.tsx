@@ -12,7 +12,7 @@ function Vital({ label, value, testID }: { label: string; value: number | null |
     <View style={styles.row}>
       <View style={styles.rowHeader}>
         <Text style={styles.label}>{label}</Text>
-        <Text testID={testID} style={[styles.value, glowText(COLOR.cyan, 4)]}>
+        <Text testID={testID} style={[styles.value, glowText(COLOR.blue, 4)]}>
           {pct(value)}
         </Text>
       </View>
@@ -42,6 +42,6 @@ const styles = StyleSheet.create({
   row: { marginBottom: SPACE.sm },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACE.xs },
   label: { ...TYPE.dataLabel, color: COLOR.dim },
-  value: { ...TYPE.dataValue, color: COLOR.cyan },
+  value: { ...TYPE.dataValue, color: COLOR.blue },
   waiting: { ...TYPE.dataLabel, color: COLOR.dim },
 });

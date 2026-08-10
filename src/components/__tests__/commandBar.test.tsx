@@ -41,4 +41,25 @@ describe('CommandBar', () => {
     const { getByPlaceholderText } = await render(<CommandBar onSubmit={jest.fn()} placeholder="link lost" />);
     expect(getByPlaceholderText('link lost')).toBeTruthy();
   });
+
+  it('renders a mic button and calls onVoice when it is pressed', async () => {
+    const onVoice = jest.fn();
+    const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} onVoice={onVoice} />);
+    expect(getByTestId('mic-icon')).toBeTruthy();
+    await fireEvent.press(getByTestId('command-voice'));
+    expect(onVoice).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not trigger voice capture while disabled', async () => {
+    const onVoice = jest.fn();
+    const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} onVoice={onVoice} disabled />);
+    await fireEvent.press(getByTestId('command-voice'));
+    expect(onVoice).not.toHaveBeenCalled();
+  });
+
+  it('renders without a voice handler wired up', async () => {
+    const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} />);
+    await fireEvent.press(getByTestId('command-voice'));
+    expect(getByTestId('command-voice')).toBeTruthy();
+  });
 });

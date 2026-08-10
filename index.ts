@@ -1,3 +1,6 @@
+// must be the first import in the entry file so gesture handler installs its
+// native side before any view that uses a gesture mounts
+import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

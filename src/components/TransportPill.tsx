@@ -4,9 +4,9 @@ import type { LinkMode, LinkStatus } from '../link/config';
 
 const LABEL: Record<LinkMode, string> = { lan: 'LAN', cloud: 'CLOUD', offline: 'DARK' };
 
-/** cloud is gold, not cyan: a cloud session holds no PC-control powers and the
+/** cloud is gold, not blue: a cloud session holds no PC-control powers and the
  *  user must never read it as a full desk link. */
-const TINT: Record<LinkMode, string> = { lan: COLOR.cyan, cloud: COLOR.gold, offline: COLOR.dim };
+const TINT: Record<LinkMode, string> = { lan: COLOR.blue, cloud: COLOR.gold, offline: COLOR.dim };
 
 export function TransportPill({ mode, status }: { mode: LinkMode; status: LinkStatus }) {
   const color = TINT[mode];
@@ -23,10 +23,10 @@ export function TransportPill({ mode, status }: { mode: LinkMode; status: LinkSt
 const styles = StyleSheet.create({
   pill: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
-    paddingHorizontal: SPACE.sm,
-    paddingVertical: 2,
-    backgroundColor: COLOR.cyanDim,
+    borderRadius: 999,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: 3,
+    backgroundColor: COLOR.blueDim,
   },
   label: { fontFamily: FONT.data, fontSize: 10, letterSpacing: 1.5 },
 });

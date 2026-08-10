@@ -20,7 +20,7 @@ function clamp(value: number): number {
  * Segmented LED bargraph — the instrument idiom. Not a smooth bar: a row of
  * equal-width segments, lit up to the value threshold, dim past it.
  */
-export function Meter({ value, color = COLOR.cyan, segments = 12 }: MeterProps) {
+export function Meter({ value, color = COLOR.blue, segments = 12 }: MeterProps) {
   const pct = clamp(value);
   const filledCount = Math.round((pct / 100) * segments);
 
@@ -32,7 +32,7 @@ export function Meter({ value, color = COLOR.cyan, segments = 12 }: MeterProps) 
           <View
             key={i}
             testID={filled ? 'meter-segment-filled' : 'meter-segment-empty'}
-            style={[styles.segment, { backgroundColor: filled ? color : COLOR.cyanDim }]}
+            style={[styles.segment, { backgroundColor: filled ? color : COLOR.blueDim }]}
           />
         );
       })}
@@ -41,6 +41,6 @@ export function Meter({ value, color = COLOR.cyan, segments = 12 }: MeterProps) 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 2 },
-  segment: { flex: 1, height: SPACE.sm, borderRadius: 1 },
+  row: { flexDirection: 'row', gap: 3 },
+  segment: { flex: 1, height: 5, borderRadius: 999 },
 });
