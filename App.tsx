@@ -1,8 +1,3 @@
-/**
- * TEMPORARY: mounts PreviewScreen, a fixture harness, so the HUD can be seen
- * in Expo Go ahead of the real screen. Task 14 of the plan replaces the
- * PreviewScreen import below with the real HudScreen.
- */
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
@@ -10,7 +5,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { Orbitron_400Regular, Orbitron_700Bold, useFonts } from '@expo-google-fonts/orbitron';
-import { PreviewScreen } from './src/screens/PreviewScreen';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { AppearanceProvider } from './src/theme/appearance';
+import { JarvisProvider } from './src/state/JarvisProvider';
 import { COLOR } from './src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
@@ -24,13 +21,17 @@ export default function App() {
 
   if (!loaded && !error) return null;
 
-  // No SafeAreaView here on purpose: the canvas gradient runs edge to edge and
-  // the screen applies insets itself as padding.
+  // AppearanceProvider is outermost: the navigator itself reads the accent for
+  // its header tint and tab bar.
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        <PreviewScreen />
+        <AppearanceProvider>
+          <JarvisProvider>
+            <StatusBar style="light" />
+            <RootNavigator />
+          </JarvisProvider>
+        </AppearanceProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

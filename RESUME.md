@@ -1,0 +1,105 @@
+# Resume point — jarvis-mobile
+
+Branch: `feat/mobile-hud`. Written 2026-08-10, mid-session, at the user's request.
+
+## Where the work stands
+
+The app was being built from `../docs/superpowers/plans/2026-08-10-jarvis-mobile-hud.md`
+(15 tasks, single HUD canvas). Mid-plan the user supplied reference images in
+`C:\Users\Fortmindz\Downloads\Jarvis UI\` and redirected the design **twice**.
+The plan is now partly superseded — read "Deviations" below before following it.
+
+### Done and committed
+
+| Plan task | State |
+|---|---|
+| 1 tokens + jest | done, but the palette was **replaced** (see Deviations) |
+| 2 WS frame contract | done |
+| 3 HUD reducer | done |
+| 4 LAN/cloud probe | done |
+| 5 LinkMachine | done |
+| 6 useLink | done |
+| 7 REST client | done |
+| 8 Node mock backend | done — `mock/server.js`, 9 tests |
+| 9–13 HUD components | done, then re-skinned |
+| 14 HudScreen + app shell | **superseded** — replaced by a 4-tab app, see below |
+| 15 integration test + README | **not started** |
+
+### Uncommitted / in flight when work stopped
+
+The 4-tab app shell was just finished and typechecks clean, but has **no tests
+of its own yet**. Everything below is new since the last commit:
+
+- `src/navigation/RootNavigator.tsx`, `src/navigation/types.ts` — 4 tabs
+  (Status / Scripts / Commands / Settings), each a native stack.
+- `src/screens/` — `StatusScreen`, `ConnectionScreen`, `ScriptsScreen`,
+  `ScriptDetailsScreen`, `CommandsScreen`, `CommandResultScreen`,
+  `SettingsScreen`, `AppearanceScreen`, `AboutScreen`.
+- `src/components/ui/` — `Card` (+`InfoRow`), `Button`, `ListCard` (+`RunButton`),
+  `SettingsRow`, `Atoms` (`Screen`, `SectionLabel`, `Badge`, `MonoCard`, `EmptyState`).
+- `src/state/JarvisProvider.tsx` — owns the one reducer + one `useLink` for all tabs.
+- `src/theme/appearance.tsx` — accent / glow / animations / theme, consumed live.
+- `src/data/fixtures.ts` — scripts, recent commands, sample result.
+- `App.tsx` — GestureHandlerRootView → SafeAreaProvider → AppearanceProvider →
+  JarvisProvider → RootNavigator.
+
+## Next steps, in order
+
+1. **Smoke tests for the nine screens and the ui kit.** Nothing under
+   `src/screens/` or `src/components/ui/` is covered. Screens that call
+   `useJarvis()` need a `<JarvisProvider>` wrapper, and `useLink` inside it hits
+   the network — either inject a fake machine via `machineFactory` or mock the
+   module. Screens using safe-area insets need `<SafeAreaProvider initialMetrics>`.
+2. **Plan Task 15** — `__tests__/integration.test.ts` and `README.md`. Note the
+   test as written in the plan uses global `fetch`; under jest that is Expo's
+   stubbed winter fetch, so pass `mock/nodeFetch.js`'s `nodeFetch` as `fetchImpl`.
+3. **Wire the screens that are still fixture-backed**: Scripts and Script Details
+   read `src/data/fixtures.ts`. `/api/tasks` exists in the REST client; a script
+   *run/edit* surface does not exist on the desk backend at all.
+4. **Persist appearance settings.** `AppearanceProvider` is in-memory only.
+5. **Voice.** `CommandBar` renders a mic and calls `onVoice`, which every screen
+   currently leaves empty. No capture, no permission, no STT. The user asked for
+   the icon only, deliberately.
+
+## Deviations from the plan (all deliberate, all user-directed)
+
+1. **Palette replaced.** The plan pinned the desk HUD's cyan-on-black
+   (`#00ffcc` / `#050505`) and forbade approximation. The user rejected the look.
+   It is now electric blue on navy — `COLOR.blue #3ea6ff` on `COLOR.bg #020814`.
+   `src/theme/__tests__/tokens.test.ts` pins the new values and asserts no cyan
+   survives.
+2. **No single canvas.** The plan says "no expo-router, no tab bar, no navigation
+   chrome. One scrolling HUD canvas." The user chose the full tabbed app from the
+   second reference image. React Navigation 7 (not expo-router) is used.
+3. **Task 14's HudScreen does not exist.** Its reducer-owning job moved to
+   `src/state/JarvisProvider.tsx` so four tabs share one socket.
+4. **Deleted:** `Reticle`, `StatusOrb`, `Scanline`, `Sheet`, `PreviewScreen`, and
+   their tests. `ArcReactor` replaces the first two; the user rejected the sheet.
+   `statusColor` now lives in `src/theme/status.ts` and takes an accent argument.
+5. **Mock tests use a node:http fetch shim** (`mock/nodeFetch.js`) because
+   jest-expo's global `fetch` is a stubbed native module that returns
+   `status: undefined`. One plan expectation was corrected: the WS connect
+   greeting arrives before the client's `open` handler attaches.
+
+## Running it
+
+```bash
+npm install
+npm run mock      # terminal 1 — http://127.0.0.1:8787
+npm start         # terminal 2 — scan with Expo Go, press r to reload fully
+npm test          # jest
+npm run typecheck # tsc --noEmit
+```
+
+The phone cannot reach `127.0.0.1` on the dev machine. To actually connect, set
+`EXPO_PUBLIC_JARVIS_DESK` to the machine's LAN IP in `.env.local` and run the
+mock there. Until then the app honestly reports **Disconnected**, which is what
+the Connection screen is for.
+
+## Known gaps
+
+- Backend work in design §6 (bind host, app auth, push, presence, cloud
+  `/app-link`) is owed on the desk machine and is unverified from here.
+- General / Connection / Notifications / Security rows on Settings are inert.
+- "System" theme on the Appearance screen behaves identically to Dark.
+- Script edit is a button with a note saying no endpoint exists.
