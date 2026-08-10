@@ -26,7 +26,19 @@
     "plugins": [
       "expo-secure-store",
       "expo-font",
-      "expo-splash-screen"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-reactor.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#020814",
+          "dark": {
+            "image": "./assets/splash-reactor.png",
+            "backgroundColor": "#020814"
+          }
+        }
+      ]
     ]
   }
 }

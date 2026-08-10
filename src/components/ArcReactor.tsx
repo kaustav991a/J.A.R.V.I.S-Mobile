@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
@@ -25,6 +25,12 @@ export type ArcReactorProps = {
 export function ArcReactor({ size, status, label = 'JARVIS', sublabel }: ArcReactorProps) {
   const { accent, glow, animations } = useAppearance();
   const color = statusColor(status, accent);
+
+  // gradient ids must be unique or a second reactor on screen (About) steals
+  // the first one's fills
+  const uid = useId().replace(/:/g, '');
+  const bloomId = `bloom-${uid}`;
+  const wellId = `well-${uid}`;
 
   const sweep = useSharedValue(0);
   const counter = useSharedValue(0);
@@ -71,33 +77,49 @@ export function ArcReactor({ size, status, label = 'JARVIS', sublabel }: ArcReac
 
   return (
     <View testID="arc-reactor" style={[styles.wrap, { width: size, height: size }]}>
-      {/* soft bloom — the light the reactor throws onto the canvas */}
+      {/* soft bloom — the light the reactor throws onto the canvas — over a
+          well of darkness inside the ring, which is what gives the reference
+          image its depth. */}
       <Animated.View style={[StyleSheet.absoluteFill, breathStyle]}>
         <Svg width={size} height={size}>
           <Defs>
-            <RadialGradient id="reactorBloom" cx="50%" cy="50%" r="50%">
-              <Stop offset="35%" stopColor={color} stopOpacity={0.14 + glow * 0.3} />
-              <Stop offset="72%" stopColor={color} stopOpacity={0.04 + glow * 0.1} />
+            <RadialGradient id={bloomId} cx="50%" cy="50%" r="50%">
+              <Stop offset="52%" stopColor={color} stopOpacity={0} />
+              <Stop offset="76%" stopColor={color} stopOpacity={0.1 + glow * 0.22} />
               <Stop offset="100%" stopColor={color} stopOpacity={0} />
             </RadialGradient>
+            <RadialGradient id={wellId} cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor="#01060f" stopOpacity={0.9} />
+              <Stop offset="70%" stopColor="#01060f" stopOpacity={0.65} />
+              <Stop offset="100%" stopColor="#01060f" stopOpacity={0} />
+            </RadialGradient>
           </Defs>
-          <Circle testID="arc-reactor-bloom" cx={c} cy={c} r={c} fill="url(#reactorBloom)" />
+          <Circle cx={c} cy={c} r={c * 0.78} fill={`url(#${wellId})`} />
+          <Circle testID="arc-reactor-bloom" cx={c} cy={c} r={c} fill={`url(#${bloomId})`} />
         </Svg>
       </Animated.View>
 
-      {/* the ring itself, carrying the native glow */}
-      <View style={[StyleSheet.absoluteFill, glowBox(color, 8 + glow * 30)]}>
+      {/* The ring, built like a neon tube: three wide, near-transparent strokes
+          stacked under one hot thin stroke. RN has no blur filter for SVG, so
+          the halo is faked by the stack — this is what makes it read as light
+          rather than as a drawn circle. */}
+      <View style={[StyleSheet.absoluteFill, glowBox(color, 10 + glow * 34)]}>
         <Svg width={size} height={size}>
-          <Circle {...ring(c * 0.86, 0.75, color, 0.25)} />
-          <Circle testID="arc-reactor-ring" {...ring(c * 0.78, 2.5, color, 0.95)} />
-          <Circle {...ring(c * 0.7, 0.75, COLOR.blueBright, 0.5)} />
+          <Circle {...ring(c * 0.8, c * 0.2, color, 0.05 + glow * 0.06)} />
+          <Circle {...ring(c * 0.8, c * 0.12, color, 0.07 + glow * 0.09)} />
+          <Circle {...ring(c * 0.8, c * 0.06, color, 0.12 + glow * 0.16)} />
+          <Circle testID="arc-reactor-ring" {...ring(c * 0.8, Math.max(3, c * 0.032), color, 1)} />
+          {/* the white-hot centre line inside the tube */}
+          <Circle {...ring(c * 0.8, Math.max(1, c * 0.01), COLOR.blueBright, 0.9)} />
+          {/* thin companion ring, as in the reference */}
+          <Circle {...ring(c * 0.68, Math.max(1, c * 0.008), COLOR.blueBright, 0.45)} />
         </Svg>
       </View>
 
       {/* one bright arc sweeping the outer track */}
       <Animated.View style={[StyleSheet.absoluteFill, sweepStyle]}>
         <Svg width={size} height={size}>
-          <Circle testID="arc-reactor-sweep" {...ring(c * 0.86, 1.75, COLOR.blueBright, 0.85, `${c * 0.9} ${c * 6}`)} />
+          <Circle testID="arc-reactor-sweep" {...ring(c * 0.92, 2, COLOR.blueBright, 0.7, `${c * 0.7} ${c * 6}`)} />
         </Svg>
       </Animated.View>
 
