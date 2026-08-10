@@ -2,21 +2,22 @@
  * PreviewScreen — TEMPORARY fixture harness.
  *
  * This is not part of the plan. It exists only so the HUD built so far
- * (Panel, Scanline, TransportPill, Reticle, StatusOrb) can be seen running
- * on a real phone in Expo Go, ahead of the real screen. Task 14 of the plan
- * replaces `App.tsx` with the real `HudScreen`, which renders live reducer
- * state instead of these hardcoded fixtures. Delete this file once
+ * (Panel, Scanline, TransportPill, Reticle, StatusOrb, Meter) can be seen
+ * running on a real phone in Expo Go, ahead of the real screen. Task 14 of
+ * the plan replaces `App.tsx` with the real `HudScreen`, which renders live
+ * reducer state instead of these hardcoded fixtures. Delete this file once
  * `HudScreen` exists.
  */
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLOR, FONT, SCRIM, SPACE } from '../theme/tokens';
+import { COLOR, FONT, SCRIM, SPACE, TYPE, glowText } from '../theme/tokens';
 import { Panel } from '../components/Panel';
 import { Scanline } from '../components/Scanline';
 import { TransportPill } from '../components/TransportPill';
 import { Reticle } from '../components/Reticle';
-import { StatusOrb } from '../components/StatusOrb';
+import { StatusOrb, statusColor } from '../components/StatusOrb';
+import { Meter } from '../components/Meter';
 import type { LinkMode, LinkStatus } from '../link/config';
 
 /** cycles every 2500ms so status colour + reticle/orb animation are visible on device */
@@ -29,11 +30,11 @@ const TRANSPORT_CYCLE: ReadonlyArray<{ mode: LinkMode; status: LinkStatus }> = [
   { mode: 'offline', status: 'closed' },
 ];
 
-const VITALS: ReadonlyArray<{ label: string; value: string }> = [
-  { label: 'CPU', value: '34%' },
-  { label: 'MEM', value: '61%' },
-  { label: 'DISK', value: '48%' },
-  { label: 'GPU', value: '12%' },
+const VITALS: ReadonlyArray<{ label: string; value: number }> = [
+  { label: 'CPU', value: 34 },
+  { label: 'MEM', value: 61 },
+  { label: 'DISK', value: 48 },
+  { label: 'GPU', value: 12 },
 ];
 
 export function PreviewScreen() {
@@ -76,25 +77,30 @@ export function PreviewScreen() {
           </View>
         </View>
 
+        <Text style={[styles.statusLabel, { color: statusColor(status) }, glowText(statusColor(status), 6)]}>
+          {status.toUpperCase()}
+        </Text>
+
         <Text style={styles.message}>Systems nominal, sir.</Text>
 
-        <Panel title="vitals">
-          <View style={styles.vitalsGrid}>
-            {VITALS.map((v) => (
-              <View key={v.label} style={styles.vitalsCell}>
+        <Panel title="vitals" testID="vitals-panel">
+          {VITALS.map((v) => (
+            <View key={v.label} style={styles.vitalsRow}>
+              <View style={styles.vitalsRowHeader}>
                 <Text style={styles.vitalsLabel}>{v.label}</Text>
-                <Text style={styles.vitalsValue}>{v.value}</Text>
+                <Text style={[styles.vitalsValue, glowText(COLOR.cyan, 4)]}>{`${v.value}%`}</Text>
               </View>
-            ))}
-          </View>
+              <Meter value={v.value} />
+            </View>
+          ))}
         </Panel>
 
         <Panel title="parked ⚠" accent={COLOR.gold}>
           <View style={styles.governanceCard}>
-            <Text style={styles.governanceAction}>delete 3 files</Text>
+            <Text style={[styles.governanceAction, glowText(COLOR.gold, 6)]}>delete 3 files</Text>
             <Text style={styles.governanceMeta}>{'goal: tidy downloads'}</Text>
             <Text style={styles.governanceMeta}>setup_old.exe, node_v12.msi, tmp.iso</Text>
-            <Text style={styles.governanceRisk}>RISK HIGH</Text>
+            <Text style={[styles.governanceRisk, glowText(COLOR.red, 6)]}>RISK HIGH</Text>
             <View style={styles.governanceRow}>
               <Pressable style={[styles.governanceButton, styles.denyButton]}>
                 <Text style={[styles.governanceButtonLabel, { color: COLOR.red }]}>DENY</Text>
@@ -125,30 +131,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACE.md,
   },
-  brand: { fontFamily: FONT.display, fontSize: 13, letterSpacing: 3, color: COLOR.cyan },
-  reticleWrap: { alignItems: 'center', justifyContent: 'center', height: 220, marginBottom: SPACE.md },
+  brand: { ...TYPE.brand, color: COLOR.cyan, ...glowText(COLOR.cyan, 8) },
+  reticleWrap: { alignItems: 'center', justifyContent: 'center', height: 220, marginBottom: SPACE.sm },
   orbWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  statusLabel: { ...TYPE.statusLabel, textAlign: 'center', marginBottom: SPACE.md },
   message: {
-    fontFamily: FONT.data,
-    fontSize: 12,
+    ...TYPE.meta,
     color: COLOR.cyan,
     textAlign: 'center',
     marginBottom: SPACE.md,
   },
-  vitalsGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  vitalsCell: {
-    width: '50%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingRight: SPACE.md,
-    paddingBottom: SPACE.xs,
-  },
-  vitalsLabel: { fontFamily: FONT.data, fontSize: 11, color: COLOR.dim, letterSpacing: 1 },
-  vitalsValue: { fontFamily: FONT.data, fontSize: 11, color: COLOR.cyan },
+  vitalsRow: { marginBottom: SPACE.sm },
+  vitalsRowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACE.xs },
+  vitalsLabel: { ...TYPE.dataLabel, color: COLOR.dim },
+  vitalsValue: { ...TYPE.dataValue, color: COLOR.cyan },
   governanceCard: { paddingBottom: SPACE.sm },
-  governanceAction: { fontFamily: FONT.display, fontSize: 13, color: COLOR.gold, marginBottom: 2 },
-  governanceMeta: { fontFamily: FONT.data, fontSize: 11, color: COLOR.dim, lineHeight: 15 },
-  governanceRisk: { fontFamily: FONT.data, fontSize: 10, color: COLOR.red, letterSpacing: 1.5, marginTop: SPACE.xs },
+  governanceAction: { ...TYPE.dataValue, fontFamily: FONT.display, color: COLOR.gold, marginBottom: 2 },
+  governanceMeta: { ...TYPE.meta, color: COLOR.dim },
+  governanceRisk: { ...TYPE.dataLabel, letterSpacing: 1.5, color: COLOR.red, marginTop: SPACE.xs },
   governanceRow: { flexDirection: 'row', gap: SPACE.sm, marginTop: SPACE.sm },
   governanceButton: {
     flex: 1,
@@ -160,5 +160,5 @@ const styles = StyleSheet.create({
   denyButton: { borderColor: COLOR.red },
   allowButton: { borderColor: COLOR.green },
   governanceButtonLabel: { fontFamily: FONT.display, fontSize: 11, letterSpacing: 2 },
-  traceLine: { fontFamily: FONT.data, fontSize: 11, color: COLOR.dim, lineHeight: 16 },
+  traceLine: { ...TYPE.meta, color: COLOR.dim },
 });

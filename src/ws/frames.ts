@@ -61,6 +61,45 @@ const obj = (v: unknown): Obj => (v !== null && typeof v === 'object' && !Array.
 const identity = (o: Obj): string => str(o.id) || str(o.action_id) || str(o.request_id);
 
 /**
+ * Coerce a raw telemetry `data` payload field-by-field through `num()`
+ * instead of a bare type assertion — a mistyped field (e.g. cpu sent as a
+ * string) is dropped rather than handed downstream typed as `number`.
+ * A field absent from the payload stays absent, matching the old
+ * pass-through behaviour exactly.
+ */
+const coerceTelemetry = (o: Obj): TelemetryData => {
+  const data: TelemetryData = {};
+  const cpu = num(o.cpu);
+  if (cpu !== null) data.cpu = cpu;
+  const mem = num(o.mem);
+  if (mem !== null) data.mem = mem;
+  const disk = num(o.disk);
+  if (disk !== null) data.disk = disk;
+  if (o.gpu !== undefined) data.gpu = num(o.gpu);
+  if (o.temp !== undefined) data.temp = num(o.temp);
+  if (o.battery !== undefined) data.battery = num(o.battery);
+  const netUp = num(o.net_up);
+  if (netUp !== null) data.net_up = netUp;
+  const netDown = num(o.net_down);
+  if (netDown !== null) data.net_down = netDown;
+  return data;
+};
+
+/**
+ * Coerce a raw weather `data` payload field-by-field through `num()` /
+ * `str()` instead of a bare type assertion — see `coerceTelemetry`.
+ */
+const coerceWeather = (o: Obj): WeatherData => {
+  const data: WeatherData = {};
+  const temp = num(o.temp);
+  if (temp !== null) data.temp = temp;
+  if (typeof o.desc === 'string') data.desc = str(o.desc);
+  if (typeof o.city === 'string') data.city = str(o.city);
+  if (typeof o.icon === 'string') data.icon = str(o.icon);
+  return data;
+};
+
+/**
  * Normalise one wire frame. Returns null for frames the phone deliberately
  * ignores (gesture_state, ui_state), for unknown frame types, and for
  * anything unparseable — a bad frame must never take the socket down.
@@ -84,8 +123,8 @@ export function parseFrame(raw: string | unknown): JarvisFrame | null {
   if (type === 'gesture_state' || type === 'ui_state') return null;
 
   if (o.status === 'sync') {
-    if (type === 'telemetry') return { kind: 'telemetry', data: obj(o.data) as TelemetryData };
-    if (type === 'weather') return { kind: 'weather', data: obj(o.data) as WeatherData };
+    if (type === 'telemetry') return { kind: 'telemetry', data: coerceTelemetry(obj(o.data)) };
+    if (type === 'weather') return { kind: 'weather', data: coerceWeather(obj(o.data)) };
     return null;
   }
 

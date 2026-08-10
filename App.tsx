@@ -5,7 +5,8 @@
  */
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { Orbitron_400Regular, Orbitron_700Bold, useFonts } from '@expo-google-fonts/orbitron';
 import { PreviewScreen } from './src/screens/PreviewScreen';
@@ -23,10 +24,12 @@ export default function App() {
   if (!loaded && !error) return null;
 
   return (
-    <SafeAreaView style={styles.root}>
-      <StatusBar style="light" />
-      <PreviewScreen />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="light" />
+        <PreviewScreen />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

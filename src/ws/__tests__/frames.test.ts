@@ -1,4 +1,5 @@
 import { parseFrame } from '../frames';
+import type { TelemetryData, WeatherData } from '../frames';
 
 const j = (o: unknown) => JSON.stringify(o);
 
@@ -73,5 +74,17 @@ describe('parseFrame', () => {
   it('tolerates unknown extra keys on a known frame', () => {
     const f = parseFrame(j({ status: 'online', message: 'hi', future_field: 42 }));
     expect(f).toMatchObject({ kind: 'status', status: 'online' });
+  });
+
+  it('drops a wrong-typed telemetry cpu instead of leaking it through as a string', () => {
+    const f = parseFrame(j({ status: 'sync', type: 'telemetry', data: { cpu: '34', mem: 61 } }));
+    expect(f).toEqual({ kind: 'telemetry', data: { mem: 61 } });
+    expect((f as { kind: 'telemetry'; data: TelemetryData }).data.cpu).toBeUndefined();
+  });
+
+  it('drops a wrong-typed weather desc instead of leaking it through as a number', () => {
+    const f = parseFrame(j({ status: 'sync', type: 'weather', data: { temp: 31, desc: 42 } }));
+    expect(f).toEqual({ kind: 'weather', data: { temp: 31 } });
+    expect((f as { kind: 'weather'; data: WeatherData }).data.desc).toBeUndefined();
   });
 });

@@ -1,7 +1,11 @@
 import { render } from '@testing-library/react-native';
+import { processColor } from 'react-native';
 import { Reticle } from '../Reticle';
 import { StatusOrb, statusColor } from '../StatusOrb';
 import { COLOR } from '../../theme/tokens';
+
+/** react-native-svg's extractBrush wraps a resolved fill color as this shape. */
+const brush = (color: string) => ({ type: 0, payload: processColor(color) });
 
 describe('statusColor', () => {
   it('is cyan for healthy states', () => {
@@ -37,13 +41,20 @@ describe('Reticle', () => {
 });
 
 describe('StatusOrb', () => {
-  it('renders and labels the current status', async () => {
-    const { getByText } = await render(<StatusOrb status="online" />);
-    expect(getByText('ONLINE')).toBeTruthy();
+  it('renders its luminous circles', async () => {
+    const { getByTestId } = await render(<StatusOrb status="online" />);
+    expect(getByTestId('status-orb')).toBeTruthy();
   });
 
-  it('labels an alert state', async () => {
-    const { getByText } = await render(<StatusOrb status="alert" />);
-    expect(getByText('ALERT')).toBeTruthy();
+  it('takes the online status color on its circles', async () => {
+    const { getByTestId } = await render(<StatusOrb status="online" />);
+    expect(getByTestId('status-orb-core').props.fill).toEqual(brush(statusColor('online')));
+    expect(getByTestId('status-orb-halo').props.fill).toEqual(brush(statusColor('online')));
+  });
+
+  it('recolors its circles for an alert state', async () => {
+    const { getByTestId } = await render(<StatusOrb status="alert" />);
+    expect(getByTestId('status-orb-core').props.fill).toEqual(brush(statusColor('alert')));
+    expect(getByTestId('status-orb-halo').props.fill).toEqual(brush(statusColor('alert')));
   });
 });
