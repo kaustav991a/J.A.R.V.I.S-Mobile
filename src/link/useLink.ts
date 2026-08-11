@@ -82,7 +82,9 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
     });
     return () => {
       appSub.remove();
-      netSub.remove();
+      // expo-network has returned both a subscription and nothing across
+      // versions; unsubscribing must not be what takes the app down
+      netSub?.remove?.();
     };
   }, [machine]);
 

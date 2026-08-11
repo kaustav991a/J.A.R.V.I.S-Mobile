@@ -27,7 +27,13 @@ export type GlassTabBarProps = BottomTabBarProps & {
 /** an unselected tab is a glyph and nothing else */
 const IDLE_W = 52;
 const RUBBER = 46;
-const SNAP = { damping: 17, stiffness: 195, mass: 0.55 } as const;
+/** heavy and slow on purpose: the dial should feel like it has mass, and
+ *  settle into a detent rather than snapping to it */
+const SNAP = { damping: 22, stiffness: 78, mass: 1.1 } as const;
+/** the finger travels further than the strip does — that is the stickiness */
+const DRAG = 1.45;
+/** waking and settling the dial: quick enough to feel like a response */
+const WAKE = { damping: 20, stiffness: 160, mass: 0.7 } as const;
 
 /**
  * Labels are set in the data face, which is monospace on both platforms, so a
@@ -97,6 +103,8 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
     };
   }, []);
 
+  /** 0 resting, 1 armed — a brief press wakes the dial before it is dragged */
+  const armed = useSharedValue(0);
   const pos = useSharedValue(state.index);
   const start = useSharedValue(0);
   const detent = useSharedValue(state.index);
@@ -114,18 +122,32 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
     if (!event.defaultPrevented) navigation.navigate(route.name, route.params);
   };
 
+  const hold = Gesture.LongPress()
+    .minDuration(160)
+    .maxDistance(1000)
+    .shouldCancelWhenOutside(false)
+    .onStart(() => {
+      armed.value = withSpring(1, WAKE);
+      runOnJS(haptic.tap)();
+    })
+    .onFinalize(() => {
+      armed.value = withSpring(0, WAKE);
+    });
+
   const pan = Gesture.Pan()
     .activeOffsetX([-8, 8])
     .failOffsetY([-14, 14])
     .onBegin(() => {
       start.value = pos.value;
+      armed.value = withSpring(1, WAKE);
     })
     .onUpdate((e) => {
       // a drag is measured against the closed width: that is what the finger
       // travels between one glyph and the next
-      const raw = start.value - e.translationX / IDLE_W;
+      const raw = start.value - e.translationX / (IDLE_W * DRAG);
       const over = raw < 0 ? raw : raw > last ? raw - last : 0;
-      const banded = raw < 0 ? (over * RUBBER) / IDLE_W : raw > last ? last + (over * RUBBER) / IDLE_W : raw;
+      const banded =
+        raw < 0 ? (over * RUBBER) / (IDLE_W * DRAG) : raw > last ? last + (over * RUBBER) / (IDLE_W * DRAG) : raw;
       pos.value = banded;
       const near = Math.round(clamp(banded, 0, last));
       if (near !== detent.value) {
@@ -134,12 +156,17 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
       }
     })
     .onEnd((e) => {
-      const flick = clamp(-e.velocityX / 1200, -1, 1);
+      const flick = clamp(-e.velocityX / 1800, -1, 1);
       const target = Math.round(clamp(pos.value + flick, 0, last));
       pos.value = animations ? withSpring(target, SNAP) : withTiming(target, { duration: 0 });
       detent.value = target;
+      armed.value = withSpring(0, WAKE);
       runOnJS(jump)(target);
     });
+
+  const barStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + armed.value * 0.035 }],
+  }));
 
   const stripStyle = useAnimatedStyle(() => {
     const i = Math.round(clamp(pos.value, 0, last));
@@ -157,12 +184,12 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
   });
 
   return (
-    <View
+    <Animated.View
       testID="tab-bar"
       // stowed, never unmounted: tearing down views that own a running
       // animation is a way to crash Android
       pointerEvents={hidden ? 'none' : 'auto'}
-      style={[styles.wrap, { bottom: Math.max(insets.bottom, CHROME.tabBarGap) }, hidden && styles.stowed]}
+      style={[styles.wrap, { bottom: Math.max(insets.bottom, CHROME.tabBarGap) }, hidden && styles.stowed, barStyle]}
       accessibilityRole="tablist"
       accessibilityElementsHidden={hidden}
       importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
@@ -176,7 +203,7 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
         />
       </View>
 
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={Gesture.Simultaneous(hold, pan)}>
         <View style={styles.track}>
           <Animated.View style={[styles.strip, stripStyle]}>
             {state.routes.map((route, index) => {
@@ -186,6 +213,7 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
                   key={route.key}
                   index={index}
                   pos={pos}
+                  armed={armed}
                   opens={opens}
                   label={label}
                   icon={icons[route.name]}
@@ -202,13 +230,14 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
           </Animated.View>
         </View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 }
 
 type DetentProps = {
   index: number;
   pos: { value: number };
+  armed: { value: number };
   opens: number[];
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -218,7 +247,7 @@ type DetentProps = {
   onLongPress: () => void;
 };
 
-function TabDetent({ index, pos, opens, label, icon, accent, selected, onPress, onLongPress }: DetentProps) {
+function TabDetent({ index, pos, armed, opens, label, icon, accent, selected, onPress, onLongPress }: DetentProps) {
   /** 0 under the lens, 1 a whole tab away — everything here reads off it */
   const away = useDerivedValue(() => Math.min(Math.abs(pos.value - index), 1));
   const nameWidth = labelWidth(label);
@@ -226,7 +255,9 @@ function TabDetent({ index, pos, opens, label, icon, accent, selected, onPress, 
   const slotStyle = useAnimatedStyle(() => ({ width: widthAt(index, pos.value, opens) }));
 
   const iconStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(away.value, [0, 1], [1, 0.55], Extrapolation.CLAMP),
+    // resting glyphs come up as the dial wakes, so the whole row reads as
+    // reachable the moment it is armed
+    opacity: interpolate(away.value, [0, 1], [1, 0.55 + armed.value * 0.3], Extrapolation.CLAMP),
     transform: [{ scale: interpolate(away.value, [0, 1], [1, 0.92], Extrapolation.CLAMP) }],
   }));
 
