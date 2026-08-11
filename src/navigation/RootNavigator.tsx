@@ -13,7 +13,7 @@ import { ConnectionScreen } from '../screens/ConnectionScreen';
 import { ActivityScreen } from '../screens/ActivityScreen';
 import { ScriptsScreen } from '../screens/ScriptsScreen';
 import { ScriptDetailsScreen } from '../screens/ScriptDetailsScreen';
-import { CommandsScreen } from '../screens/CommandsScreen';
+import { ChatScreen } from '../screens/ChatScreen';
 import { CommandResultScreen } from '../screens/CommandResultScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { AppearanceScreen } from '../screens/AppearanceScreen';
@@ -84,7 +84,7 @@ function ScriptsStackScreens() {
 function CommandsStackScreens() {
   return (
     <CommandsStack.Navigator screenOptions={SCREEN_OPTIONS}>
-      <CommandsStack.Screen name="CommandsHome" component={CommandsScreen} />
+      <CommandsStack.Screen name="CommandsHome" component={ChatScreen} />
       <CommandsStack.Screen
         name="CommandResult"
         component={CommandResultScreen}
@@ -107,7 +107,7 @@ function SettingsStackScreens() {
 const TAB_ICON: Record<keyof TabParams, keyof typeof Ionicons.glyphMap> = {
   Home: 'home-outline',
   Scripts: 'document-text-outline',
-  Commands: 'terminal-outline',
+  Commands: 'chatbubble-ellipses-outline',
   Reports: 'bar-chart-outline',
   Settings: 'settings-outline',
 };
@@ -126,7 +126,7 @@ export function RootNavigator() {
         >
           <Tabs.Screen name="Home" component={HomeStackScreens} />
           <Tabs.Screen name="Scripts" component={ScriptsStackScreens} />
-          <Tabs.Screen name="Commands" component={CommandsStackScreens} />
+          <Tabs.Screen name="Commands" component={CommandsStackScreens} options={{ tabBarLabel: 'Chat' }} />
           <Tabs.Screen name="Reports" component={ReportsStackScreens} />
           <Tabs.Screen name="Settings" component={SettingsStackScreens} />
         </Tabs.Navigator>

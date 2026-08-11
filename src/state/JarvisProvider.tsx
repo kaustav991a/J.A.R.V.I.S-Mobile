@@ -37,6 +37,8 @@ export type JarvisContextValue = {
   /** stand-in desk, for showing the app with no machine to talk to */
   demo: boolean;
   setDemo: (on: boolean) => void;
+  /** true when the link being reported is the stand-in, not a machine */
+  simulated: boolean;
 };
 
 /** how often the stand-in desk speaks */
@@ -66,6 +68,32 @@ export function JarvisProvider({ children }: PropsWithChildren) {
 
   const connected = link.status === 'open';
   const tick = useRef(0);
+
+  /**
+   * The stand-in desk also stands in for the link.
+   *
+   * Data alone was not enough for a prototype: every screen still read
+   * Disconnected in red while telemetry moved behind it, which is a
+   * contradiction a demo cannot explain away. So demo mode runs a handshake —
+   * probing, then linked — and `connect()` re-runs it, so the CONNECT button
+   * and pull-to-refresh do something.
+   *
+   * It is never silent about this: `simulated` is true whenever the link the
+   * app reports is the stand-in rather than a machine, and the Connection
+   * screen says so on its face.
+   */
+  const [demoPhase, setDemoPhase] = useState<'probing' | 'open'>('probing');
+
+  useEffect(() => {
+    if (!demo || connected) return;
+    setDemoPhase('probing');
+    const timer = setTimeout(() => setDemoPhase('open'), 1400);
+    return () => clearTimeout(timer);
+  }, [demo, connected]);
+
+  const simulated = demo && !connected;
+  const shownConnected = connected || (simulated && demoPhase === 'open');
+  const shownConnecting = link.status === 'probing' || link.status === 'connecting' || (simulated && demoPhase === 'probing');
 
   useEffect(() => {
     // a real desk always wins; the stand-in only speaks when nothing else does
@@ -104,6 +132,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     async (id: string, approved: boolean) => {
       dispatch({ type: 'resolving', id });
       try {
+        // the stand-in desk has no /confirm to call; it just agrees
+        if (simulated) return;
         await api.confirm(id, approved);
       } finally {
         // the server echoes an agent_confirm too; dropping it locally keeps the
@@ -114,23 +144,43 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     [api]
   );
 
+  const connect = useCallback(() => {
+    // in demo the handshake is the thing being simulated, so re-run it
+    if (simulated) setDemoPhase('probing');
+    link.reprobe();
+  }, [simulated, link]);
+
   const value = useMemo<JarvisContextValue>(
     () => ({
       hud,
-      mode: link.mode,
-      linkStatus: link.status,
-      lastError: link.lastError,
-      connected,
-      connecting: link.status === 'probing' || link.status === 'connecting',
-      connect: link.reprobe,
+      mode: simulated ? 'lan' : link.mode,
+      linkStatus: simulated ? (shownConnected ? 'open' : 'probing') : link.status,
+      lastError: simulated ? null : link.lastError,
+      connected: shownConnected,
+      connecting: shownConnecting,
+      connect,
       sendCommand,
       decide,
       recent,
       clearRecent: () => setRecent([]),
       demo,
       setDemo,
+      simulated,
     }),
-    [hud, link.mode, link.status, link.lastError, connected, link.reprobe, sendCommand, decide, recent, demo]
+    [
+      hud,
+      link.mode,
+      link.status,
+      link.lastError,
+      shownConnected,
+      shownConnecting,
+      simulated,
+      connect,
+      sendCommand,
+      decide,
+      recent,
+      demo,
+    ]
   );
 
   return <JarvisContext.Provider value={value}>{children}</JarvisContext.Provider>;

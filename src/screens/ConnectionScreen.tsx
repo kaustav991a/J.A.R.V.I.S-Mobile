@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
-import { Screen } from '../components/ui/Atoms';
+import { Badge, Screen } from '../components/ui/Atoms';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { Button } from '../components/ui/Button';
 import { COLOR, SPACE, TYPE, glowText } from '../theme/tokens';
@@ -38,7 +38,7 @@ function LinkRings({ size, color, connected }: { size: number; color: string; co
 export function ConnectionScreen() {
   const { width } = useWindowDimensions();
   const { accent } = useAppearance();
-  const { connected, connecting, connect, mode, lastError } = useJarvis();
+  const { connected, connecting, connect, mode, lastError, simulated } = useJarvis();
 
   const color = connected ? COLOR.green : accent;
   const state = connecting ? 'Connecting…' : connected ? 'Connected' : 'Disconnected';
@@ -57,12 +57,18 @@ export function ConnectionScreen() {
         <Text style={[styles.dot, { color: connected ? COLOR.green : COLOR.red }]}>●</Text>
       </View>
 
+      {/* a simulated link that looks real is the one thing this screen must
+          never do — it is the screen people come to when something is wrong */}
+      {simulated ? <Badge testID="connection-simulated" label="SIMULATED" tint={COLOR.gold} /> : null}
+
       <Text style={styles.blurb}>
-        {connected
-          ? `Linked to the desk over ${mode.toUpperCase()}.`
-          : connecting
-            ? 'Probing the local network, then the cloud gateway.'
-            : 'Connect to reach the desk. The phone and the desk must be on the same network.'}
+        {simulated
+          ? 'Demo data is on, so this link is a stand-in. Turn it off in the Home menu to reach a real desk.'
+          : connected
+            ? `Linked to the desk over ${mode.toUpperCase()}.`
+            : connecting
+              ? 'Probing the local network, then the cloud gateway.'
+              : 'Connect to reach the desk. The phone and the desk must be on the same network.'}
       </Text>
 
       <Button
@@ -89,6 +95,7 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingTop: SPACE.xl, paddingBottom: SPACE.lg },
   rings: { alignItems: 'center', justifyContent: 'center' },
   glyph: { position: 'absolute' },
+  simulatedNote: { marginTop: SPACE.sm },
   headline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.sm },
   state: { ...TYPE.wordmark, fontSize: 20, letterSpacing: 1, color: COLOR.white },
   dot: { fontSize: 11 },

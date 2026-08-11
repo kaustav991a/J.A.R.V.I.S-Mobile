@@ -43,7 +43,8 @@ describe('RootNavigator', () => {
   it('carries the five tabs from the reference', async () => {
     const { findByTestId, getByTestId } = await mount();
     await findByTestId('home-screen');
-    for (const name of ['Home', 'Scripts', 'Commands', 'Reports', 'Settings']) {
+    // the Commands tab is labelled Chat; GlassTabBar keys its testID off the label
+    for (const name of ['Home', 'Scripts', 'Chat', 'Reports', 'Settings']) {
       expect(getByTestId(`tab-${name}`)).toBeTruthy();
     }
   });
@@ -64,7 +65,7 @@ describe('RootNavigator', () => {
   it('sends the Commands shortcut to the Commands tab', async () => {
     const { findByTestId } = await mount();
     fireEvent.press(await findByTestId('quick-commands'));
-    expect(await findByTestId('commands-screen')).toBeTruthy();
+    expect(await findByTestId('chat-screen')).toBeTruthy();
   });
 
   it('sends the Reports shortcut to the Reports tab', async () => {

@@ -1,7 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SettingsScreen } from '../SettingsScreen';
-import { CommandsScreen } from '../CommandsScreen';
+import { ChatScreen } from '../ChatScreen';
 import { AppearanceProvider } from '../../theme/appearance';
 
 const mockNavigate = jest.fn();
@@ -74,16 +74,16 @@ describe('SettingsScreen', () => {
   });
 });
 
-describe('CommandsScreen', () => {
+describe('ChatScreen', () => {
   it('offers commands the backend answers, and sends one on tap', async () => {
-    const { getByTestId } = await mount(<CommandsScreen />);
+    const { getByTestId } = await mount(<ChatScreen />);
     fireEvent.press(getByTestId('suggest-system status'));
     expect(mockSendCommand).toHaveBeenCalledWith('system status');
   });
 
   it('invites a first command when nothing has been sent', async () => {
-    const { getByTestId, getByText } = await mount(<CommandsScreen />);
-    expect(getByTestId('commands-empty').props.children).toBe('No commands yet');
-    expect(getByText('Type one above, or start with a suggestion.')).toBeTruthy();
+    const { getByTestId, getByText } = await mount(<ChatScreen />);
+    expect(getByTestId('chat-empty').props.children).toBe('No conversation yet');
+    expect(getByText('Say something below, or tap one of these.')).toBeTruthy();
   });
 });
