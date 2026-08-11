@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
+import { Slider } from '../components/ui/Slider';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { COLOR, SPACE, TYPE } from '../theme/tokens';
@@ -65,17 +65,7 @@ export function AppearanceScreen() {
       </View>
 
       <SectionLabel>Glow intensity</SectionLabel>
-      <Slider
-        testID="glow-slider"
-        value={glow}
-        onValueChange={setGlow}
-        minimumValue={0}
-        maximumValue={1}
-        minimumTrackTintColor={accent}
-        maximumTrackTintColor={COLOR.line}
-        thumbTintColor={accent}
-        style={styles.slider}
-      />
+      <Slider testID="glow-slider" value={glow} onChange={setGlow} />
 
       <SectionLabel>Animation</SectionLabel>
       <View style={styles.group}>
