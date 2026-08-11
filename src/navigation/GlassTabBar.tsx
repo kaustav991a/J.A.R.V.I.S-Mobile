@@ -275,8 +275,11 @@ function TabDetent({ index, pos, armed, opens, label, icon, accent, selected, on
     });
   const long = Gesture.LongPress().onStart(() => runOnJS(onLongPress)());
 
+  // Race, not Exclusive: Exclusive gives the long press priority, so every
+  // tap waited the full 160ms for the hold to fail before it fired — that is
+  // the split second before the tab changed
   return (
-    <GestureDetector gesture={Gesture.Exclusive(long, tap)}>
+    <GestureDetector gesture={Gesture.Race(tap, long)}>
       <Animated.View
         testID={`tab-${label}`}
         accessibilityRole="tab"

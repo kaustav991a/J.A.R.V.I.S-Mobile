@@ -4,32 +4,28 @@ import { BlurView } from 'expo-blur';
 import { RADIUS } from '../../theme/tokens';
 
 /**
- * Real blur is iOS only, for now.
+ * Real blur is iOS only, and that is settled rather than pending.
  *
- * Android's blur needs a `BlurTargetView` ancestor and samples it every frame
- * per surface. Wrapping the whole app in one and hanging four blurs off it is
- * what the app started exiting on — silently, with no JS error, which is the
- * signature of a native crash no error boundary can catch. Expo Go fell over on
- * the same view.
+ * Android's `BlurView` blurs nothing unless it is given a `BlurTargetView` to
+ * sample — and mounting that view takes the process down natively: no JS error,
+ * no red screen, nothing an error boundary can catch. It was proven on a
+ * running dev build by putting the target back (died on reload), removing it
+ * (lived), then rendering a targetless `BlurView` (lived, and blurred nothing).
  *
- * Until that is diagnosed against a device log, Android gets the tint alone.
- * On this palette the difference is slight; a crash is not.
+ * So Android gets a tint heavy enough to read as smoked glass on this palette.
+ * Do not reintroduce `BlurTargetView` without testing it on a dev build first —
+ * an APK gives no diagnosis, which is what made this cost a day.
  */
-const REAL_BLUR = Platform.OS === 'ios';
+const IOS = Platform.OS === 'ios';
 
 const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
 
 /**
- * Owns the one view Android's blur samples.
- *
- * iOS blurs whatever happens to be behind a `BlurView`; Android has to be told
- * what to sample, and that target must be an ancestor of everything the glass
- * should see. One provider at the root is the only arrangement that lets any
- * surface anywhere in the app be glass.
+ * Kept as the seam for the day Android blur is worth another attempt: it hands
+ * down a ref that nothing currently mounts a target for.
  */
 export function BlurTargetProvider({ children }: PropsWithChildren) {
   const ref = useRef<View | null>(null);
-  // no BlurTargetView: nothing samples it while Android blur is off
   return (
     <BlurTargetContext.Provider value={ref}>
       <View style={styles.fill}>{children}</View>
@@ -42,9 +38,9 @@ export const useBlurTarget = (): RefObject<View | null> | null => useContext(Blu
 export type GlassProps = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
   radius?: number;
-  /** 0–100; the Android figure is raised because its blur reads weaker */
+  /** 0–100, iOS only */
   intensity?: number;
-  /** the wash over the blur — glass needs a tint or it is just a smear */
+  /** the wash; on Android it is the whole effect, so it defaults heavier */
   tint?: string;
   /** a one-pixel highlight along the top edge, the way glass catches light */
   sheen?: boolean;
@@ -52,37 +48,23 @@ export type GlassProps = PropsWithChildren<{
 }>;
 
 /**
- * A frosted surface: blur, a tint over it, a hairline round it.
+ * A frosted surface: blur where the platform can, a tint over it, a hairline
+ * round it.
  *
  * Worth using where something moves behind the surface — a bar over a scrolling
  * list, a sheet over the canvas. Not worth it on a card sitting on a flat
- * gradient: the blur costs a full-screen sample per frame on Android and buys
- * no depth when what it samples does not change.
+ * gradient, which is why it is not the background for everything.
  */
-export function Glass({
-  children,
-  style,
-  radius = RADIUS.lg,
-  intensity,
-  // without a blur behind it the tint has to carry the surface on its own
-  tint = REAL_BLUR ? 'rgba(8,20,44,0.45)' : 'rgba(7,18,40,0.88)',
-  sheen = true,
-  testID,
-}: GlassProps) {
-  const target = useBlurTarget();
-  const strength = intensity ?? (Platform.OS === 'android' ? 72 : 60);
+export function Glass({ children, style, radius = RADIUS.lg, intensity, tint, sheen = true, testID }: GlassProps) {
+  const wash = tint ?? (IOS ? 'rgba(8,20,44,0.45)' : 'rgba(7,18,40,0.88)');
 
   return (
     <View testID={testID} style={[{ borderRadius: radius }, styles.clip, style]}>
-      {REAL_BLUR ? (
-        <BlurView
-          style={StyleSheet.absoluteFill}
-          // the chrome material is what iOS uses for its own bars
-          tint="systemChromeMaterialDark"
-          intensity={strength}
-        />
+      {IOS ? (
+        // the chrome material is what iOS uses for its own bars
+        <BlurView style={StyleSheet.absoluteFill} tint="systemChromeMaterialDark" intensity={intensity ?? 60} />
       ) : null}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: tint }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: wash }]} />
       {sheen ? <View style={styles.sheen} /> : null}
       {children}
     </View>
