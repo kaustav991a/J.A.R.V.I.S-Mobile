@@ -1,9 +1,10 @@
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../components/ui/Atoms';
+import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
 import { ArcReactor } from '../components/ArcReactor';
-import { COLOR, SPACE, TYPE } from '../theme/tokens';
+import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { APP_VERSION } from '../data/fixtures';
 
 export function AboutScreen() {
@@ -13,8 +14,11 @@ export function AboutScreen() {
 
   return (
     <Screen testID="about-screen">
+      <ScreenTitle title="ABOUT" />
       <View style={styles.hero}>
-        <ArcReactor size={130} status="online" label="" />
+        {/* the same lockup Home carries, one size up — About is where it is the
+            subject rather than a status light */}
+        <ArcReactor size={112} status="online" label="" monogram="J" />
         <Text style={styles.name}>JARVIS</Text>
         <Text testID="about-version" style={styles.version}>{`Version ${APP_VERSION}`}</Text>
         <Text style={styles.blurb}>Your intelligent assistant for automation and productivity.</Text>
@@ -50,7 +54,7 @@ const styles = StyleSheet.create({
   },
   group: {
     backgroundColor: COLOR.panel,
-    borderRadius: 16,
+    borderRadius: RADIUS.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLOR.line,
     overflow: 'hidden',

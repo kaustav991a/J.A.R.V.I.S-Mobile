@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { Screen } from '../components/ui/Atoms';
+import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { Button } from '../components/ui/Button';
 import { COLOR, SPACE, TYPE, glowText } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
@@ -44,6 +45,7 @@ export function ConnectionScreen() {
 
   return (
     <Screen testID="connection-screen">
+      <ScreenTitle title="CONNECTION" />
       <View style={styles.hero}>
         <LinkRings size={Math.min(width * 0.55, 230)} color={color} connected={connected} />
       </View>
@@ -57,15 +59,17 @@ export function ConnectionScreen() {
 
       <Text style={styles.blurb}>
         {connected
-          ? `Linked to the Jarvis server over ${mode.toUpperCase()}.`
-          : 'Tap connect to establish connection with Jarvis server.'}
+          ? `Linked to the desk over ${mode.toUpperCase()}.`
+          : connecting
+            ? 'Probing the local network, then the cloud gateway.'
+            : 'Connect to reach the desk. The phone and the desk must be on the same network.'}
       </Text>
 
       <Button
         testID="connection-connect"
-        label={connecting ? 'CONNECTING…' : connected ? 'RECONNECT' : 'CONNECT'}
+        label={connecting ? 'CONNECTING' : connected ? 'RECONNECT' : 'CONNECT'}
         onPress={connect}
-        disabled={connecting}
+        busy={connecting}
         style={styles.button}
       />
 

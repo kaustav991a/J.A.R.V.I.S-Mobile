@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLOR, SPACE, TYPE, glowBox } from '../theme/tokens';
 import { MicIcon } from './MicIcon';
 
@@ -11,6 +12,8 @@ export type CommandBarProps = {
   listening?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  /** optional glyph before the field, e.g. the sparkle on the Home tab */
+  leadingIcon?: keyof typeof Ionicons.glyphMap;
 };
 
 export function CommandBar({
@@ -19,6 +22,7 @@ export function CommandBar({
   listening = false,
   disabled = false,
   placeholder = 'Speak or type…',
+  leadingIcon,
 }: CommandBarProps) {
   const [text, setText] = useState('');
   const hasText = text.trim().length > 0;
@@ -34,6 +38,7 @@ export function CommandBar({
 
   return (
     <View style={[styles.bar, disabled && styles.disabled]}>
+      {leadingIcon ? <Ionicons name={leadingIcon} size={17} color={COLOR.blue} /> : null}
       <TextInput
         testID="command-input"
         style={styles.input}

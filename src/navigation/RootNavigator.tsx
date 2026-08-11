@@ -1,12 +1,16 @@
+import { useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StyleSheet } from 'react-native';
-import { COLOR, FONT } from '../theme/tokens';
-import { useAppearance } from '../theme/appearance';
-import { StatusScreen } from '../screens/StatusScreen';
+import { StyleSheet, View } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
+import { COLOR } from '../theme/tokens';
+import { GlassTabBar } from './GlassTabBar';
+import { HomeScreen } from '../screens/HomeScreen';
+import { ReportsScreen } from '../screens/ReportsScreen';
 import { ConnectionScreen } from '../screens/ConnectionScreen';
+import { ActivityScreen } from '../screens/ActivityScreen';
 import { ScriptsScreen } from '../screens/ScriptsScreen';
 import { ScriptDetailsScreen } from '../screens/ScriptDetailsScreen';
 import { CommandsScreen } from '../screens/CommandsScreen';
@@ -14,132 +18,125 @@ import { CommandResultScreen } from '../screens/CommandResultScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { AppearanceScreen } from '../screens/AppearanceScreen';
 import { AboutScreen } from '../screens/AboutScreen';
+import { TABS_ID } from './types';
 import type {
   CommandsStackParams,
+  HomeStackParams,
+  ReportsStackParams,
   ScriptsStackParams,
   SettingsStackParams,
-  StatusStackParams,
   TabParams,
 } from './types';
 
-const StatusStack = createNativeStackNavigator<StatusStackParams>();
+const HomeStack = createNativeStackNavigator<HomeStackParams>();
 const ScriptsStack = createNativeStackNavigator<ScriptsStackParams>();
 const CommandsStack = createNativeStackNavigator<CommandsStackParams>();
+const ReportsStack = createNativeStackNavigator<ReportsStackParams>();
 const SettingsStack = createNativeStackNavigator<SettingsStackParams>();
-const Tabs = createBottomTabNavigator<TabParams>();
+const Tabs = createBottomTabNavigator<TabParams, typeof TABS_ID>();
 
 /** The canvas gradient shows through every screen, so no navigator paints a background. */
 const navTheme: Theme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: COLOR.bg, card: COLOR.bg, border: COLOR.line, text: COLOR.white },
+  colors: { ...DarkTheme.colors, background: COLOR.bg, card: 'transparent', border: COLOR.line, text: COLOR.white },
 };
 
-function useHeader() {
-  const { accent } = useAppearance();
-  return {
-    headerStyle: { backgroundColor: COLOR.bg },
-    headerShadowVisible: false,
-    headerTitleAlign: 'center' as const,
-    headerTitleStyle: { fontFamily: FONT.display, fontSize: 14, letterSpacing: 2, color: COLOR.white },
-    headerTintColor: accent,
-  };
+/**
+ * No navigator headers anywhere. Each screen sets its own title through
+ * `ScreenTitle`, at a size a header cannot reach — a 14px centred header title
+ * above a screen whose own heading shouts is a hierarchy with two heads. It
+ * also keeps the canvas gradient running to the top of the display, which an
+ * opaque header used to cut with a flat black band.
+ */
+const SCREEN_OPTIONS = { headerShown: false } as const;
+
+function HomeStackScreens() {
+  return (
+    <HomeStack.Navigator screenOptions={SCREEN_OPTIONS}>
+      {/* Home draws its own top row — a navigator header would double it */}
+      <HomeStack.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStack.Screen name="Connection" component={ConnectionScreen} />
+      <HomeStack.Screen name="Activity" component={ActivityScreen} />
+    </HomeStack.Navigator>
+  );
 }
 
-function StatusStackScreens() {
-  const header = useHeader();
+function ReportsStackScreens() {
   return (
-    <StatusStack.Navigator screenOptions={header}>
-      <StatusStack.Screen name="StatusHome" component={StatusScreen} options={{ title: 'STATUS' }} />
-      <StatusStack.Screen name="Connection" component={ConnectionScreen} options={{ title: 'CONNECTION' }} />
-    </StatusStack.Navigator>
+    <ReportsStack.Navigator screenOptions={SCREEN_OPTIONS}>
+      <ReportsStack.Screen name="ReportsHome" component={ReportsScreen} />
+    </ReportsStack.Navigator>
   );
 }
 
 function ScriptsStackScreens() {
-  const header = useHeader();
   return (
-    <ScriptsStack.Navigator screenOptions={header}>
-      <ScriptsStack.Screen name="ScriptsHome" component={ScriptsScreen} options={{ title: 'SCRIPTS' }} />
+    <ScriptsStack.Navigator screenOptions={SCREEN_OPTIONS}>
+      <ScriptsStack.Screen name="ScriptsHome" component={ScriptsScreen} />
       <ScriptsStack.Screen
         name="ScriptDetails"
         component={ScriptDetailsScreen}
-        options={{ title: 'SCRIPT DETAILS' }}
       />
     </ScriptsStack.Navigator>
   );
 }
 
 function CommandsStackScreens() {
-  const header = useHeader();
   return (
-    <CommandsStack.Navigator screenOptions={header}>
-      <CommandsStack.Screen name="CommandsHome" component={CommandsScreen} options={{ title: 'COMMANDS' }} />
+    <CommandsStack.Navigator screenOptions={SCREEN_OPTIONS}>
+      <CommandsStack.Screen name="CommandsHome" component={CommandsScreen} />
       <CommandsStack.Screen
         name="CommandResult"
         component={CommandResultScreen}
-        options={{ title: 'COMMAND RESULT' }}
       />
     </CommandsStack.Navigator>
   );
 }
 
 function SettingsStackScreens() {
-  const header = useHeader();
   return (
-    <SettingsStack.Navigator screenOptions={header}>
-      <SettingsStack.Screen name="SettingsHome" component={SettingsScreen} options={{ title: 'SETTINGS' }} />
-      <SettingsStack.Screen name="Appearance" component={AppearanceScreen} options={{ title: 'APPEARANCE' }} />
-      <SettingsStack.Screen name="About" component={AboutScreen} options={{ title: 'ABOUT' }} />
+    <SettingsStack.Navigator screenOptions={SCREEN_OPTIONS}>
+      <SettingsStack.Screen name="SettingsHome" component={SettingsScreen} />
+      <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
+      <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>
   );
 }
 
-const TAB_ICON: Record<keyof TabParams, { on: keyof typeof Ionicons.glyphMap; off: keyof typeof Ionicons.glyphMap }> =
-  {
-    Status: { on: 'home', off: 'home-outline' },
-    Scripts: { on: 'documents', off: 'documents-outline' },
-    Commands: { on: 'terminal', off: 'terminal-outline' },
-    Settings: { on: 'settings', off: 'settings-outline' },
-  };
+/** outline glyphs throughout: the accent capsule carries selection, not weight */
+const TAB_ICON: Record<keyof TabParams, keyof typeof Ionicons.glyphMap> = {
+  Home: 'home-outline',
+  Scripts: 'document-text-outline',
+  Commands: 'terminal-outline',
+  Reports: 'bar-chart-outline',
+  Settings: 'settings-outline',
+};
 
 export function RootNavigator() {
-  const { accent } = useAppearance();
+  // Android's BlurView samples this view; on iOS it is a plain container.
+  const blurTarget = useRef<View | null>(null);
 
   return (
-    <NavigationContainer theme={navTheme}>
-      <Tabs.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: accent,
-          tabBarInactiveTintColor: COLOR.dim,
-          tabBarStyle: styles.tabBar,
-          tabBarLabelStyle: styles.tabLabel,
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons
-              name={focused ? TAB_ICON[route.name].on : TAB_ICON[route.name].off}
-              size={size}
-              color={color}
-            />
-          ),
-        })}
-      >
-        <Tabs.Screen name="Status" component={StatusStackScreens} />
-        <Tabs.Screen name="Scripts" component={ScriptsStackScreens} />
-        <Tabs.Screen name="Commands" component={CommandsStackScreens} />
-        <Tabs.Screen name="Settings" component={SettingsStackScreens} />
-      </Tabs.Navigator>
-    </NavigationContainer>
+    <BlurTargetView ref={blurTarget} style={styles.root}>
+      <NavigationContainer theme={navTheme}>
+        <Tabs.Navigator
+          id={TABS_ID}
+          tabBar={(props) => <GlassTabBar {...props} blurTarget={blurTarget} icons={TAB_ICON} />}
+          screenOptions={{ headerShown: false, sceneStyle: styles.scene }}
+        >
+          <Tabs.Screen name="Home" component={HomeStackScreens} />
+          <Tabs.Screen name="Scripts" component={ScriptsStackScreens} />
+          <Tabs.Screen name="Commands" component={CommandsStackScreens} />
+          <Tabs.Screen name="Reports" component={ReportsStackScreens} />
+          <Tabs.Screen name="Settings" component={SettingsStackScreens} />
+        </Tabs.Navigator>
+      </NavigationContainer>
+    </BlurTargetView>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: 'rgba(4,12,28,0.96)',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLOR.line,
-    height: 64,
-    paddingTop: 6,
-    paddingBottom: 8,
-  },
-  tabLabel: { fontFamily: FONT.data, fontSize: 10, letterSpacing: 0.5 },
+  root: { flex: 1, backgroundColor: COLOR.bg },
+  /** the screens paint their own gradient; anything opaque here would cover it */
+  scene: { backgroundColor: 'transparent' },
 });

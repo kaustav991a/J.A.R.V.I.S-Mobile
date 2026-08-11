@@ -13,6 +13,11 @@ export type ArcReactorProps = {
   label?: string;
   /** small line under the lockup, e.g. the activity word */
   sublabel?: string;
+  /**
+   * A single glyph for sizes too small to carry the wordmark — the ring alone
+   * reads as an empty black hole. Drawn over a lit core.
+   */
+  monogram?: string;
 };
 
 /**
@@ -22,7 +27,7 @@ export type ArcReactorProps = {
  * `react-native-svg` attributes through reanimated is the least reliable
  * surface in this stack, and a rotated View is visually identical here.
  */
-export function ArcReactor({ size, status, label = 'JARVIS', sublabel }: ArcReactorProps) {
+export function ArcReactor({ size, status, label = 'JARVIS', sublabel, monogram }: ArcReactorProps) {
   const { accent, glow, animations } = useAppearance();
   const color = statusColor(status, accent);
 
@@ -130,6 +135,28 @@ export function ArcReactor({ size, status, label = 'JARVIS', sublabel }: ArcReac
         </Svg>
       </Animated.View>
 
+      {/* the lit core a small reactor needs so its middle is not a black hole */}
+      {monogram ? (
+        <View style={styles.lockup} pointerEvents="none">
+          <Animated.View style={breathStyle}>
+            <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+              <Circle cx={c} cy={c} r={c * 0.42} fill={color} opacity={0.1 + glow * 0.12} />
+              <Circle cx={c} cy={c} r={c * 0.2} fill={COLOR.blueBright} opacity={0.16 + glow * 0.16} />
+            </Svg>
+          </Animated.View>
+          <Text
+            testID="arc-reactor-monogram"
+            style={[
+              styles.monogram,
+              { fontSize: size * 0.34, color: COLOR.white },
+              glowText(color, 6 + glow * 12),
+            ]}
+          >
+            {monogram}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.lockup} pointerEvents="none">
         <Text testID="arc-reactor-wordmark" style={[styles.wordmark, glowText(color, 6 + glow * 14)]}>
           {label}
@@ -154,4 +181,5 @@ const styles = StyleSheet.create({
     marginLeft: TYPE.wordmark.letterSpacing,
   },
   sublabel: { ...TYPE.strip, marginTop: 6, marginLeft: 2, opacity: 0.9 },
+  monogram: { fontFamily: TYPE.wordmark.fontFamily, letterSpacing: 2, marginLeft: 2 },
 });

@@ -43,6 +43,36 @@ export const FONT = {
 
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
 
+/** corner radii, so a card and the tile inside it never disagree by 2px */
+export const RADIUS = { sm: 10, md: 12, lg: 16, pill: 999 } as const;
+
+/**
+ * Motion vocabulary. Two durations and one spring: a press, and everything
+ * else. Anything slower than `settle` on a phone reads as lag, not polish.
+ */
+export const MOTION = {
+  press: 90,
+  settle: 240,
+  spring: { damping: 15, stiffness: 220, mass: 0.6 },
+  /** how far a screen's content rises as it fades in */
+  rise: 10,
+} as const;
+
+/**
+ * App chrome geometry. The tab bar floats over the canvas rather than sitting
+ * in the layout, so its height is not something a screen can measure — every
+ * screen clears it from this one place.
+ */
+export const CHROME = {
+  /** the floating tab bar's own height */
+  tabBarHeight: 62,
+  /** its gap from the bottom edge; also the floor for the safe-area inset */
+  tabBarGap: 30,
+  /** its inset from the left and right edges */
+  tabBarSide: 16,
+  tabBarRadius: 26,
+} as const;
+
 /** HUD_EASE — the same cubic-bezier the desk HUD feeds GSAP. */
 export const HUD_BEZIER = [0.16, 1, 0.3, 1] as const;
 

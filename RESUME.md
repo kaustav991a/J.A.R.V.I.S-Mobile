@@ -76,6 +76,120 @@ the orb in the three reference images):
   needs changing, redraw it or replace the file. Transparent background so it
   glows on the navy.
 
+## Session 3 — full-bleed chrome, launch screen, Home tab
+
+Driven by three reference images in `C:\Users\Fortmindz\Downloads\Jarvis UI\`
+(`ChatGPT Image …`, `more screens.png`, `Home and splash screen.png`).
+
+1. **The black band at the top is gone.** Every stack header is
+   `headerTransparent`, and the tab navigator's `sceneStyle` and theme `card`
+   are transparent. The opaque `COLOR.bg` header was painting a flat near-black
+   strip over the status bar while the screen gradient started below it. Screens
+   now run edge to edge and `Screen` pads its own content past the header
+   (`Math.max(headerHeight ?? 0, insets.top)` — a `headerShown: false` screen
+   still receives the context, reporting 0, which is what put Home's menu and
+   bell under the status bar).
+2. **`LaunchScreen`** — the reactor over a radial wash and two faint halo rings,
+   with the reference's `YOUR INTELLIGENT ASSISTANT / FOR AUTOMATION AND
+   PRODUCTIVITY` tagline. It is an overlay in `App.tsx`, not a route, so the
+   socket is already probing behind it. Self-dismisses after 2.4s; a tap skips.
+3. **`HomeScreen`** — "Hello, SIR", the command bar, four quick actions and a
+   three-column status card. The greeting's addressee is `ADDRESS` in that file.
+4. **Five tabs, matching the reference**: Home / Scripts / Commands / Reports /
+   Settings. `StatusScreen` and `ConnectionScreen` moved into the Home stack;
+   `ReportsScreen` is new (vitals, trace, script outcomes, last message).
+5. **The tab bar floats and is frosted.** `position: absolute`, inset 16 and
+   `CHROME.tabBarGap` (30) clear of the bottom, `tabBarBackground` = a
+   `BlurView` over a tint. Android blur needs a `BlurTargetView` ref, so
+   `RootNavigator` wraps the whole app in one. `TabIcon` animates selection.
+6. **Tab jumps go through `getParent(TABS_ID)`.** Left to bubble, a
+   `navigate('Scripts')` from a Home-stack screen could be answered by the Home
+   stack itself — the screen changes but the tab bar stays lit on Home.
+   `src/navigation/__tests__/rootNavigator.test.tsx` pins all four shortcuts.
+7. `expo-asset` was added: `@expo/vector-icons` → `expo-font` requires it, and
+   without it every jest suite importing an icon failed to resolve.
+   `@react-navigation/elements` is now a direct dependency too.
+8. **`StatusScreen` is deleted.** Every route into it landed the user on a
+   screen that looked like the Home they had just left, with the tab bar still
+   lit on Home. Its parts already live elsewhere: vitals and trace on Reports,
+   the connect button and transport detail on Connection, and the parked-action
+   `GovernancePanel` moved onto Home, where it only appears when something is
+   actually waiting. The Home status card's three columns are now separate
+   targets — Connection, Connection, Scripts tab — and the bell opens Reports.
+9. **The greeting follows the device clock** (`src/theme/greeting.ts`: morning
+   05–12, afternoon 12–17, evening 17–21, night otherwise), re-read on the
+   minute while Home is mounted. `ADDRESS` in `HomeScreen` is the addressee.
+10. **`TypeLine`** types the prompt out on a plain interval — the thing being
+    animated is the string, not a style — and prints it whole when the
+    Appearance screen's animations toggle is off.
+11. `ArcReactor` takes a `monogram`: at 84px the wordmark cannot be read, and
+    the ring alone reads as a black hole, so Home's small reactor carries a lit
+    core and a `J`.
+
+Verified: `npx tsc --noEmit` clean, 156 jest tests pass, and a throwaway Metro
+on 8091 served `index.bundle?platform=android` with a 200.
+
+## Session 4 — UI polish pass
+
+No backend work. `docs/ui-reference-prompt.md` holds the image-generator prompt
+that produces new reference mockups; keep its DESIGN SYSTEM block in sync with
+`src/theme/tokens.ts`.
+
+- **One press language.** `src/components/ui/Touchable.tsx` replaced five
+  different `pressed && { opacity }` values. A held scale plus a dip reads on a
+  fast tap where an opacity frame does not. Honours the animations toggle,
+  which is also the reduced-motion switch.
+- **`RADIUS` and `MOTION` tokens.** Radii were 12/14/16 by hand; motion had no
+  vocabulary at all.
+- **Keyboard.** `Screen` now wraps content in `KeyboardAvoidingView` and sets
+  `keyboardShouldPersistTaps="handled"`. Without that last one a tap landing
+  while the keyboard is open is spent dismissing it, and the button under the
+  finger never fires — the single worst bug in the old build.
+- **Pull to refresh** on Home and Reports, wired to `connect` (re-probe).
+- **`Toast`** (`src/components/ui/Toast.tsx`, provider in `App.tsx`). Running a
+  script or sending a command puts its result on the desk, not on screen, so
+  those buttons used to do nothing observable. Now they confirm, and say when
+  there is no link.
+- **Screen entrance**: one fade-and-rise on the content, not a stagger.
+- **Empty states are invitations**: unlit ring, what belongs here, how to start.
+- **Settings is split** into rows that lead somewhere and rows marked SOON,
+  which are genuinely disabled rather than dead taps. Connection now jumps to
+  the Home stack's Connection screen instead of sitting inert.
+- **Commands** offers four suggestion chips in the phrasing the desk expects.
+- **Reports** uses `Badge` for outcomes; **Scripts** carries an outcome dot.
+- `Button` gained `busy` (spinner, press blocked), used by Connection.
+
+## Session 5 — the Claude Design reference, and the chrome it changed
+
+The user generated a mockup sheet in Claude Design (12 frames, plus isolated
+`JarvisTabBar` / `JarvisStatusBar` pages). It is only reachable while signed in;
+`WebFetch` gets a 403, so it was read through the browser tools. What it changed:
+
+- **Navigator headers are gone entirely** (`SCREEN_OPTIONS = { headerShown: false }`).
+  Each screen renders `ScreenTitle` — a 22px display-face lockup with an optional
+  caption ("5 SAVED") and a back chevron that appears when the stack can pop. A
+  14px centred header above a screen with its own heading was two heads.
+- **`GlassTabBar`** replaced the stock bar and `TabIcon`. The tab bar is now a
+  custom `tabBar`, in the iOS idiom the user asked for (dribbble 19674219): a
+  frosted pill floating 30px clear of the bottom, inactive tabs icon-only, the
+  selected tab grown into an accent capsule carrying its label. Every item
+  shrinks and the row clips to the pill radius — a fixed-width item is what let
+  the grown capsule ride outside the container.
+- **Launch screen has a progress rail** (`LoadingBar`): a filling bar with a
+  brighter head and a sweeping sheen, under a label that names what is actually
+  being waited on, not invented steps.
+- **`CommandResultScreen` rebuilt** around a terminal card — traffic lights,
+  `jarvis@desktop`, the echoed prompt — with COPY (`expo-clipboard`) and RUN
+  AGAIN.
+- Scripts rows take a per-script tile hue and put the outcome dot at the right
+  edge; About carries the same `J` reactor as Home, one size up.
+
+Held deliberately, at the user's instruction: **Home's reactor stays 84px** with
+the `J` monogram — the sheet's 190px version was rejected.
+
+**The bounce is gone.** Screen content no longer animates in, and the tab
+selection is a timing curve: springy entrances read as lag, not polish.
+
 ## Next steps, in order
 
 1. **Smoke tests for the nine screens and the ui kit.** Nothing under

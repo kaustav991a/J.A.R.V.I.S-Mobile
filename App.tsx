@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { Orbitron_400Regular, Orbitron_700Bold, useFonts } from '@expo-google-fonts/orbitron';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { LaunchScreen } from './src/screens/LaunchScreen';
+import { ToastProvider } from './src/components/ui/Toast';
 import { AppearanceProvider } from './src/theme/appearance';
 import { JarvisProvider } from './src/state/JarvisProvider';
 import { COLOR } from './src/theme/tokens';
@@ -14,6 +16,9 @@ void SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   const [loaded, error] = useFonts({ Orbitron_400Regular, Orbitron_700Bold });
+  // the native splash hands off to this one, so the reactor never blinks out
+  const [launching, setLaunching] = useState(true);
+  const enter = useCallback(() => setLaunching(false), []);
 
   useEffect(() => {
     if (loaded || error) void SplashScreen.hideAsync();
@@ -28,8 +33,11 @@ export default function App() {
       <SafeAreaProvider>
         <AppearanceProvider>
           <JarvisProvider>
-            <StatusBar style="light" />
-            <RootNavigator />
+            <ToastProvider>
+              <StatusBar style="light" />
+              <RootNavigator />
+              {launching ? <LaunchScreen onDone={enter} /> : null}
+            </ToastProvider>
           </JarvisProvider>
         </AppearanceProvider>
       </SafeAreaProvider>

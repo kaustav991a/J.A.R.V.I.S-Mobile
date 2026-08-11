@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
+import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { COLOR, SPACE, TYPE } from '../theme/tokens';
 import { ACCENTS, AccentKey, ThemeChoice, useAppearance } from '../theme/appearance';
 
@@ -16,6 +17,7 @@ export function AppearanceScreen() {
 
   return (
     <Screen testID="appearance-screen">
+      <ScreenTitle title="APPEARANCE" />
       <SectionLabel>Theme</SectionLabel>
       <View style={styles.group}>
         {THEMES.map((t, i) => {

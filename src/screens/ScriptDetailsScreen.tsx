@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Screen, Badge, SectionLabel } from '../components/ui/Atoms';
+import { Screen, Badge, EmptyState, Hint, SectionLabel } from '../components/ui/Atoms';
+import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { Button } from '../components/ui/Button';
-import { COLOR, SPACE, TYPE } from '../theme/tokens';
+import { useToast } from '../components/ui/Toast';
+import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
 import { SCRIPTS } from '../data/fixtures';
 import { useJarvis } from '../state/JarvisProvider';
@@ -19,16 +21,23 @@ type Props = NativeStackScreenProps<ScriptsStackParams, 'ScriptDetails'>;
 
 export function ScriptDetailsScreen({ route }: Props) {
   const { accent } = useAppearance();
-  const { sendCommand } = useJarvis();
+  const { sendCommand, connected } = useJarvis();
+  const toast = useToast();
   const script = SCRIPTS.find((s) => s.id === route.params.id);
 
   if (!script) {
     return (
       <Screen testID="script-details-screen">
-        <Text style={styles.missing}>That script no longer exists.</Text>
+      <ScreenTitle title="SCRIPT DETAILS" />
+        <EmptyState text="This script is gone" hint="It was removed from the desk. Go back to the list." />
       </Screen>
     );
   }
+
+  const run = () => {
+    void sendCommand(`run script ${script.name}`).catch(() => {});
+    toast.show(connected ? `Running ${script.name}` : `Queued ${script.name} — no link`, connected ? 'good' : 'bad');
+  };
 
   const outcome = OUTCOME[script.outcome] ?? OUTCOME.never;
 
@@ -51,13 +60,9 @@ export function ScriptDetailsScreen({ route }: Props) {
       </Text>
 
       <SectionLabel>Actions</SectionLabel>
-      <Button
-        testID="script-run"
-        label="RUN SCRIPT"
-        onPress={() => void sendCommand(`run script ${script.name}`).catch(() => {})}
-      />
-      <Button testID="script-edit" label="EDIT SCRIPT" variant="ghost" style={styles.edit} />
-      <Text style={styles.note}>Editing needs a script endpoint the desk backend does not expose yet.</Text>
+      <Button testID="script-run" label="RUN SCRIPT" onPress={run} />
+      <Button testID="script-edit" label="EDIT SCRIPT" variant="ghost" disabled style={styles.edit} />
+      <Hint>Editing needs a script endpoint the desk does not expose yet.</Hint>
     </Screen>
   );
 }
@@ -66,14 +71,14 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     backgroundColor: COLOR.panel,
-    borderRadius: 16,
+    borderRadius: RADIUS.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLOR.line,
     paddingVertical: SPACE.xl,
     paddingHorizontal: SPACE.lg,
     gap: SPACE.sm,
   },
-  tile: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  tile: { width: 56, height: 56, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
   name: { ...TYPE.dataValue, fontSize: 18, color: COLOR.white, marginTop: SPACE.xs },
   lastRun: { ...TYPE.dataLabel, color: COLOR.dim },
   description: { ...TYPE.meta, color: COLOR.dim },
