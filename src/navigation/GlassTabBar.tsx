@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
-import { useEffect } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +60,19 @@ export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons 
   const start = useSharedValue(0);
   const detent = useSharedValue(state.index);
 
+  // a floating bar has nowhere to go when the keyboard opens: it would sit on
+  // top of whatever is being typed into. It is also unreachable while typing,
+  // so it stands down until the keyboard is gone.
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setHidden(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setHidden(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   // a tab changed from somewhere else (a quick action, a deep link): follow it
   useEffect(() => {
     detent.value = state.index;
@@ -104,6 +117,8 @@ export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons 
   const stripStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: barWidth / 2 - ITEM / 2 - pos.value * ITEM }],
   }));
+
+  if (hidden) return null;
 
   return (
     <View

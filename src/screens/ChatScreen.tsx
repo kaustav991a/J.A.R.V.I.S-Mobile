@@ -1,5 +1,5 @@
-import { useContext, useEffect, useRef } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,12 +51,31 @@ export function ChatScreen() {
     if (turns.length) list.current?.scrollToOffset({ offset: 0, animated: true });
   }, [turns.length]);
 
+  /**
+   * While the keyboard is up the composer must sit on it, not on the tab bar's
+   * reserved space — that gap is what was pushing the newest turn out of sight.
+   * The window itself resizes (`softwareKeyboardLayoutMode: resize`), so the
+   * only thing to give back is the clearance, plus a scroll to the newest turn.
+   */
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setTyping(true);
+      list.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setTyping(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const send = (text: string) => {
     void sendCommand(text).catch(() => {});
     if (!connected) toast.show('No link — answered locally', 'bad');
   };
 
-  const bottom = CHROME.tabBarHeight + Math.max(insets.bottom, CHROME.tabBarGap) + SPACE.sm;
+  const bottom = typing ? SPACE.sm : CHROME.tabBarHeight + Math.max(insets.bottom, CHROME.tabBarGap) + SPACE.sm;
 
   return (
     <View style={styles.root} testID="chat-screen">

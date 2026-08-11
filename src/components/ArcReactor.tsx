@@ -135,22 +135,24 @@ export function ArcReactor({ size, status, label = 'JARVIS', sublabel, monogram 
         </Svg>
       </Animated.View>
 
-      {/* the lit core a small reactor needs so its middle is not a black hole */}
+      {/* The lit core a small reactor needs so its middle is not a black hole.
+          It gets its own absolute-fill layer: nested in the lockup — which is
+          absolutely positioned and sized to its text — a size×size canvas blew
+          that box out and drew a second orb beside the ring. */}
+      {monogram ? (
+        <Animated.View style={[StyleSheet.absoluteFill, breathStyle]} pointerEvents="none">
+          <Svg width={size} height={size}>
+            <Circle cx={c} cy={c} r={c * 0.42} fill={color} opacity={0.1 + glow * 0.12} />
+            <Circle cx={c} cy={c} r={c * 0.2} fill={COLOR.blueBright} opacity={0.16 + glow * 0.16} />
+          </Svg>
+        </Animated.View>
+      ) : null}
+
       {monogram ? (
         <View style={styles.lockup} pointerEvents="none">
-          <Animated.View style={breathStyle}>
-            <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-              <Circle cx={c} cy={c} r={c * 0.42} fill={color} opacity={0.1 + glow * 0.12} />
-              <Circle cx={c} cy={c} r={c * 0.2} fill={COLOR.blueBright} opacity={0.16 + glow * 0.16} />
-            </Svg>
-          </Animated.View>
           <Text
             testID="arc-reactor-monogram"
-            style={[
-              styles.monogram,
-              { fontSize: size * 0.34, color: COLOR.white },
-              glowText(color, 6 + glow * 12),
-            ]}
+            style={[styles.monogram, { fontSize: size * 0.34, color: COLOR.white }, glowText(color, 6 + glow * 12)]}
           >
             {monogram}
           </Text>
