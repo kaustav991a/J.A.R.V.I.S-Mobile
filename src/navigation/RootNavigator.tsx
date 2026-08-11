@@ -113,15 +113,12 @@ const TAB_ICON: Record<keyof TabParams, keyof typeof Ionicons.glyphMap> = {
 };
 
 export function RootNavigator() {
-  // Android's BlurView samples this view; on iOS it is a plain container.
-  const blurTarget = useRef<View | null>(null);
-
   return (
-    <BlurTargetView ref={blurTarget} style={styles.root}>
+    <View style={styles.root}>
       <NavigationContainer theme={navTheme}>
         <Tabs.Navigator
           id={TABS_ID}
-          tabBar={(props) => <GlassTabBar {...props} blurTarget={blurTarget} icons={TAB_ICON} />}
+          tabBar={(props) => <GlassTabBar {...props} icons={TAB_ICON} />}
           screenOptions={{ headerShown: false, sceneStyle: styles.scene }}
         >
           <Tabs.Screen name="Home" component={HomeStackScreens} />
@@ -131,7 +128,7 @@ export function RootNavigator() {
           <Tabs.Screen name="Settings" component={SettingsStackScreens} />
         </Tabs.Navigator>
       </NavigationContainer>
-    </BlurTargetView>
+    </View>
   );
 }
 

@@ -5,6 +5,7 @@ import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
 import { useJarvis } from '../state/JarvisProvider';
 import { Touchable } from './ui/Touchable';
+import { Glass } from './ui/Glass';
 
 export type QuickMenuProps = {
   visible: boolean;
@@ -37,7 +38,7 @@ export function QuickMenu({ visible, onClose, onGo }: QuickMenuProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable testID="quick-menu-scrim" style={styles.scrim} onPress={onClose} accessibilityLabel="Close menu" />
-      <View style={[styles.sheet, { paddingTop: insets.top + SPACE.lg }]} testID="quick-menu">
+      <Glass testID="quick-menu" radius={0} intensity={90} tint="rgba(6,16,36,0.72)" sheen={false} style={[styles.sheet, { paddingTop: insets.top + SPACE.lg }]}>
         <View style={styles.head}>
           <Text style={styles.title}>JARVIS</Text>
           <View style={styles.linkRow}>
@@ -109,7 +110,7 @@ export function QuickMenu({ visible, onClose, onGo }: QuickMenuProps) {
         >
           <Text style={styles.closeText}>CLOSE</Text>
         </Touchable>
-      </View>
+      </Glass>
     </Modal>
   );
 }

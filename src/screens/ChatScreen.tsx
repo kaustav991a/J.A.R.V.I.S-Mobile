@@ -9,6 +9,7 @@ import { CommandBar } from '../components/CommandBar';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { EmptyState } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
+import { Glass } from '../components/ui/Glass';
 import { useToast } from '../components/ui/Toast';
 import { CHROME, COLOR, RADIUS, SCRIM, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
@@ -148,14 +149,14 @@ export function ChatScreen() {
           />
         )}
 
-        <View style={[styles.composer, { paddingBottom: bottom }]}>
+        <Glass radius={0} sheen style={[styles.composer, { paddingBottom: bottom }]}>
           <CommandBar
             placeholder="Message Jarvis…"
             leadingIcon="sparkles"
             onSubmit={send}
             onVoice={() => toast.show('Voice is not wired up yet')}
           />
-        </View>
+        </Glass>
       </KeyboardAvoidingView>
     </View>
   );

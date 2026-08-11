@@ -9,6 +9,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { LaunchScreen } from './src/screens/LaunchScreen';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { BlurTargetProvider } from './src/components/ui/Glass';
 import { AppearanceProvider } from './src/theme/appearance';
 import { JarvisProvider } from './src/state/JarvisProvider';
 import { COLOR } from './src/theme/tokens';
@@ -32,6 +33,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={styles.root}>
+      <BlurTargetProvider>
       <SafeAreaProvider>
         <AppearanceProvider>
           <JarvisProvider>
@@ -43,6 +45,7 @@ export default function App() {
           </JarvisProvider>
         </AppearanceProvider>
       </SafeAreaProvider>
+      </BlurTargetProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

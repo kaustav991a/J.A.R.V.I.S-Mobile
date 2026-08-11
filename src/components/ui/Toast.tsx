@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { CHROME, COLOR, MOTION, RADIUS, SPACE, TYPE } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
 import { haptic } from '../../lib/haptics';
+import { Glass } from './Glass';
 
 export type ToastTone = 'info' | 'good' | 'bad';
 
@@ -69,12 +70,12 @@ function ToastBar({ toast }: { toast: Toast | null }) {
 
   return (
     <Animated.View pointerEvents="none" style={[styles.wrap, { bottom }, style]}>
-      <View testID="toast" style={[styles.bar, { borderColor: tint }]}>
+      <Glass testID="toast" radius={RADIUS.pill} style={[styles.bar, { borderColor: tint }]}>
         <View style={[styles.dot, { backgroundColor: tint }]} />
         <Text testID="toast-text" style={styles.text}>
           {toast.text}
         </Text>
-      </View>
+      </Glass>
     </Animated.View>
   );
 }

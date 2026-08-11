@@ -1,4 +1,3 @@
-import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { Keyboard, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,35 +18,42 @@ import Animated, {
 import { CHROME, COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
 import { haptic } from '../lib/haptics';
-import { TabBarBackground } from './TabBarBackground';
+import { Glass } from '../components/ui/Glass';
 
 export type GlassTabBarProps = BottomTabBarProps & {
-  /** the view Android's blur samples; see TabBarBackground */
-  blurTarget: RefObject<View | null>;
   icons: Record<string, keyof typeof Ionicons.glyphMap>;
 };
 
 /** an unselected tab is a glyph and nothing else */
 const IDLE_W = 52;
-/** the one under the lens grows to carry its name */
-const ACTIVE_W = 116;
 const RUBBER = 46;
 const SNAP = { damping: 17, stiffness: 195, mass: 0.55 } as const;
 
+/**
+ * Labels are set in the data face, which is monospace on both platforms, so a
+ * name's width is its length — no measuring pass, and every tab opens to
+ * exactly its own name rather than to one width that fits the longest.
+ */
+const CHAR_W = 7;
+const LENS_PAD = SPACE.md;
+
+const labelWidth = (label: string): number => label.length * CHAR_W;
+const openWidth = (label: string): number => IDLE_W + labelWidth(label) + SPACE.sm + LENS_PAD;
+
 /** how wide tab `i` is when the dial sits at `pos` — the whole layout follows
  *  from this, so the strip offset and the tabs can never disagree */
-function widthAt(i: number, pos: number): number {
+function widthAt(i: number, pos: number, opens: number[]): number {
   'worklet';
   const near = 1 - Math.min(Math.abs(pos - i), 1);
-  return IDLE_W + (ACTIVE_W - IDLE_W) * near;
+  return IDLE_W + (opens[i] - IDLE_W) * near;
 }
 
 /** distance from the strip's left edge to the centre of tab `i` */
-function centreOf(i: number, pos: number, count: number): number {
+function centreOf(i: number, pos: number, opens: number[]): number {
   'worklet';
   let x = 0;
-  for (let j = 0; j < count; j++) {
-    const w = widthAt(j, pos);
+  for (let j = 0; j < opens.length; j++) {
+    const w = widthAt(j, pos, opens);
     if (j === i) return x + w / 2;
     x += w;
   }
@@ -65,14 +71,19 @@ function centreOf(i: number, pos: number, count: number): number {
  *
  * Let go and it springs to the nearest detent; every detent crossed ticks.
  */
-export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons }: GlassTabBarProps) {
+export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabBarProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { accent, animations } = useAppearance();
 
-  const count = state.routes.length;
-  const last = count - 1;
+  const last = state.routes.length - 1;
   const barWidth = width - CHROME.tabBarSide * 2;
+
+  const labels = state.routes.map((route) => {
+    const label = descriptors[route.key].options.tabBarLabel;
+    return typeof label === 'string' ? label : route.name;
+  });
+  const opens = labels.map(openWidth);
 
   // a floating bar has nowhere to go when the keyboard opens: it would sit on
   // top of whatever is being typed into, and it cannot be reached anyway
@@ -132,7 +143,17 @@ export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons 
 
   const stripStyle = useAnimatedStyle(() => {
     const i = Math.round(clamp(pos.value, 0, last));
-    return { transform: [{ translateX: barWidth / 2 - centreOf(i, pos.value, count) }] };
+    return { transform: [{ translateX: barWidth / 2 - centreOf(i, pos.value, opens) }] };
+  });
+
+  // the lens breathes with the dial rather than standing at the widest name:
+  // fixed at the maximum it hangs loose around a short one like CHAT
+  const lensStyle = useAnimatedStyle(() => {
+    const at = clamp(pos.value, 0, last);
+    const lo = Math.floor(at);
+    const hi = Math.ceil(at);
+    const t = at - lo;
+    return { width: opens[lo] * (1 - t) + opens[hi] * t };
   });
 
   return (
@@ -146,24 +167,26 @@ export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons 
       accessibilityElementsHidden={hidden}
       importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
     >
-      <TabBarBackground target={blurTarget} />
+      <Glass style={styles.pane} radius={CHROME.tabBarHeight / 2} />
 
       {/* the lens: fixed at the centre, the strip moves under it */}
       <View pointerEvents="none" style={styles.lensLayer}>
-        <View style={[styles.lens, { borderColor: `${accent}55`, backgroundColor: `${accent}20` }]} />
+        <Animated.View
+          style={[styles.lens, { borderColor: `${accent}55`, backgroundColor: `${accent}20` }, lensStyle]}
+        />
       </View>
 
       <GestureDetector gesture={pan}>
         <View style={styles.track}>
           <Animated.View style={[styles.strip, stripStyle]}>
             {state.routes.map((route, index) => {
-              const { options } = descriptors[route.key];
-              const label = typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name;
+              const label = labels[index];
               return (
                 <TabDetent
                   key={route.key}
                   index={index}
                   pos={pos}
+                  opens={opens}
                   label={label}
                   icon={icons[route.name]}
                   accent={accent}
@@ -186,6 +209,7 @@ export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons 
 type DetentProps = {
   index: number;
   pos: { value: number };
+  opens: number[];
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
@@ -194,11 +218,12 @@ type DetentProps = {
   onLongPress: () => void;
 };
 
-function TabDetent({ index, pos, label, icon, accent, selected, onPress, onLongPress }: DetentProps) {
+function TabDetent({ index, pos, opens, label, icon, accent, selected, onPress, onLongPress }: DetentProps) {
   /** 0 under the lens, 1 a whole tab away — everything here reads off it */
   const away = useDerivedValue(() => Math.min(Math.abs(pos.value - index), 1));
+  const nameWidth = labelWidth(label);
 
-  const slotStyle = useAnimatedStyle(() => ({ width: widthAt(index, pos.value) }));
+  const slotStyle = useAnimatedStyle(() => ({ width: widthAt(index, pos.value, opens) }));
 
   const iconStyle = useAnimatedStyle(() => ({
     opacity: interpolate(away.value, [0, 1], [1, 0.55], Extrapolation.CLAMP),
@@ -207,7 +232,9 @@ function TabDetent({ index, pos, label, icon, accent, selected, onPress, onLongP
 
   const labelStyle = useAnimatedStyle(() => ({
     opacity: interpolate(away.value, [0, 0.5], [1, 0], Extrapolation.CLAMP),
-    width: interpolate(away.value, [0, 1], [ACTIVE_W - IDLE_W - SPACE.sm, 0], Extrapolation.CLAMP),
+    // exactly the name's own width, so there is no slack between it and the
+    // icon and the pair sits centred in the capsule
+    width: interpolate(away.value, [0, 1], [nameWidth, 0], Extrapolation.CLAMP),
   }));
 
   const tap = Gesture.Tap()
@@ -251,6 +278,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   stowed: { opacity: 0, transform: [{ translateY: 200 }] },
+  pane: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   lensLayer: {
     position: 'absolute',
     top: 0,
@@ -260,12 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  lens: {
-    width: ACTIVE_W - 6,
-    height: 44,
-    borderRadius: RADIUS.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  lens: { height: 44, borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth },
   track: {
     height: CHROME.tabBarHeight,
     borderRadius: CHROME.tabBarHeight / 2,
@@ -279,9 +302,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACE.xs,
+    // the icon and the name read as one pair, not two things sharing a pill
+    gap: SPACE.sm,
+    overflow: 'hidden',
   },
-  // the label owns a fixed animated width, so it has to centre its own text —
-  // left-aligned inside that box pulls the icon-and-name pair off centre
-  label: { ...TYPE.dataLabel, fontSize: 11, letterSpacing: 0.4, textAlign: 'center' },
+  label: {
+    ...TYPE.dataLabel,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    // Android pads glyphs vertically by default, which sits the name a pixel
+    // or two below the icon's centre line
+    includeFontPadding: false,
+  },
 });
