@@ -29,6 +29,13 @@ export type ReportsStackParams = {
 
 export type SettingsStackParams = {
   SettingsHome: undefined;
+  /**
+   * The same screen the Home stack carries. Connection is two things at once —
+   * configuration, which belongs here, and urgent status, which belongs a tap
+   * from Home — and registering it in both stacks is what stops either route
+   * throwing the user into the other tab.
+   */
+  Connection: undefined;
   Appearance: undefined;
   About: undefined;
 };

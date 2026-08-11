@@ -97,6 +97,7 @@ function SettingsStackScreens() {
   return (
     <SettingsStack.Navigator screenOptions={SCREEN_OPTIONS}>
       <SettingsStack.Screen name="SettingsHome" component={SettingsScreen} />
+      <SettingsStack.Screen name="Connection" component={ConnectionScreen} />
       <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
       <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>

@@ -59,10 +59,11 @@ describe('SettingsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Appearance');
   });
 
-  it('sends Connection to the Home stack, where that screen lives', async () => {
+  it('opens Connection inside Settings, without jumping tabs', async () => {
     const { getByTestId } = await mount(<SettingsScreen />);
     fireEvent.press(getByTestId('settings-connection'));
-    expect(mockParentNavigate).toHaveBeenCalledWith('Home', { screen: 'Connection' });
+    expect(mockNavigate).toHaveBeenCalledWith('Connection');
+    expect(mockParentNavigate).not.toHaveBeenCalled();
   });
 
   it('marks unbuilt rows instead of leaving dead taps', async () => {

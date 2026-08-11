@@ -26,7 +26,7 @@ export function SettingsScreen() {
           icon="link-outline"
           title="Connection"
           subtitle="Server, transport and link state"
-          onPress={() => tabs?.navigate('Home', { screen: 'Connection' })}
+          onPress={() => nav.navigate('Connection')}
         />
         <SettingsRow
           testID="settings-appearance"
