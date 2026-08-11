@@ -1,17 +1,21 @@
 import { PropsWithChildren, RefObject, createContext, useContext, useRef } from 'react';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { BlurTargetView, BlurView } from 'expo-blur';
+import { BlurView } from 'expo-blur';
 import { RADIUS } from '../../theme/tokens';
 
 /**
- * Expo Go ships one fixed set of native views, and a view it does not have
- * cannot be caught by an error boundary — it takes the process down with no JS
- * error at all, which is exactly how this app was dying there while the
- * compiled build was fine. So in Expo Go the blur target is never mounted and
- * the glass falls back to its tint, which is the whole point of having a tint.
+ * Real blur is iOS only, for now.
+ *
+ * Android's blur needs a `BlurTargetView` ancestor and samples it every frame
+ * per surface. Wrapping the whole app in one and hanging four blurs off it is
+ * what the app started exiting on — silently, with no JS error, which is the
+ * signature of a native crash no error boundary can catch. Expo Go fell over on
+ * the same view.
+ *
+ * Until that is diagnosed against a device log, Android gets the tint alone.
+ * On this palette the difference is slight; a crash is not.
  */
-const IN_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const REAL_BLUR = Platform.OS === 'ios';
 
 const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
 
@@ -25,12 +29,10 @@ const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
  */
 export function BlurTargetProvider({ children }: PropsWithChildren) {
   const ref = useRef<View | null>(null);
-  if (IN_EXPO_GO) return <View style={styles.fill}>{children}</View>;
+  // no BlurTargetView: nothing samples it while Android blur is off
   return (
     <BlurTargetContext.Provider value={ref}>
-      <BlurTargetView ref={ref} style={styles.fill}>
-        {children}
-      </BlurTargetView>
+      <View style={styles.fill}>{children}</View>
     </BlurTargetContext.Provider>
   );
 }
@@ -62,7 +64,8 @@ export function Glass({
   style,
   radius = RADIUS.lg,
   intensity,
-  tint = 'rgba(8,20,44,0.45)',
+  // without a blur behind it the tint has to carry the surface on its own
+  tint = REAL_BLUR ? 'rgba(8,20,44,0.45)' : 'rgba(7,18,40,0.88)',
   sheen = true,
   testID,
 }: GlassProps) {
@@ -71,15 +74,14 @@ export function Glass({
 
   return (
     <View testID={testID} style={[{ borderRadius: radius }, styles.clip, style]}>
-      <BlurView
-        style={StyleSheet.absoluteFill}
-        // the chrome material is what iOS uses for its own bars
-        tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
-        intensity={strength}
-        // Android's blur needs a target it cannot have in Expo Go
-        blurMethod={IN_EXPO_GO ? 'none' : 'dimezisBlurViewSdk31Plus'}
-        blurTarget={target ?? undefined}
-      />
+      {REAL_BLUR ? (
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          // the chrome material is what iOS uses for its own bars
+          tint="systemChromeMaterialDark"
+          intensity={strength}
+        />
+      ) : null}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: tint }]} />
       {sheen ? <View style={styles.sheen} /> : null}
       {children}
