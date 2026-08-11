@@ -118,13 +118,20 @@ export function GlassTabBar({ state, descriptors, navigation, blurTarget, icons 
     transform: [{ translateX: barWidth / 2 - ITEM / 2 - pos.value * ITEM }],
   }));
 
-  if (hidden) return null;
-
   return (
     <View
       testID="tab-bar"
-      style={[styles.wrap, { bottom: Math.max(insets.bottom, CHROME.tabBarGap) }]}
+      // hidden by moving it out of the way, never unmounted: tearing down views
+      // that own a running layout animation is a way to crash Android
+      pointerEvents={hidden ? 'none' : 'auto'}
+      style={[
+        styles.wrap,
+        { bottom: Math.max(insets.bottom, CHROME.tabBarGap) },
+        hidden && styles.stowed,
+      ]}
       accessibilityRole="tablist"
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
     >
       <TabBarBackground target={blurTarget} />
 
@@ -228,6 +235,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
+  stowed: { opacity: 0, transform: [{ translateY: 200 }] },
   lensLayer: {
     position: 'absolute',
     top: 0,

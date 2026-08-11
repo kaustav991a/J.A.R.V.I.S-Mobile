@@ -52,30 +52,38 @@ export function ChatScreen() {
   }, [turns.length]);
 
   /**
-   * While the keyboard is up the composer must sit on it, not on the tab bar's
-   * reserved space — that gap is what was pushing the newest turn out of sight.
-   * The window itself resizes (`softwareKeyboardLayoutMode: resize`), so the
-   * only thing to give back is the clearance, plus a scroll to the newest turn.
+   * Lift the composer by the keyboard's measured height.
+   *
+   * `softwareKeyboardLayoutMode: resize` does not resize an edge-to-edge
+   * Android window — the app owns its insets there, and assuming otherwise is
+   * what left the composer sitting under the keyboard with the newest turn
+   * hidden behind it. So take the height the event reports and pad by it.
    */
-  const [typing, setTyping] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => {
-      setTyping(true);
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
       list.current?.scrollToOffset({ offset: 0, animated: true });
     });
-    const hide = Keyboard.addListener('keyboardDidHide', () => setTyping(false));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
     return () => {
       show.remove();
       hide.remove();
     };
   }, []);
 
+  const typing = keyboardHeight > 0;
+
   const send = (text: string) => {
     void sendCommand(text).catch(() => {});
     if (!connected) toast.show('No link — answered locally', 'bad');
   };
 
-  const bottom = typing ? SPACE.sm : CHROME.tabBarHeight + Math.max(insets.bottom, CHROME.tabBarGap) + SPACE.sm;
+  // iOS lifts the whole view itself, so only Android pays the keyboard height
+  const lift = Platform.OS === 'android' ? keyboardHeight : 0;
+  const bottom = typing
+    ? lift + SPACE.sm
+    : CHROME.tabBarHeight + Math.max(insets.bottom, CHROME.tabBarGap) + SPACE.sm;
 
   return (
     <View style={styles.root} testID="chat-screen">

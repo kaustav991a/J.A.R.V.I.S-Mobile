@@ -8,6 +8,7 @@ import { Orbitron_400Regular, Orbitron_700Bold, useFonts } from '@expo-google-fo
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { LaunchScreen } from './src/screens/LaunchScreen';
 import { ToastProvider } from './src/components/ui/Toast';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { AppearanceProvider } from './src/theme/appearance';
 import { JarvisProvider } from './src/state/JarvisProvider';
 import { COLOR } from './src/theme/tokens';
@@ -29,7 +30,8 @@ export default function App() {
   // AppearanceProvider is outermost: the navigator itself reads the accent for
   // its header tint and tab bar.
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <AppearanceProvider>
           <JarvisProvider>
@@ -41,7 +43,8 @@ export default function App() {
           </JarvisProvider>
         </AppearanceProvider>
       </SafeAreaProvider>
-    </GestureHandlerRootView>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 
