@@ -40,7 +40,7 @@ const allDown = (): typeof fetch =>
 const cloudOnly = (): typeof fetch =>
   jest.fn(async (url: unknown) => {
     if (String(url).includes('desk')) throw new Error('ECONNREFUSED');
-    return new Response('{}', { status: 200 });
+    return new Response(JSON.stringify({ app_link: true }), { status: 200 });
   }) as unknown as typeof fetch;
 
 type Harness = {

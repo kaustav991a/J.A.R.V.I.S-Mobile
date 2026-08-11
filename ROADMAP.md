@@ -145,8 +145,28 @@ Collected so the backend work can be scoped once:
 - **A push token registry** and a server-side sender.
 - **App auth**: issue and revoke pairing tokens, and reject unauthenticated
   calls. Design §6 owes this and it is unverified from here.
-- **Cloud gateway** (`/app-link`). `cloudBase` is null in every build today, so
-  the cloud half of the transport has never run against a real server.
+- **Cloud gateway `/app-link`.** The app side of automatic failover is done and
+  wired: `chooseMode` probes the desk, then the cloud, then goes dark, and
+  re-probes on a 5s tick, on foreground, and on any network change.
+  `EXPO_PUBLIC_JARVIS_CLOUD` now points at
+  `https://jarvis-cloud-gateway.onrender.com`, whose `/health` answers 200.
+
+  What the gateway still owes, checked 2026-08-11 against its own
+  `/openapi.json` — it serves exactly `/health`, `/`, and one webhook path:
+
+  1. **`WS /app-link`**, accepting `?token=…`, speaking the frames in
+     `src/ws/frames.ts` and taking a bare command string (no JSON envelope —
+     `LinkMachine.send` writes the text straight to the socket).
+  2. **`{"app_link": true}` in the `/health` body.** The app refuses to choose
+     a gateway that does not declare this, because a 200 alone would flip it to
+     CLOUD and leave it on a dead socket — worse than staying dark. Add the
+     flag only once the socket actually exists.
+  3. Optionally `/api/backdoor` and `/api/confirm`, which would let commands
+     work over REST while the socket is down.
+
+  The free tier also sleeps; the cloud probe timeout was raised 4s → 8s, but a
+  cold start still takes tens of seconds, so the first probe after idle will
+  miss and the next tick will catch it.
 - **Presence**, so the app can say the desk is awake but idle, rather than
   inferring it from socket state.
 
@@ -166,9 +186,10 @@ Collected so the backend work can be scoped once:
   breakpoint before iPad is claimed.
 - **Error surfaces.** `lastError` is shown only on the Connection screen. A
   failed command currently reports success-shaped toast copy.
-- **EAS build + OTA updates.** Everything so far runs in Expo Go. A dev build is
-  required by voice, notifications and widgets, and Android blur behaves
-  differently outside Expo Go — worth verifying early rather than at ship time.
+- ~~**EAS build**~~ — done. `eas.json` `preview` profile builds a signed APK;
+  first one shipped 2026-08-11 from `da7bf8a`. Still to do: **OTA updates**
+  (`expo-updates`, so a UI change reaches the phone without a rebuild) and a
+  `development` client build, which voice, notifications and widgets all need.
 - **Crash and error reporting** before any external tester sees it.
 
 ## 6. Deliberately not doing

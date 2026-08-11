@@ -3,8 +3,9 @@ import { probeLan, probeCloud, chooseMode } from '../probe';
 
 const endpoints: Endpoints = { deskBase: 'http://192.168.1.9:8000', cloudBase: 'https://jarvis.example.com' };
 
+/** the desk answers a bare 200; the cloud must also declare it serves /app-link */
 const okFetch = (): typeof fetch =>
-  jest.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
+  jest.fn(async () => new Response(JSON.stringify({ app_link: true }), { status: 200 })) as unknown as typeof fetch;
 
 const failFetch = (): typeof fetch =>
   jest.fn(async () => {
@@ -54,7 +55,7 @@ describe('probeLan', () => {
 });
 
 describe('probeCloud', () => {
-  it('hits /health and returns true on 200', async () => {
+  it('hits /health and accepts a gateway that declares app_link', async () => {
     const fetchImpl = okFetch();
     await expect(probeCloud(endpoints, { fetchImpl })).resolves.toBe(true);
     expect((fetchImpl as jest.Mock).mock.calls[0][0]).toBe('https://jarvis.example.com/health');
@@ -75,7 +76,7 @@ describe('chooseMode', () => {
   it('falls back to cloud when only the cloud answers', async () => {
     const fetchImpl = jest.fn(async (url: unknown) => {
       if (String(url).includes('192.168')) throw new Error('ECONNREFUSED');
-      return new Response('{}', { status: 200 });
+      return new Response(JSON.stringify({ app_link: true }), { status: 200 });
     }) as unknown as typeof fetch;
     await expect(chooseMode(endpoints, { fetchImpl })).resolves.toBe('cloud');
   });

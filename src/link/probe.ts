@@ -20,11 +20,36 @@ async function reachable(url: string, fetchImpl: typeof fetch, timeoutMs: number
   }
 }
 
+/**
+ * A gateway is only a usable fallback if it can hold the app's socket. The
+ * live cloud brain answers `/health` with 200 while serving no `/app-link` at
+ * all — picking it on a 200 alone would flip the app to CLOUD and leave it
+ * sitting on a dead socket, which reads worse than staying dark.
+ *
+ * So the gateway must say so: `{"app_link": true}` in its health body.
+ */
+async function serves(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(url, { signal: controller.signal });
+    if (res.status !== 200) return false;
+    const body: unknown = await res.json();
+    return typeof body === 'object' && body !== null && (body as { app_link?: unknown }).app_link === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const probeLan = (e: Endpoints, deps: ProbeDeps): Promise<boolean> =>
   reachable(`${e.deskBase}/api/health/summary`, deps.fetchImpl, deps.lanTimeoutMs ?? 1500);
 
+/** 8s, not 4: a sleeping free-tier host takes tens of seconds to wake, and a
+ *  timeout that fires before the first byte can never see it come back. */
 export const probeCloud = async (e: Endpoints, deps: ProbeDeps): Promise<boolean> =>
-  e.cloudBase ? reachable(`${e.cloudBase}/health`, deps.fetchImpl, deps.cloudTimeoutMs ?? 4000) : false;
+  e.cloudBase ? serves(`${e.cloudBase}/health`, deps.fetchImpl, deps.cloudTimeoutMs ?? 8000) : false;
 
 /** LAN first, cloud second, dark last. Never probes the cloud if the desk answers. */
 export async function chooseMode(e: Endpoints, deps: ProbeDeps): Promise<LinkMode> {
