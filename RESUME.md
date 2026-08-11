@@ -1,6 +1,72 @@
 # Resume point — jarvis-mobile
 
-Branch: `feat/mobile-hud`. Written 2026-08-10, mid-session, at the user's request.
+Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11.
+
+---
+
+## Start here (2026-08-11, end of day)
+
+**The app runs.** Everything below §"Session 6" is history; this is the state.
+
+### The one bug that cost the day, and its answer
+
+Android **cannot** use `BlurTargetView`. Mounting it kills the process
+natively — no JS error, no red screen, nothing an `ErrorBoundary` can catch, so
+it presents as "the app just exits while loading". It took two crashing APKs and
+a broken Expo Go before a dev build proved it in three reloads:
+
+| what was mounted | result |
+|---|---|
+| `BlurTargetView` at the root | dies on launch |
+| removed | runs clean |
+| `BlurView` with no target | runs, blurs nothing |
+
+So on Android it is a crash or a no-op, nothing in between. `Glass`
+(`src/components/ui/Glass.tsx`) now gives Android a heavy tint that reads as
+smoked glass, and keeps real blur on iOS. **Do not reintroduce
+`BlurTargetView`** without testing on a dev build first.
+
+The lesson worth keeping: *an APK gives no diagnosis*. A release build has no
+red box, so a native crash is silent. Use the dev build for anything native.
+
+### How to work on this now
+
+```bash
+npx expo start --dev-client     # phone: JARVIS dev build, tap the server
+npm test                        # 172 tests
+npm run typecheck
+```
+
+The dev build APK (`f2dadbf`) is installed on the user's phone. JS changes
+reload in seconds; only a **new native dependency** needs a rebuild:
+
+```bash
+eas build -p android --profile development   # rebuild the dev client
+eas build -p android --profile preview       # standalone APK to share
+```
+
+Expo Go is dead to this project — it lacks the native modules and gave no
+diagnosis. `@react-native-community/slider` was removed for the same reason
+(replaced by `src/components/ui/Slider.tsx`, drawn from views over a pan
+gesture).
+
+**Owed:** a standalone `preview` APK has not been built since the fixes. The
+last one published (`0b0c84e`) still crashes. Build one first thing.
+
+### Agreed next, not started
+
+Making the launch screen cinematic, in the user's priority order:
+
+1. **Ignition, not fade** — the reactor ring draws itself round via
+   stroke-dashoffset, so it powers on instead of appearing.
+2. **Sequence the arrival** — ring, then wash, then wordmark, then the rail;
+   about half a second of choreography using the elements already there.
+3. Hand off to Home's small reactor rather than cutting (shared-element).
+4. Replace the two static halo rings with one slow tick track.
+
+Then `ROADMAP.md` §1: persistence, the Connection endpoint field, pairing token.
+
+---
 
 ## Where the work stands
 
@@ -189,6 +255,42 @@ the `J` monogram — the sheet's 190px version was rejected.
 
 **The bounce is gone.** Screen content no longer animates in, and the tab
 selection is a timing curve: springy entrances read as lag, not polish.
+
+## Session 6 — shipping to a phone, and the blur hunt
+
+- **App id set**: `com.mypersonalintelligence.jarvis`, display name JARVIS.
+  `eas.json` carries `preview` (standalone APK) and `development` (dev client).
+  EAS project `@kaustav790/jarvis-mobile`.
+- **Chat panel** replaced the Commands tab (`ChatScreen`): inverted bubble list
+  pinned to a glass composer, typing dots, tap a reply to read it as terminal
+  output. Voice needs no surface of its own — a transcript is another user turn.
+- **Demo mode** (`src/state/demoFeed.ts`) stands in for the desk *and* the link:
+  telemetry that moves, an approval request, a reply to every command, and a
+  simulated handshake so screens do not read Disconnected while data flows. The
+  Connection screen wears a SIMULATED badge; `simulated` is on the context.
+- **Activity screen** behind the bell (approvals, then one timeline of commands,
+  replies and agent steps). **QuickMenu** behind the hamburger — deliberately
+  not a second Settings tab, only what is worth changing while looking at the
+  HUD. Connection is registered in **both** the Home and Settings stacks, so
+  neither route jumps tabs.
+- **Tab bar**: the iOS Camera dial. Width follows dial position (`widthAt`), so
+  growing and sliding are one motion; a 160ms press arms it; rubber band, spring
+  settle, a tick per detent. Taps use `Gesture.Race`, not `Exclusive` — the
+  latter made every tap wait out the hold before firing.
+- **Haptics** (`src/lib/haptics.ts`): tap, good, bad. Wired to buttons, the run
+  button, the toast (so an outcome cannot feel one way here and another there)
+  and each detent.
+- **`__tests__/app.test.tsx`** mounts the whole app as the device does. It
+  needed the gesture-handler jest shim and the safe-area mock, and it found a
+  real defect: `netSub.remove()` assumed a subscription `expo-network` does not
+  always return.
+- Git history was rewritten twice: author `Kaustav Sengupta`, email
+  `kaustav.wlh@gmail.com` (the one GitHub links to `kaustav991a`). Backup branch
+  `backup/pre-author-rewrite` still exists locally and can be deleted.
+- `docs/cloud-app-link.md` specifies what the Render gateway owes for cloud
+  failover: a `WS /app-link` speaking `src/ws/frames.ts` and taking bare text,
+  plus `{"app_link": true}` in `/health`. The app already probes desk → cloud →
+  dark and refuses a gateway that does not declare that flag.
 
 ## Next steps, in order
 
