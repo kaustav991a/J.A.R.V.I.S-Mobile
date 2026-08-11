@@ -1,7 +1,17 @@
 import { PropsWithChildren, RefObject, createContext, useContext, useRef } from 'react';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { BlurTargetView, BlurView } from 'expo-blur';
 import { RADIUS } from '../../theme/tokens';
+
+/**
+ * Expo Go ships one fixed set of native views, and a view it does not have
+ * cannot be caught by an error boundary — it takes the process down with no JS
+ * error at all, which is exactly how this app was dying there while the
+ * compiled build was fine. So in Expo Go the blur target is never mounted and
+ * the glass falls back to its tint, which is the whole point of having a tint.
+ */
+const IN_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
 
@@ -15,6 +25,7 @@ const BlurTargetContext = createContext<RefObject<View | null> | null>(null);
  */
 export function BlurTargetProvider({ children }: PropsWithChildren) {
   const ref = useRef<View | null>(null);
+  if (IN_EXPO_GO) return <View style={styles.fill}>{children}</View>;
   return (
     <BlurTargetContext.Provider value={ref}>
       <BlurTargetView ref={ref} style={styles.fill}>
@@ -65,7 +76,8 @@ export function Glass({
         // the chrome material is what iOS uses for its own bars
         tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
         intensity={strength}
-        blurMethod="dimezisBlurViewSdk31Plus"
+        // Android's blur needs a target it cannot have in Expo Go
+        blurMethod={IN_EXPO_GO ? 'none' : 'dimezisBlurViewSdk31Plus'}
         blurTarget={target ?? undefined}
       />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: tint }]} />
