@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -28,11 +28,15 @@ const THUMB = 22;
 export function Slider({ value, onChange, testID }: SliderProps) {
   const { accent } = useAppearance();
   const [width, setWidth] = useState(0);
-  const start = useSharedValue(0);
+  const dragging = useSharedValue(false);
   const at = useSharedValue(value);
 
-  // follow the prop while the finger is off it
-  if (!start.value && at.value !== value) at.value = value;
+  // Follow the prop while the finger is off it — in an effect, never in the
+  // render body: reading or writing a shared value during render is a data
+  // race with the UI thread, and Reanimated warns about it for good reason.
+  useEffect(() => {
+    if (!dragging.value) at.value = value;
+  }, [value, at, dragging]);
 
   const commit = (v: number) => {
     onChange(Math.round(v * 100) / 100);
@@ -41,7 +45,7 @@ export function Slider({ value, onChange, testID }: SliderProps) {
   const pan = Gesture.Pan()
     .minDistance(0)
     .onBegin((e) => {
-      start.value = 1;
+      dragging.value = true;
       if (width > 0) {
         at.value = Math.min(Math.max(e.x / width, 0), 1);
         runOnJS(commit)(at.value);
@@ -54,7 +58,7 @@ export function Slider({ value, onChange, testID }: SliderProps) {
       runOnJS(commit)(at.value);
     })
     .onFinalize(() => {
-      start.value = 0;
+      dragging.value = false;
     });
 
   const fillStyle = useAnimatedStyle(() => ({ width: at.value * width }));
