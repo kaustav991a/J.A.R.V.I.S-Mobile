@@ -81,8 +81,10 @@ export function ChatScreen() {
 
   // iOS lifts the whole view itself, so only Android pays the keyboard height
   const lift = Platform.OS === 'android' ? keyboardHeight : 0;
+  // 20 clear of the keyboard: sitting flush on it leaves the field looking
+  // stuck to the keys, and the newest turn crowded right behind the composer
   const bottom = typing
-    ? lift + SPACE.sm
+    ? lift + SPACE.xl
     : CHROME.tabBarHeight + Math.max(insets.bottom, CHROME.tabBarGap) + SPACE.sm;
 
   return (
