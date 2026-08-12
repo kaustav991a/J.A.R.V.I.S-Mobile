@@ -9,6 +9,7 @@ import Animated, {
   clamp,
   interpolate,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -27,13 +28,35 @@ export type GlassTabBarProps = BottomTabBarProps & {
 /** an unselected tab is a glyph and nothing else */
 const IDLE_W = 52;
 const RUBBER = 46;
-/** heavy and slow on purpose: the dial should feel like it has mass, and
- *  settle into a detent rather than snapping to it */
-const SNAP = { damping: 22, stiffness: 78, mass: 1.1 } as const;
+/**
+ * The grab. Slightly under-damped (ζ≈0.67) so the dial arrives with a hint of
+ * overshoot instead of easing in — that overshoot is what reads as magnetic.
+ * This was heavier (damping 22, stiffness 78, mass 1.1), chosen to give the dial
+ * mass; on device the mass read as syrup.
+ */
+const SNAP = { damping: 17, stiffness: 190, mass: 0.85 } as const;
+/**
+ * How long a flick is treated as still coasting. Multiplied by the release
+ * velocity, it says which detent the finger was *aiming* at — the old code
+ * clamped the throw to ±1 detent, so a hard swipe could never cross more than
+ * one tab and momentum died the instant the finger left the glass.
+ */
+const COAST_S = 0.22;
+/** but a wild swipe should not fly the length of the dial */
+const MAX_FLICK = 3;
 /** the finger travels further than the strip does — that is the stickiness */
 const DRAG = 1.45;
 /** waking and settling the dial: quick enough to feel like a response */
 const WAKE = { damping: 20, stiffness: 160, mass: 0.7 } as const;
+/**
+ * How hard a detent holds the dial *while the finger is still down* — 0 is a
+ * linear strip, 1 is a pure snap. This is the other half of the Camera feel:
+ * the spring on release only ever tidied up after the drag, so mid-drag the
+ * dial slid like a scrollview. At 0.55 leaving a tab costs about twice the
+ * finger travel that crossing the middle does, and the total travel per detent
+ * is unchanged — the magnet redistributes the drag, it does not add friction.
+ */
+export const MAGNET = 0.68;
 
 /**
  * Labels are set in the data face, which is monospace on both platforms, so a
@@ -48,14 +71,14 @@ const openWidth = (label: string): number => IDLE_W + labelWidth(label) + SPACE.
 
 /** how wide tab `i` is when the dial sits at `pos` — the whole layout follows
  *  from this, so the strip offset and the tabs can never disagree */
-function widthAt(i: number, pos: number, opens: number[]): number {
+export function widthAt(i: number, pos: number, opens: number[]): number {
   'worklet';
   const near = 1 - Math.min(Math.abs(pos - i), 1);
   return IDLE_W + (opens[i] - IDLE_W) * near;
 }
 
 /** distance from the strip's left edge to the centre of tab `i` */
-function centreOf(i: number, pos: number, opens: number[]): number {
+export function centreOf(i: number, pos: number, opens: number[]): number {
   'worklet';
   let x = 0;
   for (let j = 0; j < opens.length; j++) {
@@ -64,6 +87,85 @@ function centreOf(i: number, pos: number, opens: number[]): number {
     x += w;
   }
   return x;
+}
+
+/**
+ * Smootherstep: flat at both ends, steep through the middle. Its derivative is
+ * zero at 0 and 1, which is exactly the shape of a detent — the dial is
+ * reluctant to leave one and eager to arrive at the next.
+ */
+function detentCurve(t: number): number {
+  'worklet';
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/**
+ * Bend a raw dial position toward whichever detent it is nearest, so the dial
+ * is sticky under the finger instead of only after it lifts.
+ *
+ * Blended with the identity rather than used outright: pure smootherstep would
+ * bring the dial to a dead stop at each tab, and a control that stops moving
+ * while the finger is still moving reads as broken, not as magnetic. The blend
+ * keeps the rate between 0.45x and 1.48x — always advancing.
+ *
+ * Detents land on integers (`magnetize(k) === k`) and the midpoints are
+ * untouched, so nothing downstream — the tick, the spring target, the lens —
+ * has to know this ran.
+ *
+ * `strength` is defaulted in the body, not in the signature. The reanimated
+ * babel plugin builds a worklet's closure from the identifiers in its *body*,
+ * so a default parameter of `= MAGNET` compiles fine, passes under jest — which
+ * runs on the JS thread, where the real closure still exists — and then throws
+ * `Property 'MAGNET' doesn't exist` on the UI thread on device, once per frame.
+ */
+export function magnetize(raw: number, strength?: number): number {
+  'worklet';
+  const pull = strength === undefined ? MAGNET : strength;
+  const base = Math.floor(raw);
+  const t = raw - base;
+  return base + t + pull * (detentCurve(t) - t);
+}
+
+/**
+ * The strip offset for a *fractional* dial position, lerped between the two
+ * detents it lies between.
+ *
+ * This replaces rounding the dial to the nearest tab and centring that one:
+ * because every tab's width follows the dial, the two neighbours' centres are
+ * about a tab apart, so the round tripped the strip roughly 60px sideways in a
+ * single frame as the dial crossed a boundary — the jump in the middle of every
+ * drag.
+ */
+export function centreAt(pos: number, opens: number[]): number {
+  'worklet';
+  const last = opens.length - 1;
+  const at = clamp(pos, 0, last);
+  const lo = Math.floor(at);
+  const hi = Math.ceil(at);
+  const t = at - lo;
+  const centre = centreOf(lo, at, opens) * (1 - t) + centreOf(hi, at, opens) * t;
+  // Past either end the widths have to stop following the dial. Fed the raw
+  // position, `widthAt` narrows the over-dragged edge tab, which walks its own
+  // centre back the way the finger came — the band ran backwards. So the layout
+  // freezes at the edge and the overscroll shows as plain travel, at the same
+  // rate a closed tab moves at.
+  return centre + (pos - at) * IDLE_W;
+}
+
+/**
+ * Which detent a release was aiming at, given where the dial is and how fast it
+ * was still travelling.
+ *
+ * The release velocity is in px/s, so it converts to detents/s through exactly
+ * the mapping the drag used — one detent is `IDLE_W * DRAG` of finger travel —
+ * and then coasts for {@link COAST_S}. Sign is flipped because dragging left
+ * (negative x) advances the dial.
+ */
+export function projectDetent(pos: number, velocityX: number, last: number): number {
+  'worklet';
+  const detentsPerSec = -velocityX / (IDLE_W * DRAG);
+  const flick = clamp(detentsPerSec * COAST_S, -MAX_FLICK, MAX_FLICK);
+  return Math.round(clamp(pos + flick, 0, last));
 }
 
 /**
@@ -148,30 +250,38 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
       const over = raw < 0 ? raw : raw > last ? raw - last : 0;
       const banded =
         raw < 0 ? (over * RUBBER) / (IDLE_W * DRAG) : raw > last ? last + (over * RUBBER) / (IDLE_W * DRAG) : raw;
-      pos.value = banded;
-      const near = Math.round(clamp(banded, 0, last));
-      if (near !== detent.value) {
-        detent.value = near;
-        runOnJS(haptic.tap)();
-      }
+      // the magnet goes on last, over the band, so inside the strip each tab
+      // holds on; past the ends it damps the overscroll a little further, which
+      // is the same direction the band is already pulling
+      pos.value = magnetize(banded);
     })
     .onEnd((e) => {
-      const flick = clamp(-e.velocityX / 1800, -1, 1);
-      const target = Math.round(clamp(pos.value + flick, 0, last));
+      const target = projectDetent(pos.value, e.velocityX, last);
       pos.value = animations ? withSpring(target, SNAP) : withTiming(target, { duration: 0 });
-      detent.value = target;
       armed.value = withSpring(0, WAKE);
       runOnJS(jump)(target);
     });
+
+  // One tick per detent, wherever the dial is when it crosses one. Reading the
+  // dial rather than the drag means the flick's coast ticks too: the old tick
+  // lived in `onUpdate`, so the moment the finger lifted the dial slid past the
+  // remaining tabs in silence, which is what made a throw feel weightless.
+  useAnimatedReaction(
+    () => Math.round(clamp(pos.value, 0, last)),
+    (now, before) => {
+      if (before === null || now === before) return;
+      detent.value = now;
+      runOnJS(haptic.tap)();
+    }
+  );
 
   const barStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + armed.value * 0.035 }],
   }));
 
-  const stripStyle = useAnimatedStyle(() => {
-    const i = Math.round(clamp(pos.value, 0, last));
-    return { transform: [{ translateX: barWidth / 2 - centreOf(i, pos.value, opens) }] };
-  });
+  const stripStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: barWidth / 2 - centreAt(pos.value, opens) }],
+  }));
 
   // the lens breathes with the dial rather than standing at the widest name:
   // fixed at the maximum it hangs loose around a short one like CHAT
