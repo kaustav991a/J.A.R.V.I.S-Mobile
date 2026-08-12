@@ -95,6 +95,14 @@ const upsertParked = (parked: ParkedAction[], next: ParkedAction): ParkedAction[
 
 function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
   switch (frame.kind) {
+    case 'transcript':
+      // from: 'user' — these are his words coming back, not the machine's. Typed
+      // commands get the same entry locally via `local_command`; a spoken one has
+      // no local text to log, so the transcript is the only place it appears.
+      return {
+        ...state,
+        chat: cap([...state.chat, { from: 'user' as const, text: frame.text, at }], CHAT_CAP),
+      };
     case 'status':
       return {
         ...state,

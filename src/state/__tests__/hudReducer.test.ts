@@ -213,3 +213,16 @@ describe('hudReducer', () => {
     });
   });
 });
+
+describe('a voice transcript', () => {
+  it('is logged as him speaking, not as J.A.R.V.I.S.', () => {
+    // a typed command gets its user entry from `local_command`; a spoken one has
+    // no local text, so this frame is the only place it can come from
+    const s = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'transcript', text: 'lock the pc' },
+      at: 7,
+    });
+    expect(s.chat).toEqual([{ from: 'user', text: 'lock the pc', at: 7 }]);
+  });
+});

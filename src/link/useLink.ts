@@ -24,6 +24,8 @@ export type UseLinkResult = {
   status: LinkStatus;
   lastError: string | null;
   send: (text: string) => boolean;
+  /** send a recorded clip; the far end transcribes it and answers */
+  sendVoice: (clip: ArrayBuffer) => boolean;
   reprobe: () => void;
 };
 
@@ -105,9 +107,10 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
   }, [machine]);
 
   const send = useCallback((text: string) => machine.send(text), [machine]);
+  const sendVoice = useCallback((clip: ArrayBuffer) => machine.sendVoice(clip), [machine]);
   const reprobe = useCallback(() => {
     void machine.reprobe();
   }, [machine]);
 
-  return { mode: snap.mode, status: snap.status, lastError: snap.lastError, send, reprobe };
+  return { mode: snap.mode, status: snap.status, lastError: snap.lastError, send, sendVoice, reprobe };
 }

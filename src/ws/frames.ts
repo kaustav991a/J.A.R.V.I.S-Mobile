@@ -75,7 +75,16 @@ export type IntruderResolvedFrame = {
   outcome: 'approved' | 'locked';
 };
 
+/**
+ * What the desk heard you say. Sent after a voice clip is transcribed, and kept
+ * separate from `status` on purpose: a transcript delivered as a status message
+ * would be appended to the chat log as J.A.R.V.I.S. having said it, which
+ * misattributes your own words to the machine.
+ */
+export type TranscriptFrame = { kind: 'transcript'; text: string };
+
 export type JarvisFrame =
+  | TranscriptFrame
   | StatusFrame
   | TelemetryFrame
   | WeatherFrame
@@ -104,11 +113,17 @@ const identity = (o: Obj): string => str(o.id) || str(o.action_id) || str(o.requ
  */
 const coerceTelemetry = (o: Obj): TelemetryData => {
   const data: TelemetryData = {};
-  const cpu = num(o.cpu);
+  // The desk sends `cpu_percent` / `ram_percent` / `disk_percent` — that is what
+  // `sensors.get_system_telemetry()` has always returned, and the web HUD reads
+  // those names. The short names here came from the spec, so every telemetry
+  // frame from a real desk was silently coerced to `{}` and the Vitals panel sat
+  // empty against a machine that was reporting fine. Both spellings are accepted
+  // rather than renaming either end.
+  const cpu = num(o.cpu) ?? num(o.cpu_percent);
   if (cpu !== null) data.cpu = cpu;
-  const mem = num(o.mem);
+  const mem = num(o.mem) ?? num(o.ram_percent);
   if (mem !== null) data.mem = mem;
-  const disk = num(o.disk);
+  const disk = num(o.disk) ?? num(o.disk_percent);
   if (disk !== null) data.disk = disk;
   if (o.gpu !== undefined) data.gpu = num(o.gpu);
   if (o.temp !== undefined) data.temp = num(o.temp);
@@ -164,6 +179,12 @@ export function parseFrame(raw: string | unknown): JarvisFrame | null {
   }
 
   switch (type) {
+    case 'transcript': {
+      const text = str(o.text).trim();
+      // an empty transcript is not something you said — drop it rather than
+      // writing a blank line into the chat log
+      return text ? { kind: 'transcript', text } : null;
+    }
     case 'agent_step':
       return {
         kind: 'agent_step',

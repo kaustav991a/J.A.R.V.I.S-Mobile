@@ -161,4 +161,51 @@ describe('parseFrame', () => {
       expect(parseFrame(j({ type: 'intruder_resolved', outcome: 'approved' }))).toBeNull();
     });
   });
+
+  describe('telemetry from a real desk', () => {
+    it('is read under the names the desk actually sends', () => {
+      // sensors.get_system_telemetry() has always returned cpu_percent /
+      // ram_percent / disk_percent, and the web HUD reads those. Only the spec
+      // ever said cpu/mem/disk, so every frame from a live desk used to coerce
+      // to {} and the Vitals panel sat empty against a healthy machine.
+      expect(
+        parseFrame(
+          j({
+            status: 'sync',
+            type: 'telemetry',
+            data: { cpu_percent: 12.5, ram_percent: 48, disk_percent: 71.2, uptime_hours: 3 },
+          })
+        )
+      ).toEqual({ kind: 'telemetry', data: { cpu: 12.5, mem: 48, disk: 71.2 } });
+    });
+
+    it('still reads the short names, so neither end had to be renamed', () => {
+      expect(parseFrame(j({ status: 'sync', type: 'telemetry', data: { cpu: 9, mem: 20, disk: 30 } }))).toEqual({
+        kind: 'telemetry',
+        data: { cpu: 9, mem: 20, disk: 30 },
+      });
+    });
+
+    it('prefers the short name when a frame somehow carries both', () => {
+      expect(
+        parseFrame(j({ status: 'sync', type: 'telemetry', data: { cpu: 9, cpu_percent: 88 } }))
+      ).toEqual({ kind: 'telemetry', data: { cpu: 9 } });
+    });
+  });
+
+  describe('a voice transcript', () => {
+    it('is its own frame, so it can be logged as him speaking', () => {
+      // sent as a status message it would be appended to the chat as J.A.R.V.I.S.
+      // having said it — a lie about who spoke
+      expect(parseFrame(j({ type: 'transcript', text: '  kal ki hobe  ' }))).toEqual({
+        kind: 'transcript',
+        text: 'kal ki hobe',
+      });
+    });
+
+    it('is dropped when empty, rather than writing a blank chat line', () => {
+      expect(parseFrame(j({ type: 'transcript', text: '   ' }))).toBeNull();
+      expect(parseFrame(j({ type: 'transcript' }))).toBeNull();
+    });
+  });
 });

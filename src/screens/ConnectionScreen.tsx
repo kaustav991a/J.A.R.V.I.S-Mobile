@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { Badge, Screen } from '../components/ui/Atoms';
@@ -35,13 +36,78 @@ function LinkRings({ size, color, connected }: { size: number; color: string; co
   );
 }
 
+/** one labelled field — the three here differ only in what they hold */
+function Field({
+  label,
+  hint,
+  value,
+  onChange,
+  testID,
+  secret = false,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (next: string) => void;
+  testID: string;
+  secret?: boolean;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        testID={testID}
+        value={value}
+        onChangeText={onChange}
+        placeholder={hint}
+        placeholderTextColor={COLOR.dim}
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry={secret}
+        style={styles.input}
+      />
+    </View>
+  );
+}
+
 export function ConnectionScreen() {
   const { width } = useWindowDimensions();
   const { accent } = useAppearance();
-  const { connected, connecting, connect, mode, lastError, simulated } = useJarvis();
+  const { connected, connecting, connect, mode, lastError, simulated, pairing, pair } = useJarvis();
+
+  const [desk, setDesk] = useState(pairing.deskBase);
+  const [cloud, setCloud] = useState(pairing.cloudBase ?? '');
+  const [token, setToken] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   const color = connected ? COLOR.green : accent;
   const state = connecting ? 'Connecting…' : connected ? 'Connected' : 'Disconnected';
+
+  /**
+   * Save, then re-dial.
+   *
+   * The token is write-only here: `pairing` reports whether one is held, never
+   * its value, so an empty box means "leave it alone" rather than "clear it" —
+   * otherwise every save from this screen would silently unpair the phone.
+   */
+  const save = async () => {
+    setSaving(true);
+    setNote(null);
+    const ok = await pair({
+      base: desk.trim() || null,
+      cloud: cloud.trim() || null,
+      ...(token.trim() ? { token: token.trim() } : {}),
+    });
+    setSaving(false);
+    if (!ok) {
+      setNote('That address is not usable — check the host and port.');
+      return;
+    }
+    setToken('');
+    setNote('Saved. Re-dialling…');
+    connect();
+  };
 
   return (
     <Screen testID="connection-screen">
@@ -80,11 +146,48 @@ export function ConnectionScreen() {
       />
 
       <Text testID="connection-endpoint" style={styles.endpoint}>
-        {DEFAULT_ENDPOINTS.deskBase}
+        {connected && mode === 'cloud' ? (pairing.cloudBase ?? DEFAULT_ENDPOINTS.deskBase) : pairing.deskBase}
       </Text>
       {lastError ? (
         <Text testID="connection-error" style={styles.error}>
           {lastError}
+        </Text>
+      ) : null}
+
+      <Field
+        testID="connection-desk-input"
+        label="DESK ADDRESS"
+        hint="192.168.1.9:8000"
+        value={desk}
+        onChange={setDesk}
+      />
+      <Field
+        testID="connection-cloud-input"
+        label="CLOUD GATEWAY"
+        hint="https://jarvis-cloud-gateway.onrender.com"
+        value={cloud}
+        onChange={setCloud}
+      />
+      <Field
+        testID="connection-token-input"
+        label={pairing.hasToken ? 'PAIRING TOKEN — SET' : 'PAIRING TOKEN — NOT SET'}
+        hint={pairing.hasToken ? 'leave blank to keep the current one' : 'the gateway APP_TOKEN'}
+        value={token}
+        onChange={setToken}
+        secret
+      />
+
+      <Button testID="connection-save" label={saving ? 'SAVING' : 'SAVE & RECONNECT'} onPress={save} busy={saving} />
+      {note ? (
+        <Text testID="connection-note" style={styles.note}>
+          {note}
+        </Text>
+      ) : null}
+      {/* the token is what the gateway checks; without one it refuses the socket
+          outright, and the phone would sit dark with no explanation */}
+      {!pairing.hasToken ? (
+        <Text testID="connection-unpaired" style={styles.note}>
+          No token yet. The cloud gateway refuses every socket until this matches its APP_TOKEN.
         </Text>
       ) : null}
     </Screen>
@@ -107,6 +210,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.xl,
   },
   button: { marginTop: SPACE.xl },
+  field: { marginTop: SPACE.md },
+  fieldLabel: { ...TYPE.dataLabel, color: COLOR.dim, marginBottom: SPACE.xs },
+  input: {
+    ...TYPE.meta,
+    color: COLOR.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLOR.dim,
+    borderRadius: 8,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.sm,
+    minHeight: 44,
+  },
+  note: { ...TYPE.dataLabel, color: COLOR.dim, textAlign: 'center', marginTop: SPACE.sm },
   endpoint: { ...TYPE.dataLabel, color: COLOR.dim, textAlign: 'center', marginTop: SPACE.lg, opacity: 0.7 },
   error: { ...TYPE.dataLabel, color: COLOR.red, textAlign: 'center', marginTop: SPACE.sm },
 });

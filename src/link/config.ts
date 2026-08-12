@@ -29,6 +29,7 @@ export const cloudWsUrl = (e: Endpoints, token: string | null): string | null =>
 
 export const TOKEN_KEY = 'jarvis_app_token';
 export const DESK_KEY = 'jarvis_desk_base';
+export const CLOUD_KEY = 'jarvis_cloud_base';
 
 /**
  * Clean up a desk address typed by hand, or reject it.
@@ -81,17 +82,46 @@ export async function saveDeskBase(base: string | null): Promise<void> {
   }
 }
 
+/** the gateway address the user set, or null to fall back to the build's default */
+export async function loadCloudBase(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    return await SecureStore.getItemAsync(CLOUD_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** pass null to forget it and go back to the build-time default */
+export async function saveCloudBase(base: string | null): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    if (base === null) await SecureStore.deleteItemAsync(CLOUD_KEY);
+    else await SecureStore.setItemAsync(CLOUD_KEY, base);
+  } catch {
+    // a gateway that cannot be persisted still applies for this session
+  }
+}
+
 /**
- * The endpoints to actually dial: the build's defaults, with the stored desk
- * address taking precedence.
+ * The endpoints to actually dial: the build's defaults, with anything the user
+ * stored taking precedence.
  *
- * The cloud base stays build-configured. It is one fixed gateway rather than
- * something to point around, and giving it a field would invite pointing the
- * phone at a brain that can answer as you.
+ * The gateway address was deliberately build-only at first — one fixed brain
+ * rather than something to point around. It is settable now because
+ * `EXPO_PUBLIC_JARVIS_CLOUD` is baked at bundle time, so a wrong or moved URL
+ * otherwise costs a full rebuild to correct, and the phone was left unable to
+ * reach anything in the meantime. The danger it was guarding against is real but
+ * is answered elsewhere: the gateway refuses every socket that does not present
+ * the pairing token, so pointing the phone somewhere new gets you a refusal, not
+ * a brain that answers as you.
  */
 export async function loadEndpoints(): Promise<Endpoints> {
-  const stored = await loadDeskBase();
-  return stored ? { ...DEFAULT_ENDPOINTS, deskBase: stored } : DEFAULT_ENDPOINTS;
+  const [desk, cloud] = await Promise.all([loadDeskBase(), loadCloudBase()]);
+  return {
+    deskBase: desk ?? DEFAULT_ENDPOINTS.deskBase,
+    cloudBase: cloud ?? DEFAULT_ENDPOINTS.cloudBase,
+  };
 }
 
 /** SecureStore is unavailable on web; the app degrades to no token there. */

@@ -77,10 +77,15 @@ describe('the stored desk address', () => {
     await expect(loadEndpoints()).resolves.toEqual(DEFAULT_ENDPOINTS);
   });
 
-  it('overrides only the desk, never the cloud', async () => {
-    // the cloud gateway is one fixed brain that can answer as you; a field for it
-    // would invite pointing the phone somewhere else
-    store.getItemAsync.mockResolvedValue('http://10.0.0.9:8000');
+  it('overrides the desk without touching the cloud gateway', async () => {
+    // the two are read under separate keys, so setting one never moves the other.
+    // The cloud address IS settable now (see cloudEndpoint.test.ts) — a URL baked
+    // at bundle time cost a full rebuild to correct — but the phone still refuses
+    // to reach a gateway that cannot serve, and the gateway refuses a phone with
+    // no pairing token.
+    store.getItemAsync.mockImplementation(async (key: string) =>
+      key === DESK_KEY ? 'http://10.0.0.9:8000' : null
+    );
     const e = await loadEndpoints();
     expect(e.deskBase).toBe('http://10.0.0.9:8000');
     expect(e.cloudBase).toBe(DEFAULT_ENDPOINTS.cloudBase);

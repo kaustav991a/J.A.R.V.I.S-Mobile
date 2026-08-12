@@ -7,7 +7,7 @@ export type LinkSnapshot = { mode: LinkMode; status: LinkStatus; lastError: stri
 /** the slice of WebSocket this app uses — lets tests inject a fake, and lets
  *  the integration test inject the node `ws` client. */
 export type MinimalSocket = {
-  send(data: string): void;
+  send(data: string | ArrayBuffer): void;
   close(): void;
   onopen: ((e?: unknown) => void) | null;
   onclose: ((e?: unknown) => void) | null;
@@ -147,6 +147,25 @@ export class LinkMachine {
     if (!this.socket || this.snap.status !== 'open') return false;
     try {
       this.socket.send(text);
+      return true;
+    } catch (e) {
+      this.set({ lastError: errText(e) });
+      return false;
+    }
+  }
+
+  /**
+   * Send a recorded voice clip for the far end to transcribe and answer.
+   *
+   * A binary frame, not base64 in an envelope: base64 is a third larger, and the
+   * clip is already the biggest thing this socket ever carries. The gateway
+   * accepts both, so a transport that cannot send bytes can fall back to
+   * `send(JSON.stringify({type:'voice',audio,format}))` without a server change.
+   */
+  sendVoice(clip: ArrayBuffer): boolean {
+    if (!this.socket || this.snap.status !== 'open') return false;
+    try {
+      this.socket.send(clip);
       return true;
     } catch (e) {
       this.set({ lastError: errText(e) });

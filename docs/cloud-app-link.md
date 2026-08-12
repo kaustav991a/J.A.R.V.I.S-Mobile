@@ -131,3 +131,57 @@ Still owed on the phone: nothing writes the pairing token. `saveToken`/
 Until then, either leave `APP_TOKEN` unset and gate the route some other way, or
 finish pairing first — do not ship an ungated `/app-link`, since it reaches a
 brain that can answer as you.
+
+---
+
+## DONE — 2026-08-12
+
+Both halves are built. The gateway serves `WS /app-link` and `/health` declares
+`"app_link": true` once `APP_TOKEN` is configured;
+`jarvis-backend/test_app_link.py` (29 checks) covers it.
+
+What landed beyond the sketch above:
+
+- **The wire format is the desk's, not a third one.** The draft sent frames keyed
+  `kind`; `parseFrame` reads `type` and `status`. The route emits
+  `{"status":…,"message":…,"user":…}` and `{"status":"sync","type":"telemetry","data":{…}}`
+  — exactly what the desk's own `/ws` sends, so this file has one contract to
+  satisfy on either transport.
+- **PC control works.** `_forward_to_desk` was Telegram-shaped, so a second path
+  was added rather than refactored: `_ask_desk()` sends the same `cmd` frame the
+  bridge already understands and waits for the reply, and the `/desk-link` reader
+  hands any frame whose `req_id` a phone registered to that phone instead of to
+  Telegram. Desk linked → the real desk answers, PC control and all. Desk off or
+  silent → the cloud brain answers, and the turn is sealed and queued for the
+  desk. Telegram is untouched either way.
+- **Telemetry is live over the cloud.** While a desk is linked the gateway asks
+  it for a vitals snapshot every 15s (`hud_req` → `hud` on the bridge) and
+  forwards it. With no desk there are still no numbers — the cloud never
+  invents them. Note the desk sends `cpu_percent`/`ram_percent`/`disk_percent`;
+  `coerceTelemetry` now reads both those and the short names, which also fixes
+  the LAN path, where every real telemetry frame had been coercing to `{}`.
+- **Voice.** The phone can send a recorded clip as a binary frame
+  (`LinkMachine.sendVoice`) or as `{"type":"voice","format":"m4a","audio":"<b64>"}`.
+  The gateway transcribes it with the same Groq Whisper path Telegram voice notes
+  use — multilingual, Bengali and Benglish included — and sends the transcript
+  back as `{"type":"transcript","text":…}`, which the reducer logs as **him**
+  speaking. Still owed on the phone: the recorder itself. `expo-audio` is not a
+  dependency yet, so `CommandBar`'s mic remains inert and wiring it needs a new
+  dev build.
+- **A keepalive every 20s.** `LinkMachine.tick` re-probes after 30s without a
+  frame, so an idle socket was being torn down and re-dialled every half minute.
+  The keepalive carries no message, so it cannot write a chat line.
+
+### Pairing is wired now
+
+The Connection screen has three fields — desk address, cloud gateway, pairing
+token — and saves all three (`pair({base, cloud, token})`). The token is
+write-only: `pairing` reports only that one is held, so leaving the box blank
+keeps the stored one rather than unpairing the phone.
+
+The cloud address became settable, reversing the note above. The reason is
+practical: `EXPO_PUBLIC_JARVIS_CLOUD` is baked at bundle time, so a wrong or
+moved URL cost a full rebuild to correct and left the phone unable to reach
+anything meanwhile. The danger it guarded against is answered by the token —
+point the phone somewhere new and you get a refused socket, not a brain that
+answers as you.

@@ -18,6 +18,7 @@ import {
   loadEndpoints,
   loadToken,
   normaliseBase,
+  saveCloudBase,
   saveDeskBase,
   saveToken,
 } from '../link/config';
@@ -56,14 +57,14 @@ export type JarvisContextValue = {
   /** locally kept command history, newest first */
   recent: string[];
   clearRecent: () => void;
-  /** the desk address in use, and whether a pairing token is held */
-  pairing: { deskBase: string; usingDefault: boolean; hasToken: boolean };
+  /** the addresses in use, and whether a pairing token is held */
+  pairing: { deskBase: string; cloudBase: string | null; usingDefault: boolean; hasToken: boolean };
   /**
-   * Point the phone at a desk and pair it. `base` is normalised, and an
-   * unusable one is rejected — the return says which. Pass null for either to
-   * forget it. Re-dials on success.
+   * Point the phone at a desk, a cloud gateway, or both, and pair it. Addresses
+   * are normalised and an unusable one is rejected — the return says which. Pass
+   * null for any of them to forget it. Re-dials on success.
    */
-  pair: (next: { base?: string | null; token?: string | null }) => Promise<boolean>;
+  pair: (next: { base?: string | null; cloud?: string | null; token?: string | null }) => Promise<boolean>;
   /** stand-in desk, for showing the app with no machine to talk to */
   demo: boolean;
   setDemo: (on: boolean) => void;
@@ -192,6 +193,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   const pairing = useMemo(
     () => ({
       deskBase: endpoints.deskBase,
+      cloudBase: endpoints.cloudBase,
       usingDefault: endpoints.deskBase === DEFAULT_ENDPOINTS.deskBase,
       // whether one is held, never the value — nothing needs to read the secret
       // back out to render, so it is not put on the context
@@ -308,14 +310,22 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     };
   }, [alert?.id, alert]);
 
-  const pair = useCallback(async (next: { base?: string | null; token?: string | null }) => {
+  const pair = useCallback(async (next: { base?: string | null; cloud?: string | null; token?: string | null }) => {
     if (next.base !== undefined) {
       // null forgets the address; anything unusable is refused rather than stored,
       // because a stored address that cannot be dialled looks like a dead desk
       const base = next.base === null ? null : normaliseBase(next.base);
       if (next.base !== null && base === null) return false;
       await saveDeskBase(base);
-      setEndpoints(base ? { ...DEFAULT_ENDPOINTS, deskBase: base } : DEFAULT_ENDPOINTS);
+      // merged into the CURRENT endpoints, not into the build defaults: rebuilding
+      // from DEFAULT_ENDPOINTS here silently threw away a gateway the user had set
+      setEndpoints((e) => ({ ...e, deskBase: base ?? DEFAULT_ENDPOINTS.deskBase }));
+    }
+    if (next.cloud !== undefined) {
+      const cloud = next.cloud === null ? null : normaliseBase(next.cloud);
+      if (next.cloud !== null && cloud === null) return false;
+      await saveCloudBase(cloud);
+      setEndpoints((e) => ({ ...e, cloudBase: cloud ?? DEFAULT_ENDPOINTS.cloudBase }));
     }
     if (next.token !== undefined) {
       const trimmed = next.token === null ? null : next.token.trim();
