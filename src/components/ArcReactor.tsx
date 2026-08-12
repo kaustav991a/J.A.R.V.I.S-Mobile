@@ -1,9 +1,8 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import Animated, {
   Easing,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -50,21 +49,37 @@ export type ArcReactorProps = {
  * - `dash` — multiplier on the sweeping arc's length. A longer arc at speed reads
  *   as urgency; a short one drifting reads as idle.
  */
-export type Tempo = { sweep: number; counter: number; breath: number; dash: number };
+export type Tempo = {
+  sweep: number;
+  counter: number;
+  breath: number;
+  dash: number;
+  /** how many arcs ride the outer track — more arcs read as more going on */
+  arcs: number;
+  /** extra width on the hot stroke, so a busy ring is visibly thicker */
+  weight: number;
+};
 
+/**
+ * The gaps here are deliberately wide. A first pass used a 9s idle against a 2s
+ * working sweep and on device the two still read as "the same spinning ring" —
+ * a 4x difference in angular speed is not obvious when there is only one thin
+ * arc to compare. So each state now differs on four axes at once: speed, arc
+ * count, stroke weight and pulse rate.
+ */
 const TEMPO: Record<string, Tempo> = {
-  /** linked and idle: slow, calm, clearly alive */
-  online: { sweep: 9000, counter: 24000, breath: 2600, dash: 0.7 },
-  /** waiting on you — a touch quicker, attentive rather than busy */
-  listening: { sweep: 5600, counter: 17000, breath: 1500, dash: 0.8 },
-  /** working: the one that should look unmistakably different */
-  thinking: { sweep: 2000, counter: 8000, breath: 900, dash: 1.7 },
-  /** talking back: steady and deliberate */
-  speaking: { sweep: 3800, counter: 13000, breath: 1150, dash: 1.1 },
-  /** something is wrong: fast, long arc, hard pulse */
-  alert: { sweep: 1300, counter: 6000, breath: 620, dash: 2.4 },
-  /** not linked: barely moving, so a dead link never looks busy */
-  boot: { sweep: 15000, counter: 32000, breath: 3400, dash: 0.45 },
+  /** linked and idle: one short arc, drifting, clearly alive but doing nothing */
+  online: { sweep: 11000, counter: 26000, breath: 3000, dash: 0.55, arcs: 1, weight: 1 },
+  /** waiting on you: two arcs, brisker — attentive, not busy */
+  listening: { sweep: 4200, counter: 14000, breath: 1400, dash: 0.9, arcs: 2, weight: 1.15 },
+  /** working: three long arcs, fast, thick, hard pulse. Unmistakable. */
+  thinking: { sweep: 950, counter: 4200, breath: 620, dash: 2.1, arcs: 3, weight: 1.5 },
+  /** talking back: two arcs, steady and deliberate */
+  speaking: { sweep: 2400, counter: 9000, breath: 1000, dash: 1.3, arcs: 2, weight: 1.25 },
+  /** something is wrong: fastest, longest, thickest */
+  alert: { sweep: 620, counter: 3000, breath: 400, dash: 2.8, arcs: 3, weight: 1.7 },
+  /** not linked: barely moving, thin, so a dead link never looks busy */
+  boot: { sweep: 22000, counter: 44000, breath: 4200, dash: 0.35, arcs: 1, weight: 0.85 },
 };
 
 /**
@@ -84,19 +99,14 @@ export const IGNITE_MS = 620;
 const AFTERGLOW_MS = 260;
 
 /**
- * Animating a `react-native-svg` attribute is the least reliable surface in this
- * stack, which is why rotation here lives on wrapping Views instead. A circle
- * being *drawn* has no View equivalent — dash offset is the only way — so this
- * is the one place that pays the cost, and it pays it on exactly one prop.
- */
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-/**
  * The single hero of the app: a breathing arc reactor.
  *
- * Rotation lives on wrapping Views, never on animated SVG props — animating
- * `react-native-svg` attributes through reanimated is the least reliable
- * surface in this stack, and a rotated View is visually identical here.
+ * **Nothing here animates a `react-native-svg` attribute through reanimated.**
+ * Rotation lives on wrapping Views, and the ignition's dash offset is driven from
+ * plain React state — an earlier version used `useAnimatedProps` for the dash and
+ * it silently did nothing on reanimated 4 with svg 15, falling back to the static
+ * props so the ring simply appeared fully drawn. If you need to animate an SVG
+ * attribute here, drive it from state and verify it on a device.
  */
 export function ArcReactor({
   size,
@@ -121,25 +131,41 @@ export function ArcReactor({
   const sweep = useSharedValue(0);
   const counter = useSharedValue(0);
   const breath = useSharedValue(0.72);
-  /** 0 unlit, 1 closed circuit */
-  const arc = useSharedValue(igniting ? 0 : 1);
+  /**
+   * How much of the tube is drawn, 0 to 1 — driven from JS state, not a worklet.
+   *
+   * This was a reanimated `useAnimatedProps` on an `Animated.createAnimatedComponent(Circle)`.
+   * On reanimated 4 with react-native-svg 15 that silently did nothing: the
+   * circles fell back to their static props, which carry no dash, so the ring
+   * appeared fully drawn instantly and the ignition never showed. There was no
+   * error — the fallback hid it.
+   *
+   * A one-shot 620ms animation re-rendering a handful of circles is cheap, and
+   * plain state is guaranteed to reach the screen. Same reasoning as `TypeLine`:
+   * the thing being animated is a value, not a style.
+   */
+  const [draw, setDraw] = useState(igniting ? 0 : 1);
   /** what rides in behind the ring */
   const after = useSharedValue(igniting ? 0 : 1);
 
   useEffect(() => {
     if (!igniting) {
-      arc.value = 1;
+      setDraw(1);
       after.value = 1;
       return;
     }
-    arc.value = withTiming(1, {
-      duration: IGNITE_MS,
-      // the same curve the rest of the HUD uses: fast out of the gate, long
-      // tail, so the last few degrees close rather than snap
-      easing: Easing.bezier(HUD_BEZIER[0], HUD_BEZIER[1], HUD_BEZIER[2], HUD_BEZIER[3]),
-    });
+    setDraw(0);
+    const startedAt = Date.now();
+    const id = setInterval(() => {
+      const t = Math.min(1, (Date.now() - startedAt) / IGNITE_MS);
+      // ease out cubic: fast out of the gate, long tail, so the last few degrees
+      // close rather than snap
+      setDraw(1 - Math.pow(1 - t, 3));
+      if (t >= 1) clearInterval(id);
+    }, 16);
     after.value = withDelay(IGNITE_MS * 0.7, withTiming(1, { duration: AFTERGLOW_MS }));
-  }, [igniting, arc, after]);
+    return () => clearInterval(id);
+  }, [igniting, after]);
 
   useEffect(() => {
     if (!animations) {
@@ -175,14 +201,13 @@ export function ArcReactor({
   /** the hot ring's own circumference: the whole length that has to be drawn */
   const lap = 2 * Math.PI * (c * 0.8);
 
-  // A dash the length of the circle, offset by the same amount, is an invisible
-  // ring; winding the offset to zero draws it. `lap` is read inside the worklet
-  // body, never as a default parameter — a default initialiser is not scanned
-  // for closure capture and the value arrives undefined on the UI thread.
-  const drawProps = useAnimatedProps(() => ({
-    strokeDasharray: [lap, lap],
-    strokeDashoffset: lap * (1 - arc.value),
-  }));
+  /**
+   * A dash the length of the circle, offset by the same amount, is an invisible
+   * ring; winding the offset to zero draws it. Plain props, so they cannot be
+   * silently dropped the way animated SVG props were.
+   */
+  const drawProps =
+    draw >= 1 ? {} : { strokeDasharray: `${lap} ${lap}`, strokeDashoffset: lap * (1 - draw) };
 
   const afterStyle = useAnimatedStyle(() => ({ opacity: after.value }));
 
@@ -238,27 +263,27 @@ export function ArcReactor({
               brighten. Fixed widths meant the slider changed the halo's
               brightness by a couple of percent and its size not at all, which is
               not what a glow control is for. */}
-          <AnimatedCircle
+          <Circle
             {...ring(c * 0.8, c * (0.1 + glow * 0.22), color, 0.04 + glow * 0.09)}
-            animatedProps={drawProps}
+            {...drawProps}
           />
-          <AnimatedCircle
+          <Circle
             {...ring(c * 0.8, c * (0.07 + glow * 0.12), color, 0.06 + glow * 0.12)}
-            animatedProps={drawProps}
+            {...drawProps}
           />
-          <AnimatedCircle
+          <Circle
             {...ring(c * 0.8, c * (0.04 + glow * 0.05), color, 0.1 + glow * 0.2)}
-            animatedProps={drawProps}
+            {...drawProps}
           />
-          <AnimatedCircle
+          <Circle
             testID="arc-reactor-ring"
             {...ring(c * 0.8, Math.max(3, c * 0.032), color, 1)}
-            animatedProps={drawProps}
+            {...drawProps}
           />
           {/* the white-hot centre line inside the tube */}
-          <AnimatedCircle
+          <Circle
             {...ring(c * 0.8, Math.max(1, c * 0.01), COLOR.blueBright, 0.9)}
-            animatedProps={drawProps}
+            {...drawProps}
           />
         </Svg>
       </View>
@@ -274,12 +299,20 @@ export function ArcReactor({
       {/* one bright arc sweeping the outer track */}
       <Animated.View style={[StyleSheet.absoluteFill, sweepStyle, afterStyle]}>
         <Svg width={size} height={size}>
-          {/* arc length rides the tempo too: a long arc at speed reads as effort,
-              a short one drifting reads as idle */}
-          <Circle
-            testID="arc-reactor-sweep"
-            {...ring(c * 0.92, 2, COLOR.blueBright, 0.7, `${c * 0.7 * tempo.dash} ${c * 6}`)}
-          />
+          {/* Arc length *and count* ride the tempo. One short arc drifting reads
+              as idle; three long ones at speed read as work. The arcs are spread
+              evenly round the track, so they stay distinguishable as they turn. */}
+          {Array.from({ length: tempo.arcs }, (_, i) => {
+            const lit = c * 0.7 * tempo.dash;
+            const gap = (2 * Math.PI * c * 0.92) / tempo.arcs - lit;
+            return (
+              <Circle
+                key={i}
+                testID={i === 0 ? 'arc-reactor-sweep' : undefined}
+                {...ring(c * 0.92, 2 * tempo.weight, COLOR.blueBright, 0.7, `${lit} ${Math.max(4, gap)}`)}
+              />
+            );
+          })}
         </Svg>
       </Animated.View>
 

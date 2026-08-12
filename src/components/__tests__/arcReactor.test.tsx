@@ -57,6 +57,28 @@ describe('tempoFor', () => {
     expect(tempoFor('boot').sweep).toBeGreaterThan(Math.max(...every));
   });
 
+  it('differs on every axis at once, not just speed', () => {
+    // a 4x speed difference alone read as "the same spinning ring" on device,
+    // so arc count and stroke weight carry the signal too
+    const idle = tempoFor('online');
+    const busy = tempoFor('thinking');
+    expect(busy.arcs).toBeGreaterThan(idle.arcs);
+    expect(busy.weight).toBeGreaterThan(idle.weight);
+    expect(busy.sweep).toBeLessThan(idle.sweep / 5);
+  });
+
+  it('never draws fewer than one arc, whatever the state', () => {
+    for (const s of ['online', 'listening', 'thinking', 'speaking', 'alert', 'boot', 'nonsense']) {
+      expect(tempoFor(s).arcs).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('escalates arc count monotonically with how busy it is', () => {
+    expect(tempoFor('boot').arcs).toBeLessThanOrEqual(tempoFor('online').arcs);
+    expect(tempoFor('online').arcs).toBeLessThan(tempoFor('listening').arcs);
+    expect(tempoFor('listening').arcs).toBeLessThan(tempoFor('thinking').arcs);
+  });
+
   it('groups the aliases the way statusColor does, so pace and colour agree', () => {
     expect(tempoFor('agent')).toEqual(tempoFor('thinking'));
     expect(tempoFor('working')).toEqual(tempoFor('thinking'));

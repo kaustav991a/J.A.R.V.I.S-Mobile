@@ -23,6 +23,7 @@ import {
 } from '../link/config';
 import type { Endpoints, LinkMode, LinkStatus } from '../link/config';
 import { createApi } from '../api/client';
+import { WATCH_CATEGORY, WATCH_CHANNEL, dismiss, postNow } from '../lib/notify';
 
 export type JarvisContextValue = {
   /** everything the backend has told us */
@@ -271,6 +272,41 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   const expireWatch = useCallback((id: string) => {
     dispatch({ type: 'intruder_expired', id, at: Date.now() });
   }, []);
+
+  /**
+   * Raise a system notification when the desk watch fires.
+   *
+   * The socket only reaches a foregrounded app, so without this an alert that
+   * arrives while the phone is in a pocket is never seen — and the desk locks on
+   * silence 30 seconds later. A local notification needs no push server and no
+   * Firebase config, so it works in every build.
+   *
+   * Dismissed as soon as the alert resolves, so a notification for a closed
+   * window cannot be tapped.
+   */
+  const watchNote = useRef<string | null>(null);
+  const alert = hud.intruder;
+  useEffect(() => {
+    if (!alert) {
+      void dismiss(watchNote.current);
+      watchNote.current = null;
+      return;
+    }
+    let alive = true;
+    void postNow({
+      title: 'Someone at the desk',
+      body: `Was this you? The desk locks itself in ${Math.max(1, Math.round((alert.deadline - Date.now()) / 1000))}s.`,
+      channel: WATCH_CHANNEL,
+      category: WATCH_CATEGORY,
+      data: { kind: 'intruder', id: alert.id },
+    }).then((id) => {
+      if (alive) watchNote.current = id;
+      else void dismiss(id);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [alert?.id, alert]);
 
   const pair = useCallback(async (next: { base?: string | null; token?: string | null }) => {
     if (next.base !== undefined) {

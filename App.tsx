@@ -11,6 +11,7 @@ import { LockScreen } from './src/screens/LockScreen';
 import { WatchAlertScreen } from './src/screens/WatchAlertScreen';
 import { AuthProvider, useAuth } from './src/security/AuthProvider';
 import { ReactorHandoffProvider } from './src/components/ReactorHandoff';
+import { installHandler, prepare } from './src/lib/notify';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { BlurTargetProvider } from './src/components/ui/Glass';
@@ -19,6 +20,12 @@ import { JarvisProvider, useJarvis } from './src/state/JarvisProvider';
 import { COLOR } from './src/theme/tokens';
 
 void SplashScreen.preventAutoHideAsync();
+
+// Registered at module scope, before any component mounts: the handler decides
+// how a notification behaves when one lands while the app is open, and anything
+// that arrives before it exists is discarded. Channels and permission are asked
+// for once the app is up, since those can wait and this cannot.
+installHandler();
 
 /**
  * The gate, as a child so it can read the auth context it is gated by.
@@ -55,6 +62,13 @@ export default function App() {
   useEffect(() => {
     if (loaded || error) void SplashScreen.hideAsync();
   }, [loaded, error]);
+
+  // Channels first, then the permission prompt — Android 13+ does not reliably
+  // show the prompt for a channel that does not exist yet. `prepare()` handles
+  // both and never throws, so a build without the native module still starts.
+  useEffect(() => {
+    void prepare();
+  }, []);
 
   if (!loaded && !error) return null;
 
