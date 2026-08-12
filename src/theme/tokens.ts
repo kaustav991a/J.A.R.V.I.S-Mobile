@@ -105,13 +105,27 @@ export function glowText(color: string, radius = 8): TextStyle {
   };
 }
 
-/** A luminous box glow (RN view-shadow equivalent), for the reactor and similar. */
+/**
+ * A luminous box glow, for the reactor and similar.
+ *
+ * **iOS only, by nature.** `shadowColor`/`shadowOffset`/`shadowOpacity`/
+ * `shadowRadius` are not implemented on Android, so this is silently inert
+ * there — which is why the Appearance screen's glow slider felt like it did
+ * nothing on a phone. Anything that must respond to `glow` on both platforms has
+ * to do it with something Android actually draws: SVG opacity and stroke width,
+ * or `textShadowRadius`, which does work.
+ *
+ * `elevation` used to be set to `radius` here as an Android stand-in. It was
+ * removed: elevation draws a grey material drop shadow rather than coloured
+ * light, casts nothing from a transparent view, and — at the 10–44 range the
+ * reactor asked for — reorders siblings, so the ring could stack above the
+ * wordmark that is supposed to sit inside it.
+ */
 export function glowBox(color: string, radius = 12): ViewStyle {
   return {
     shadowColor: color,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: radius,
-    elevation: radius,
   };
 }

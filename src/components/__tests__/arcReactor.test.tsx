@@ -51,6 +51,21 @@ describe('ArcReactor', () => {
     );
   });
 
+  it('powers on when asked, drawing the same ring stack', async () => {
+    // the ignition animates a react-native-svg attribute — the one place in
+    // this component that does — so the stack must still be there afterwards
+    const { getByTestId } = await render(<ArcReactor size={240} status="online" ignite />);
+    expect(getByTestId('arc-reactor-ring')).toBeTruthy();
+    expect(getByTestId('arc-reactor-wordmark').props.children).toBe('JARVIS');
+  });
+
+  it('leaves every reactor already on screen alone', async () => {
+    // ignite is opt-in: Home and About must not start drawing themselves
+    const { getByTestId } = await render(<ArcReactor size={84} status="online" monogram="J" />);
+    expect(getByTestId('arc-reactor-ring')).toBeTruthy();
+    expect(getByTestId('arc-reactor-monogram').props.children).toBe('J');
+  });
+
   it('renders every status without crashing', async () => {
     for (const status of ['online', 'thinking', 'speaking', 'alert', 'boot']) {
       const { toJSON } = await render(<ArcReactor size={120} status={status} />);

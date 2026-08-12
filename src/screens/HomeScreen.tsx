@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { ArcReactor } from '../components/ArcReactor';
+import { HandoffAnchor } from '../components/ReactorHandoff';
 import { CommandBar } from '../components/CommandBar';
 import { GovernancePanel } from '../components/GovernancePanel';
 import { TypeLine } from '../components/TypeLine';
@@ -149,7 +150,10 @@ export function HomeScreen() {
             enabled={animations}
           />
         </View>
-        <ArcReactor size={84} status={hud.status} label="" monogram="J" />
+        {/* the launch screen's reactor flies to wherever this one lands */}
+        <HandoffAnchor id="target">
+          <ArcReactor size={84} status={hud.status} label="" monogram="J" />
+        </HandoffAnchor>
       </View>
 
       <CommandBar placeholder="Type a command…" leadingIcon="sparkles" onSubmit={send} onVoice={() => {}} />
