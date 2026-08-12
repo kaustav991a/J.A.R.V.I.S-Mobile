@@ -46,3 +46,4 @@ yarn-error.*
 # Firebase config — machine/project specific, keep out of the repo
 google-services.json
 GoogleService-Info.plist
+.expo-metro.log
