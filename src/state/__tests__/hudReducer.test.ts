@@ -130,4 +130,86 @@ describe('hudReducer', () => {
     hudReducer(before, { type: 'frame', frame: { kind: 'agent_step', goal: 'g', event: 'e2', detail: '', step: 2 }, at: 5000 });
     expect(JSON.stringify(before)).toBe(snapshot);
   });
+
+  describe('the desk watch', () => {
+    const seen: JarvisFrame = {
+      kind: 'intruder',
+      id: 'i-1',
+      expiresIn: 30,
+      image: '/api/intruder/i-1.jpg',
+      user: 'KAUSTAV',
+      trigger: 'unlock',
+    };
+
+    it('turns the desk-sent duration into one deadline on this phone', () => {
+      // the desk sends seconds-remaining, never a timestamp: this sum is the
+      // only place the two machines' clocks ever meet
+      const s = feed([seen]);
+      expect(s.intruder).toMatchObject({ id: 'i-1', deadline: 1000 + 30_000, resolving: false });
+    });
+
+    it('logs the sighting to the timeline as well as raising the alert', () => {
+      const s = feed([seen]);
+      expect(s.trace.at(-1)).toMatchObject({ goal: 'Desk watch', event: 'seen' });
+    });
+
+    it('holds only the newest alert', () => {
+      const s = feed([seen, { ...seen, id: 'i-2' }]);
+      expect(s.intruder?.id).toBe('i-2');
+    });
+
+    it('clears the alert when the desk says it is resolved', () => {
+      const s = feed([seen, { kind: 'intruder_resolved', id: 'i-1', outcome: 'approved' }]);
+      expect(s.intruder).toBeNull();
+      expect(s.trace.at(-1)).toMatchObject({ event: 'approved', detail: 'Confirmed as you' });
+    });
+
+    it('says what happened to the machine, in Chat', () => {
+      // "approved" does not tell you whether the desk ended up open or shut, and
+      // afterwards that is the only thing worth knowing
+      const open = feed([seen, { kind: 'intruder_resolved', id: 'i-1', outcome: 'approved' }]);
+      expect(open.chat.at(-1)).toMatchObject({ from: 'jarvis', text: 'That was you — the desk is still unlocked.' });
+
+      const shut = feed([seen, { kind: 'intruder_resolved', id: 'i-1', outcome: 'locked' }]);
+      expect(shut.chat.at(-1)?.text).toContain('Desk locked');
+    });
+
+    it('says so in Chat when the window simply ran out', () => {
+      const s = hudReducer(feed([seen]), { type: 'intruder_expired', id: 'i-1', at: 40_000 });
+      expect(s.chat.at(-1)).toMatchObject({ from: 'jarvis', at: 40_000 });
+      expect(s.chat.at(-1)?.text).toContain('locked the desk');
+    });
+
+    it('records a lock as a lock, not as an approval', () => {
+      const s = feed([seen, { kind: 'intruder_resolved', id: 'i-1', outcome: 'locked' }]);
+      expect(s.trace.at(-1)).toMatchObject({ event: 'locked', detail: 'Desk locked' });
+    });
+
+    it('does not let a resolution for another alert clear the live one', () => {
+      const s = feed([seen, { kind: 'intruder_resolved', id: 'other', outcome: 'approved' }]);
+      expect(s.intruder?.id).toBe('i-1');
+    });
+
+    it('marks the alert as resolving while the desk is being told', () => {
+      const s = hudReducer(feed([seen]), { type: 'intruder_resolving', id: 'i-1' });
+      expect(s.intruder?.resolving).toBe(true);
+    });
+
+    it('ignores a resolving action naming an alert that is not live', () => {
+      const s = hudReducer(feed([seen]), { type: 'intruder_resolving', id: 'stale' });
+      expect(s.intruder?.resolving).toBe(false);
+    });
+
+    it('stops offering an answer once the window has run out', () => {
+      const s = hudReducer(feed([seen]), { type: 'intruder_expired', id: 'i-1', at: 40_000 });
+      expect(s.intruder).toBeNull();
+      expect(s.trace.at(-1)).toMatchObject({ event: 'locked', detail: 'No answer in time — desk locked' });
+    });
+
+    it('ignores an expiry for an alert that has already been replaced', () => {
+      const live = feed([seen, { ...seen, id: 'i-2' }]);
+      const s = hudReducer(live, { type: 'intruder_expired', id: 'i-1', at: 40_000 });
+      expect(s).toBe(live);
+    });
+  });
 });

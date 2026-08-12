@@ -42,13 +42,48 @@ export type ConfirmFrame = {
   approved: boolean;
 };
 
+/**
+ * Someone is at the desk. The desk grabbed a webcam frame and is counting down
+ * to locking itself; this is the phone being asked whether that was you.
+ */
+export type IntruderFrame = {
+  kind: 'intruder';
+  id: string;
+  /**
+   * Seconds left when the desk sent this, not a wall-clock deadline. The phone
+   * counts down from receipt, so the two machines never have to agree on the
+   * time — and the desk's copy of this clock is the authoritative one.
+   */
+  expiresIn: number;
+  /** path on the desk to GET the mugshot; null if the capture failed */
+  image: string | null;
+  /** the Windows account that was active */
+  user: string | null;
+  /** what prompted the capture: `unlock`, `wake`, `hello_failed` */
+  trigger: string;
+};
+
+/**
+ * The window closed. Sent whether the phone answered, the desk timed out, or
+ * the desk was told from somewhere else — so a stale alert can never sit on the
+ * phone claiming to still be live.
+ */
+export type IntruderResolvedFrame = {
+  kind: 'intruder_resolved';
+  id: string;
+  /** `approved` — it was you. `locked` — denied, or the window expired. */
+  outcome: 'approved' | 'locked';
+};
+
 export type JarvisFrame =
   | StatusFrame
   | TelemetryFrame
   | WeatherFrame
   | AgentStepFrame
   | ParkedFrame
-  | ConfirmFrame;
+  | ConfirmFrame
+  | IntruderFrame
+  | IntruderResolvedFrame;
 
 type Obj = Record<string, unknown>;
 
@@ -154,6 +189,28 @@ export function parseFrame(raw: string | unknown): JarvisFrame | null {
         resolved: bool(o.resolved),
         approved: bool(o.approved),
       };
+    case 'intruder': {
+      // An alert with no id cannot be answered — approve would have nothing to
+      // name — and one already out of time must not raise a live countdown.
+      const id = identity(o);
+      const expiresIn = num(o.expires_in);
+      if (!id || expiresIn === null || expiresIn <= 0) return null;
+      return {
+        kind: 'intruder',
+        id,
+        expiresIn,
+        image: str(o.image) || null,
+        user: str(o.user) || null,
+        trigger: str(o.trigger, 'unlock'),
+      };
+    }
+    case 'intruder_resolved': {
+      const id = identity(o);
+      if (!id) return null;
+      // anything that is not an explicit approval closes the alert as locked:
+      // a garbled outcome must not read as "it was you"
+      return { kind: 'intruder_resolved', id, outcome: str(o.outcome) === 'approved' ? 'approved' : 'locked' };
+    }
   }
 
   if (typeof o.status === 'string') {

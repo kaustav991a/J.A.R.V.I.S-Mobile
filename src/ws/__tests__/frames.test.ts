@@ -87,4 +87,78 @@ describe('parseFrame', () => {
     expect(f).toEqual({ kind: 'weather', data: { temp: 31 } });
     expect((f as { kind: 'weather'; data: WeatherData }).data.desc).toBeUndefined();
   });
+
+  describe('intruder alerts', () => {
+    const alert = (extra: Record<string, unknown> = {}) =>
+      parseFrame(
+        j({
+          type: 'intruder',
+          id: 'i-1',
+          expires_in: 30,
+          image: '/api/intruder/i-1.jpg',
+          user: 'KAUSTAV',
+          trigger: 'unlock',
+          ...extra,
+        })
+      );
+
+    it('reads a capture the desk is counting down on', () => {
+      expect(alert()).toEqual({
+        kind: 'intruder',
+        id: 'i-1',
+        expiresIn: 30,
+        image: '/api/intruder/i-1.jpg',
+        user: 'KAUSTAV',
+        trigger: 'unlock',
+      });
+    });
+
+    it('still raises the alert when the camera grabbed nothing', () => {
+      // no mugshot is not a reason to stay quiet — the desk is still locking
+      expect(alert({ image: undefined })).toMatchObject({ kind: 'intruder', image: null });
+    });
+
+    it('assumes an unlock when the desk does not say what it saw', () => {
+      expect(alert({ trigger: undefined })).toMatchObject({ trigger: 'unlock' });
+    });
+
+    it('drops an alert with no id — approve would have nothing to name', () => {
+      expect(alert({ id: undefined })).toBeNull();
+    });
+
+    it('drops an alert that is already out of time', () => {
+      // a live countdown drawn from a dead window is a lie about the desk
+      expect(alert({ expires_in: 0 })).toBeNull();
+      expect(alert({ expires_in: -4 })).toBeNull();
+      expect(alert({ expires_in: undefined })).toBeNull();
+      expect(alert({ expires_in: '30' })).toBeNull();
+    });
+
+    it('accepts the other two spellings of the id, as the parked frames do', () => {
+      expect(alert({ id: undefined, action_id: 'a-9' })).toMatchObject({ id: 'a-9' });
+      expect(alert({ id: undefined, request_id: 'r-9' })).toMatchObject({ id: 'r-9' });
+    });
+
+    it('reads a resolution either way', () => {
+      expect(parseFrame(j({ type: 'intruder_resolved', id: 'i-1', outcome: 'approved' }))).toEqual({
+        kind: 'intruder_resolved',
+        id: 'i-1',
+        outcome: 'approved',
+      });
+      expect(parseFrame(j({ type: 'intruder_resolved', id: 'i-1', outcome: 'locked' }))).toMatchObject({
+        outcome: 'locked',
+      });
+    });
+
+    it('treats any outcome that is not an explicit approval as locked', () => {
+      // a garbled outcome must never read as "it was you"
+      for (const outcome of [undefined, '', 'APPROVED', 'yes', 42]) {
+        expect(parseFrame(j({ type: 'intruder_resolved', id: 'i-1', outcome }))).toMatchObject({ outcome: 'locked' });
+      }
+    });
+
+    it('drops a resolution that names no alert', () => {
+      expect(parseFrame(j({ type: 'intruder_resolved', outcome: 'approved' }))).toBeNull();
+    });
+  });
 });

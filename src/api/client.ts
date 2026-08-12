@@ -16,6 +16,12 @@ export type Api = {
   backdoor(text: string): Promise<unknown>;
   pending(): Promise<unknown>;
   confirm(id: string, approved: boolean): Promise<void>;
+  /**
+   * Answer a desk-watch alert. Separate from `confirm` on purpose: this one
+   * decides whether a machine locks itself, and it must never be reachable by
+   * anything that happens to hold an agent action id.
+   */
+  answerWatch(id: string, itWasMe: boolean): Promise<void>;
   tasks(): Promise<unknown>;
   presence(): Promise<unknown>;
 };
@@ -60,6 +66,9 @@ export function createApi(cfg: ApiConfig): Api {
     pending: () => request('/api/agent/pending'),
     confirm: async (id, approved) => {
       await post('/api/agent/confirm', { id, approved });
+    },
+    answerWatch: async (id, itWasMe) => {
+      await post('/api/watch/answer', { id, approved: itWasMe });
     },
     tasks: () => request('/api/tasks'),
     presence: () => request('/api/presence/state'),

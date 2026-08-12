@@ -31,6 +31,19 @@ export type JarvisContextValue = {
   sendCommand: (text: string) => Promise<void>;
   /** allow or deny a parked agent action */
   decide: (id: string, approved: boolean) => Promise<void>;
+  /**
+   * Answer the desk watch: true if the face at the desk was yours. Denying, or
+   * never answering, leaves the desk to lock itself — the countdown is the
+   * desk's, not this phone's.
+   */
+  answerWatch: (id: string, itWasMe: boolean) => Promise<void>;
+  /** the phone's copy of the countdown ran out with no answer */
+  expireWatch: (id: string) => void;
+  /**
+   * Absolute URL for a path the desk sent — a mugshot. Null when there is no
+   * path, or when nothing is linked to fetch it from.
+   */
+  deskAsset: (path: string | null) => string | null;
   /** locally kept command history, newest first */
   recent: string[];
   clearRecent: () => void;
@@ -106,10 +119,24 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     return () => clearInterval(timer);
   }, [demo, connected]);
 
-  const api = useMemo(() => {
-    const base = link.mode === 'cloud' && DEFAULT_ENDPOINTS.cloudBase ? DEFAULT_ENDPOINTS.cloudBase : DEFAULT_ENDPOINTS.deskBase;
-    return createApi({ baseUrl: base, token: null });
-  }, [link.mode]);
+  const base = useMemo(
+    () =>
+      link.mode === 'cloud' && DEFAULT_ENDPOINTS.cloudBase ? DEFAULT_ENDPOINTS.cloudBase : DEFAULT_ENDPOINTS.deskBase,
+    [link.mode]
+  );
+
+  const api = useMemo(() => createApi({ baseUrl: base, token: null }), [base]);
+
+  const deskAsset = useCallback(
+    (path: string | null) => {
+      if (!path) return null;
+      // an absolute url from the desk is taken as given; a bare path is resolved
+      // against whichever base the link is currently using
+      if (/^https?:\/\//i.test(path)) return path;
+      return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+    },
+    [base]
+  );
 
   const sendCommand = useCallback(
     async (text: string) => {
@@ -144,6 +171,35 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     [api]
   );
 
+  const answerWatch = useCallback(
+    async (id: string, itWasMe: boolean) => {
+      dispatch({ type: 'intruder_resolving', id });
+      try {
+        // the stand-in desk has nothing to lock, so it simply agrees
+        if (simulated) {
+          dispatch({
+            type: 'frame',
+            frame: { kind: 'intruder_resolved', id, outcome: itWasMe ? 'approved' : 'locked' },
+            at: Date.now(),
+          });
+          return;
+        }
+        await api.answerWatch(id, itWasMe);
+      } catch {
+        // The desk locks on silence, so a failed answer is not a failed
+        // outcome — it means the safe thing happens instead of the convenient
+        // one. Close the alert either way rather than leaving a live countdown
+        // the user has already answered.
+        dispatch({ type: 'intruder_expired', id, at: Date.now() });
+      }
+    },
+    [api, simulated]
+  );
+
+  const expireWatch = useCallback((id: string) => {
+    dispatch({ type: 'intruder_expired', id, at: Date.now() });
+  }, []);
+
   const connect = useCallback(() => {
     // in demo the handshake is the thing being simulated, so re-run it
     if (simulated) setDemoPhase('probing');
@@ -161,6 +217,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       connect,
       sendCommand,
       decide,
+      answerWatch,
+      expireWatch,
+      deskAsset,
       recent,
       clearRecent: () => setRecent([]),
       demo,
@@ -178,6 +237,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       connect,
       sendCommand,
       decide,
+      answerWatch,
+      expireWatch,
+      deskAsset,
       recent,
       demo,
     ]

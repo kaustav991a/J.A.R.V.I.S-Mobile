@@ -12,6 +12,25 @@ const CHAT_CAP = 100;
 
 export type ChatEntry = { from: 'jarvis' | 'user'; text: string; at: number };
 
+/**
+ * A live desk-watch alert. At most one: the desk locks itself when the window
+ * closes, so it can only ever be waiting on one answer.
+ */
+export type IntruderAlert = {
+  id: string;
+  /**
+   * Epoch ms, worked out from the frame's `expiresIn` at the moment it landed.
+   * The desk sends a duration rather than a timestamp precisely so this sum is
+   * the only place the two clocks meet.
+   */
+  deadline: number;
+  image: string | null;
+  user: string | null;
+  trigger: string;
+  /** true between tapping APPROVE and the desk confirming */
+  resolving: boolean;
+};
+
 export type HudState = {
   status: string;
   message: string;
@@ -21,6 +40,7 @@ export type HudState = {
   trace: TraceEntry[];
   chat: ChatEntry[];
   parked: ParkedAction[];
+  intruder: IntruderAlert | null;
   lastFrameAt: number | null;
 };
 
@@ -29,6 +49,9 @@ export type HudAction =
   | { type: 'local_command'; text: string; at: number }
   | { type: 'resolving'; id: string }
   | { type: 'resolved_local'; id: string }
+  | { type: 'intruder_resolving'; id: string }
+  /** the countdown ran out on the phone with no answer from the desk */
+  | { type: 'intruder_expired'; id: string; at: number }
   | { type: 'reset' };
 
 export const initialHudState: HudState = {
@@ -40,8 +63,25 @@ export const initialHudState: HudState = {
   trace: [],
   chat: [],
   parked: [],
+  intruder: null,
   lastFrameAt: null,
 };
+
+/** the desk watch writes to the same timeline the agent trace uses */
+const WATCH = 'Desk watch';
+
+/**
+ * What the desk watch says out loud when a window closes.
+ *
+ * Every outcome states the machine's resulting state in plain words, because
+ * "approved" does not tell you whether the desk is now open or shut — and that is
+ * the only thing you actually want to know afterwards.
+ */
+const WATCH_SAID = {
+  approved: 'That was you — the desk is still unlocked.',
+  locked: 'Desk locked. Windows will ask for your PIN.',
+  expired: 'No answer in time, so I locked the desk. Windows will ask for your PIN.',
+} as const;
 
 const cap = <T,>(list: T[], max: number): T[] => (list.length > max ? list.slice(list.length - max) : list);
 
@@ -106,6 +146,48 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
           resolving: false,
         }),
       };
+    case 'intruder':
+      return {
+        ...state,
+        intruder: {
+          id: frame.id,
+          deadline: at + frame.expiresIn * 1000,
+          image: frame.image,
+          user: frame.user,
+          trigger: frame.trigger,
+          resolving: false,
+        },
+        trace: cap(
+          [
+            ...state.trace,
+            { goal: WATCH, event: 'seen', detail: `Someone at the desk (${frame.trigger})`, step: null, at },
+          ],
+          TRACE_CAP
+        ),
+      };
+    case 'intruder_resolved':
+      return {
+        ...state,
+        // a resolution for some other alert must not clear the live one
+        intruder: state.intruder && state.intruder.id !== frame.id ? state.intruder : null,
+        // the outcome is said in Chat as well as logged: the timeline is a place
+        // you have to go looking, and afterwards the one thing worth knowing is
+        // whether the machine is open or shut
+        chat: cap([...state.chat, { from: 'jarvis' as const, text: WATCH_SAID[frame.outcome], at }], CHAT_CAP),
+        trace: cap(
+          [
+            ...state.trace,
+            {
+              goal: WATCH,
+              event: frame.outcome,
+              detail: frame.outcome === 'approved' ? 'Confirmed as you' : 'Desk locked',
+              step: null,
+              at,
+            },
+          ],
+          TRACE_CAP
+        ),
+      };
   }
 }
 
@@ -125,6 +207,29 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
       };
     case 'resolved_local':
       return { ...state, parked: state.parked.filter((p) => p.id !== action.id) };
+    case 'intruder_resolving':
+      return {
+        ...state,
+        intruder:
+          state.intruder && state.intruder.id === action.id ? { ...state.intruder, resolving: true } : state.intruder,
+      };
+    case 'intruder_expired':
+      // The phone's clock ran out. It does not decide anything — the desk owns
+      // the countdown and locks itself — but the alert stops claiming to be
+      // answerable, so nobody taps APPROVE into a closed window.
+      if (!state.intruder || state.intruder.id !== action.id) return state;
+      return {
+        ...state,
+        intruder: null,
+        chat: cap([...state.chat, { from: 'jarvis' as const, text: WATCH_SAID.expired, at: action.at }], CHAT_CAP),
+        trace: cap(
+          [
+            ...state.trace,
+            { goal: WATCH, event: 'locked', detail: 'No answer in time — desk locked', step: null, at: action.at },
+          ],
+          TRACE_CAP
+        ),
+      };
     case 'reset':
       return initialHudState;
   }

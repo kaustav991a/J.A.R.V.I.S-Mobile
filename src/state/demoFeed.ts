@@ -71,9 +71,40 @@ export function demoFrames(tick: number): JarvisFrame[] {
   return frames;
 }
 
+/** the phrase that makes the stand-in desk raise a watch alert */
+export const DEMO_WATCH_COMMAND = 'test watch';
+
+/**
+ * What the stand-in desk sends instead of a capture path.
+ *
+ * The stand-in stands in for the camera too, otherwise the mugshot layout is
+ * never exercised — every demo alert fell back to the NO IMAGE panel. It is a
+ * sentinel rather than a URL because there is no desk to fetch anything from;
+ * the alert screen swaps it for a bundled asset, and only it knows how.
+ */
+export const DEMO_MUGSHOT = 'demo://mugshot';
+
+/** how long the stand-in desk gives you to answer, matching the real 30s window */
+const DEMO_WATCH_SECONDS = 30;
+
 /** what the stand-in desk answers when a command is sent to it */
 export function demoReply(command: string): JarvisFrame {
   const text = command.trim().toLowerCase();
+
+  // The watch alert is a full-screen alarm, so it is asked for rather than
+  // scheduled: firing it from the tick counter would ambush the user on every
+  // launch, and a demo that cries wolf teaches you to dismiss it.
+  if (text === DEMO_WATCH_COMMAND) {
+    return {
+      kind: 'intruder',
+      id: `demo-watch-${text.length}`,
+      expiresIn: DEMO_WATCH_SECONDS,
+      image: DEMO_MUGSHOT,
+      user: 'KAUSTAV',
+      trigger: 'unlock',
+    };
+  }
+
   const message =
     text === 'system status'
       ? 'CPU 23%, memory 8.4 of 32 GB, disk 412 of 1000 GB. All systems nominal.'
