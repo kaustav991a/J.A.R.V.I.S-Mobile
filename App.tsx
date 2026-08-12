@@ -63,10 +63,18 @@ export default function App() {
     if (loaded || error) void SplashScreen.hideAsync();
   }, [loaded, error]);
 
-  // Channels first, then the permission prompt — Android 13+ does not reliably
-  // show the prompt for a channel that does not exist yet. `prepare()` handles
-  // both and never throws, so a build without the native module still starts.
+  /**
+   * Deferred until the launch screen has lifted, for two reasons.
+   *
+   * It competes with the ignition: creating channels, asking permission and
+   * resolving an FCM token are native round-trips on the JS thread, and they land
+   * inside exactly the 1250ms the reactor is drawing itself — which starved the
+   * draw and made it look like it skipped. And the permission dialog itself would
+   * appear *over* the launch animation, which is the same mistake the lock screen
+   * already queues behind it to avoid.
+   */
   useEffect(() => {
+    if (launching) return;
     void probeNotify().then(({ granted, pushToken }) => {
       // Logged rather than displayed: the desk has no way to receive this yet,
       // and a token is the address of *this install* — it belongs in the pairing
@@ -74,7 +82,7 @@ export default function App() {
       // this line is how you confirm FCM actually resolved.
       console.log(`[jarvis] notifications granted=${granted} push=${pushToken ? 'ok' : 'none'}`);
     });
-  }, []);
+  }, [launching]);
 
   if (!loaded && !error) return null;
 

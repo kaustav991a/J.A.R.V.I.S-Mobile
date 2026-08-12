@@ -85,7 +85,12 @@ describe('LockScreen', () => {
   });
 
   it('does not double-prompt on the active event that trails a cold start', async () => {
-    // asking twice there cancels the sheet that just opened and flickers it
+    // asking twice there cancels the sheet that just opened and flickers it.
+    // The clock is frozen because the guard is wall-clock: under jest, mounting
+    // the reactor's ignition takes long enough on its own to drift past the
+    // window, which would make this pass or fail on render speed rather than on
+    // the behaviour being tested.
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const calls = listen();
     await mount();
     await waitFor(() => expect(mockUnlock).toHaveBeenCalledTimes(1));
@@ -93,6 +98,7 @@ describe('LockScreen', () => {
       calls.forEach((cb) => cb('active'));
     });
     expect(mockUnlock).toHaveBeenCalledTimes(1);
+    clock.mockRestore();
   });
 
   it('ignores the app leaving — cancelling there would kill our own sheet', async () => {

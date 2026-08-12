@@ -162,16 +162,29 @@ export function ArcReactor({
       return;
     }
     setDraw(0);
+    /**
+     * requestAnimationFrame, not setInterval.
+     *
+     * A 16ms interval queues ticks it cannot deliver, so when the JS thread is
+     * busy — and it always is during startup: bundle evaluation, fonts, the
+     * biometric probe, SecureStore reads — the callbacks arrive late and in a
+     * burst, and the ring visibly jumps rather than sweeping. rAF is frame-aligned
+     * and drops missed frames instead of queuing them, and progress is computed
+     * from the clock rather than accumulated per tick, so a dropped frame costs
+     * smoothness and never correctness: the draw still finishes exactly on time.
+     */
+    let frame = 0;
     const startedAt = Date.now();
-    const id = setInterval(() => {
+    const step = () => {
       const t = Math.min(1, (Date.now() - startedAt) / IGNITE_MS);
       // ease out cubic: fast out of the gate, long tail, so the last few degrees
       // close rather than snap
       setDraw(1 - Math.pow(1 - t, 3));
-      if (t >= 1) clearInterval(id);
-    }, 16);
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
     after.value = withDelay(IGNITE_MS * 0.7, withTiming(1, { duration: AFTERGLOW_MS }));
-    return () => clearInterval(id);
+    return () => cancelAnimationFrame(frame);
   }, [igniting, after]);
 
   useEffect(() => {
