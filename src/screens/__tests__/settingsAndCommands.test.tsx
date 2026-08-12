@@ -66,9 +66,17 @@ describe('SettingsScreen', () => {
     expect(mockParentNavigate).not.toHaveBeenCalled();
   });
 
+  it('opens Security, which is a real screen now that app lock exists', async () => {
+    const { getByTestId } = await mount(<SettingsScreen />);
+    fireEvent.press(getByTestId('settings-security'));
+    expect(mockNavigate).toHaveBeenCalledWith('Security');
+  });
+
   it('marks unbuilt rows instead of leaving dead taps', async () => {
     const { getByTestId, getAllByText } = await mount(<SettingsScreen />);
-    expect(getByTestId('settings-security').props.accessibilityState).toEqual(
+    // the pairing token took Security's place in this group: the token is still
+    // owed, but the gates on the phone are built
+    expect(getByTestId('settings-pairing').props.accessibilityState).toEqual(
       expect.objectContaining({ disabled: true })
     );
     expect(getAllByText('SOON').length).toBe(3);

@@ -37,6 +37,7 @@ export type SettingsStackParams = {
    */
   Connection: undefined;
   Appearance: undefined;
+  Security: undefined;
   About: undefined;
 };
 

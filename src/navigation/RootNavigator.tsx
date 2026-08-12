@@ -18,6 +18,7 @@ import { CommandResultScreen } from '../screens/CommandResultScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { AppearanceScreen } from '../screens/AppearanceScreen';
 import { AboutScreen } from '../screens/AboutScreen';
+import { SecurityScreen } from '../screens/SecurityScreen';
 import { TABS_ID } from './types';
 import type {
   CommandsStackParams,
@@ -50,13 +51,25 @@ const navTheme: Theme = {
  */
 const SCREEN_OPTIONS = { headerShown: false } as const;
 
+/**
+ * A detour you dismiss, rather than a place you travel to.
+ *
+ * The bell is a notifications panel: it slides up, it can be swiped back down,
+ * and it does not pretend to be a destination. Pushed like a normal screen it
+ * read as one, which is what made the tab bar staying lit on Home feel wrong —
+ * the tab bar was right, the transition was the part telling the wrong story.
+ *
+ * `headerShown` stays false: every screen draws its own `ScreenTitle`.
+ */
+const MODAL_OPTIONS = { headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' } as const;
+
 function HomeStackScreens() {
   return (
     <HomeStack.Navigator screenOptions={SCREEN_OPTIONS}>
       {/* Home draws its own top row — a navigator header would double it */}
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
       <HomeStack.Screen name="Connection" component={ConnectionScreen} />
-      <HomeStack.Screen name="Activity" component={ActivityScreen} />
+      <HomeStack.Screen name="Activity" component={ActivityScreen} options={MODAL_OPTIONS} />
     </HomeStack.Navigator>
   );
 }
@@ -99,6 +112,7 @@ function SettingsStackScreens() {
       <SettingsStack.Screen name="SettingsHome" component={SettingsScreen} />
       <SettingsStack.Screen name="Connection" component={ConnectionScreen} />
       <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
+      <SettingsStack.Screen name="Security" component={SecurityScreen} />
       <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>
   );

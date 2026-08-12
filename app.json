@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": ["android.permission.POST_NOTIFICATIONS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +42,14 @@
           }
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow JARVIS to unlock with Face ID."
+        }
+      ],
+      "expo-notifications"
     ],
     "extra": {
       "eas": {

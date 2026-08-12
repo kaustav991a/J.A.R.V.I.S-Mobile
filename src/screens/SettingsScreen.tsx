@@ -36,6 +36,13 @@ export function SettingsScreen() {
           onPress={() => nav.navigate('Appearance')}
         />
         <SettingsRow
+          testID="settings-security"
+          icon="lock-closed-outline"
+          title="Security"
+          subtitle="App lock and approval confirmation"
+          onPress={() => nav.navigate('Security')}
+        />
+        <SettingsRow
           testID="settings-about"
           icon="information-circle-outline"
           title="About"
@@ -62,10 +69,10 @@ export function SettingsScreen() {
           soon
         />
         <SettingsRow
-          testID="settings-security"
-          icon="lock-closed-outline"
-          title="Security"
-          subtitle="Pairing token and permissions"
+          testID="settings-pairing"
+          icon="key-outline"
+          title="Pairing token"
+          subtitle="The secret the desk checks on the socket"
           soon
           last
         />
