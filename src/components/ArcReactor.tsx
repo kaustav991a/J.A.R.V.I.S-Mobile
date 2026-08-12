@@ -36,6 +36,48 @@ export type ArcReactorProps = {
   ignite?: boolean;
 };
 
+/**
+ * How the ring *moves* in each state.
+ *
+ * `statusColor` already gives every state its own colour, but colour alone reads
+ * as a palette change rather than a machine doing something — with identical
+ * motion, thinking and idle look the same at a glance. These are the tempos, and
+ * they are what you can tell apart across a room:
+ *
+ * - `sweep` / `counter` — ms per revolution of the bright arc and the tick track.
+ *   Lower is faster. Working states spin; resting states drift.
+ * - `breath` — ms per pulse of the bloom. Fast and shallow reads as effort.
+ * - `dash` — multiplier on the sweeping arc's length. A longer arc at speed reads
+ *   as urgency; a short one drifting reads as idle.
+ */
+export type Tempo = { sweep: number; counter: number; breath: number; dash: number };
+
+const TEMPO: Record<string, Tempo> = {
+  /** linked and idle: slow, calm, clearly alive */
+  online: { sweep: 9000, counter: 24000, breath: 2600, dash: 0.7 },
+  /** waiting on you — a touch quicker, attentive rather than busy */
+  listening: { sweep: 5600, counter: 17000, breath: 1500, dash: 0.8 },
+  /** working: the one that should look unmistakably different */
+  thinking: { sweep: 2000, counter: 8000, breath: 900, dash: 1.7 },
+  /** talking back: steady and deliberate */
+  speaking: { sweep: 3800, counter: 13000, breath: 1150, dash: 1.1 },
+  /** something is wrong: fast, long arc, hard pulse */
+  alert: { sweep: 1300, counter: 6000, breath: 620, dash: 2.4 },
+  /** not linked: barely moving, so a dead link never looks busy */
+  boot: { sweep: 15000, counter: 32000, breath: 3400, dash: 0.45 },
+};
+
+/**
+ * The tempo for a status word, matching how `statusColor` groups them so the
+ * colour and the motion always agree.
+ */
+export function tempoFor(status: string): Tempo {
+  const key = status.trim().toLowerCase();
+  if (key === 'agent' || key === 'working') return TEMPO.thinking;
+  if (key === 'lockdown') return TEMPO.alert;
+  return TEMPO[key] ?? TEMPO.boot;
+}
+
 /** how long the ring takes to draw itself round */
 export const IGNITE_MS = 620;
 /** what rides in behind it, once the circuit is closed */
@@ -66,6 +108,7 @@ export function ArcReactor({
 }: ArcReactorProps) {
   const { accent, glow, animations } = useAppearance();
   const color = statusColor(status, accent);
+  const tempo = tempoFor(status);
   /** an ignition nobody can see is just a delay */
   const igniting = ignite && animations;
 
@@ -105,17 +148,21 @@ export function ArcReactor({
       breath.value = 0.9;
       return;
     }
-    sweep.value = withRepeat(withTiming(360, { duration: 9000, easing: Easing.linear }), -1, false);
-    counter.value = withRepeat(withTiming(-360, { duration: 24000, easing: Easing.linear }), -1, false);
+    // restarted whenever the tempo changes, so a status change is visible as a
+    // change of pace rather than only a change of colour
+    sweep.value = 0;
+    counter.value = 0;
+    sweep.value = withRepeat(withTiming(360, { duration: tempo.sweep, easing: Easing.linear }), -1, false);
+    counter.value = withRepeat(withTiming(-360, { duration: tempo.counter, easing: Easing.linear }), -1, false);
     breath.value = withRepeat(
       withTiming(1, {
-        duration: 2200,
+        duration: tempo.breath,
         easing: Easing.bezier(HUD_BEZIER[0], HUD_BEZIER[1], HUD_BEZIER[2], HUD_BEZIER[3]),
       }),
       -1,
       true
     );
-  }, [sweep, counter, breath, animations]);
+  }, [sweep, counter, breath, animations, tempo.sweep, tempo.counter, tempo.breath]);
 
   const sweepStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${sweep.value}deg` }] }));
   const counterStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${counter.value}deg` }] }));
@@ -227,7 +274,12 @@ export function ArcReactor({
       {/* one bright arc sweeping the outer track */}
       <Animated.View style={[StyleSheet.absoluteFill, sweepStyle, afterStyle]}>
         <Svg width={size} height={size}>
-          <Circle testID="arc-reactor-sweep" {...ring(c * 0.92, 2, COLOR.blueBright, 0.7, `${c * 0.7} ${c * 6}`)} />
+          {/* arc length rides the tempo too: a long arc at speed reads as effort,
+              a short one drifting reads as idle */}
+          <Circle
+            testID="arc-reactor-sweep"
+            {...ring(c * 0.92, 2, COLOR.blueBright, 0.7, `${c * 0.7 * tempo.dash} ${c * 6}`)}
+          />
         </Svg>
       </Animated.View>
 

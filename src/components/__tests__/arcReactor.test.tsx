@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react-native';
-import { ArcReactor } from '../ArcReactor';
+import { ArcReactor, tempoFor } from '../ArcReactor';
 import { statusColor } from '../../theme/status';
 import { COLOR } from '../../theme/tokens';
 
@@ -26,6 +26,50 @@ describe('statusColor', () => {
   it('falls back to dim for anything it does not know', () => {
     expect(statusColor('boot')).toBe(COLOR.dim);
     expect(statusColor('who knows')).toBe(COLOR.dim);
+  });
+});
+
+describe('tempoFor', () => {
+  it('drifts when linked and idle, sprints when working', () => {
+    // colour alone reads as a palette change; the pace is what you can tell
+    // apart across a room
+    expect(tempoFor('thinking').sweep).toBeLessThan(tempoFor('online').sweep);
+    expect(tempoFor('thinking').breath).toBeLessThan(tempoFor('online').breath);
+  });
+
+  it('draws a longer arc the harder it is working', () => {
+    expect(tempoFor('thinking').dash).toBeGreaterThan(tempoFor('online').dash);
+    expect(tempoFor('alert').dash).toBeGreaterThan(tempoFor('thinking').dash);
+  });
+
+  it('puts listening between idle and working', () => {
+    expect(tempoFor('listening').sweep).toBeLessThan(tempoFor('online').sweep);
+    expect(tempoFor('listening').sweep).toBeGreaterThan(tempoFor('thinking').sweep);
+  });
+
+  it('is fastest of all when something is wrong', () => {
+    const every = ['online', 'listening', 'thinking', 'speaking', 'boot'].map((s) => tempoFor(s).sweep);
+    expect(tempoFor('alert').sweep).toBeLessThan(Math.min(...every));
+  });
+
+  it('barely moves when nothing is linked, so a dead link never looks busy', () => {
+    const every = ['online', 'listening', 'thinking', 'speaking', 'alert'].map((s) => tempoFor(s).sweep);
+    expect(tempoFor('boot').sweep).toBeGreaterThan(Math.max(...every));
+  });
+
+  it('groups the aliases the way statusColor does, so pace and colour agree', () => {
+    expect(tempoFor('agent')).toEqual(tempoFor('thinking'));
+    expect(tempoFor('working')).toEqual(tempoFor('thinking'));
+    expect(tempoFor('lockdown')).toEqual(tempoFor('alert'));
+  });
+
+  it('falls back to the unlinked pace for anything it does not know', () => {
+    expect(tempoFor('who knows')).toEqual(tempoFor('boot'));
+    expect(tempoFor('')).toEqual(tempoFor('boot'));
+  });
+
+  it('does not care about spacing or case', () => {
+    expect(tempoFor('  THINKING ')).toEqual(tempoFor('thinking'));
   });
 });
 

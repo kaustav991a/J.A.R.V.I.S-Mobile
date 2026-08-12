@@ -182,6 +182,31 @@ four agreed on 2026-08-11).
 - Arrival order: ring at 0, wash at 120ms, rail at 560ms, tagline at 680ms.
 - The two static halo rings became one dashed tick track.
 
+### Two device-found fixes, and one silent no-op still outstanding
+
+**The CONNECT button only ever worked once.** The demo handshake effect had deps
+`[demo, connected]`; `connect()` set `demoPhase` back to `probing`, but neither
+dep changed, so no new timer was scheduled and the screen sat on "Connecting"
+forever. A `probeNonce` in the deps drives the re-run now, with a 1.6s pause —
+`DEMO_HANDSHAKE_MS` — because an instant "Connected" reads as a lie.
+
+**The reactor's states looked alike.** `statusColor` gave each one a colour, but
+every state shared one tempo, so colour alone read as a palette change rather
+than a machine doing something. `tempoFor` in `ArcReactor.tsx` now sets sweep,
+counter, breath and the sweeping arc's *length* per state: `boot` 15s (barely
+drifting) → `online` 9s → `listening` 5.6s → `thinking` 2s → `alert` 1.3s. The
+aliases group exactly as `statusColor` groups them, pinned by tests, so pace and
+colour can never disagree.
+
+**Still outstanding — `userInterfaceStyle` has never worked.** `app.json` sets
+`"userInterfaceStyle": "dark"`, but `expo-system-ui` is not installed, so the
+setting is **silently ignored on every build, EAS included**. Fix is
+`npx expo install expo-system-ui` plus a rebuild. Exactly the class of silent
+native no-op that has cost this project time before.
+
+`npm run android` / `ios` now point at `expo run:android` / `run:ios` — rewritten
+by `expo run:android` itself when it generated `android/`, not by hand.
+
 ### Still owed — do these in this order
 
 The pattern so far has been to build the phone side and leave a wire hanging for

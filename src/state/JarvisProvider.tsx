@@ -73,6 +73,14 @@ export type JarvisContextValue = {
 /** how often the stand-in desk speaks */
 const DEMO_TICK_MS = 2000;
 
+/**
+ * How long the simulated handshake takes.
+ *
+ * Long enough to read as a real connection being made rather than a button that
+ * just changes colour — an instant "Connected" looks like a lie.
+ */
+const DEMO_HANDSHAKE_MS = 1600;
+
 const JarvisContext = createContext<JarvisContextValue | null>(null);
 
 const RECENT_CAP = 12;
@@ -136,13 +144,22 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    * screen says so on its face.
    */
   const [demoPhase, setDemoPhase] = useState<'probing' | 'open'>('probing');
+  /**
+   * Bumped by `connect()` to re-run the handshake.
+   *
+   * Without it the effect below only ever ran on mount: `connect()` set the
+   * phase back to `probing`, but `demo` and `connected` were both unchanged, so
+   * no new timer was scheduled and the screen sat on "Connecting" forever. Every
+   * press after the first was a dead end.
+   */
+  const [probeNonce, setProbeNonce] = useState(0);
 
   useEffect(() => {
     if (!demo || connected) return;
     setDemoPhase('probing');
-    const timer = setTimeout(() => setDemoPhase('open'), 1400);
+    const timer = setTimeout(() => setDemoPhase('open'), DEMO_HANDSHAKE_MS);
     return () => clearTimeout(timer);
-  }, [demo, connected]);
+  }, [demo, connected, probeNonce]);
 
   const simulated = demo && !connected;
   const shownConnected = connected || (simulated && demoPhase === 'open');
@@ -274,8 +291,10 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   }, []);
 
   const connect = useCallback(() => {
-    // in demo the handshake is the thing being simulated, so re-run it
-    if (simulated) setDemoPhase('probing');
+    // in demo the handshake is the thing being simulated, so re-run it — the
+    // nonce is what actually restarts it, since setting the phase alone changes
+    // none of the effect's other dependencies
+    if (simulated) setProbeNonce((n) => n + 1);
     link.reprobe();
   }, [simulated, link]);
 
