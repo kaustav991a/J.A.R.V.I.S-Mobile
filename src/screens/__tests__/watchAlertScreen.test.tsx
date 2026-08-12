@@ -17,7 +17,7 @@ jest.mock('../../state/JarvisProvider', () => ({
 }));
 
 jest.mock('../../security/AuthProvider', () => ({
-  useAuth: () => ({ confirm: mockConfirm }),
+  useAuth: () => ({ confirmCritical: mockConfirm }),
 }));
 
 const METRICS = {

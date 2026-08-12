@@ -39,7 +39,7 @@ export function WatchAlertScreen({ alert }: { alert: IntruderAlert }) {
   const { width } = useWindowDimensions();
   const { accent } = useAppearance();
   const { answerWatch, expireWatch, deskAsset } = useJarvis();
-  const { confirm } = useAuth();
+  const { confirmCritical } = useAuth();
   const toast = useToast();
 
   const [left, setLeft] = useState(() => secondsLeft(alert.deadline, Date.now()));
@@ -74,7 +74,7 @@ export function WatchAlertScreen({ alert }: { alert: IntruderAlert }) {
         // Only clearing the alert is gated. Locking is the safe direction and is
         // exactly what happens on silence anyway, so putting a sensor between
         // the user and it would protect nothing and cost seconds.
-        if (itWasMe && !(await confirm('Confirm it was you at the desk'))) {
+        if (itWasMe && !(await confirmCritical('Confirm it was you at the desk'))) {
           haptic.bad();
           return;
         }
@@ -93,7 +93,7 @@ export function WatchAlertScreen({ alert }: { alert: IntruderAlert }) {
         setAsking(null);
       }
     },
-    [alert.id, answerWatch, confirm, toast]
+    [alert.id, answerWatch, confirmCritical, toast]
   );
 
   // The stand-in desk has no camera and no URL to serve one from, so it sends a

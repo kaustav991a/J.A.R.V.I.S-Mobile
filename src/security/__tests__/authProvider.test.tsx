@@ -195,6 +195,46 @@ describe('AuthProvider — confirming a decision', () => {
   });
 });
 
+describe('AuthProvider — confirmCritical', () => {
+  it('asks even when approvals are not gated', async () => {
+    // this is the whole point of the split. `confirm` honours the preference,
+    // which is right for an agent action and wrong for the desk watch: clearing
+    // that alert is what stops a machine locking itself, so if it were opt-in
+    // then anyone holding the unlocked phone could dismiss it
+    saved({});
+    const { result } = await mount();
+    await waitFor(() => expect(result.current.requireForApprovals).toBe(false));
+    await act(async () => {
+      await result.current.confirmCritical('Confirm it was you');
+    });
+    expect(mockAuth).toHaveBeenCalledWith('Confirm it was you', { strong: true, confirm: true });
+  });
+
+  it('refuses the decision when the finger is refused', async () => {
+    mockAuth.mockResolvedValue({ ok: false, reason: 'failed' });
+    const { result } = await mount();
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.confirmCritical('Confirm it was you');
+    });
+    expect(ok).toBe(false);
+  });
+
+  it('still passes through when nothing can open the gate', async () => {
+    // a 30-second window is not the moment to discover the sensor is gone
+    mockProbe.mockResolvedValue({ ...CAPABLE, enrolled: false, passcode: false });
+    const { result } = await mount();
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    let ok = false;
+    await act(async () => {
+      ok = await result.current.confirmCritical('Confirm it was you');
+    });
+    expect(ok).toBe(true);
+    expect(mockAuth).not.toHaveBeenCalled();
+  });
+});
+
 describe('AuthProvider — leaving the foreground', () => {
   /** capture the AppState listener the provider installs */
   const listen = () => {

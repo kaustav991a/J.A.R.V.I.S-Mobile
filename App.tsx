@@ -11,7 +11,7 @@ import { LockScreen } from './src/screens/LockScreen';
 import { WatchAlertScreen } from './src/screens/WatchAlertScreen';
 import { AuthProvider, useAuth } from './src/security/AuthProvider';
 import { ReactorHandoffProvider } from './src/components/ReactorHandoff';
-import { installHandler, prepare } from './src/lib/notify';
+import { installHandler, probeNotify } from './src/lib/notify';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { BlurTargetProvider } from './src/components/ui/Glass';
@@ -67,7 +67,13 @@ export default function App() {
   // show the prompt for a channel that does not exist yet. `prepare()` handles
   // both and never throws, so a build without the native module still starts.
   useEffect(() => {
-    void prepare();
+    void probeNotify().then(({ granted, pushToken }) => {
+      // Logged rather than displayed: the desk has no way to receive this yet,
+      // and a token is the address of *this install* — it belongs in the pairing
+      // handshake once that exists, not on a screen to be read out. Until then
+      // this line is how you confirm FCM actually resolved.
+      console.log(`[jarvis] notifications granted=${granted} push=${pushToken ? 'ok' : 'none'}`);
+    });
   }, []);
 
   if (!loaded && !error) return null;

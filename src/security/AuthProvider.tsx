@@ -48,8 +48,13 @@ export type Auth = {
   /** why the last attempt did not open it, for the lock screen to say */
   lastFailure: AuthFailure | null;
   unlock: () => Promise<boolean>;
-  /** gate a decision. Resolves true when it may proceed. */
+  /** gate an ordinary decision, if the user asked for approvals to be gated */
   confirm: (reason: string) => Promise<boolean>;
+  /**
+   * Gate a decision that must not be answerable by whoever is holding the phone —
+   * ignores the approvals preference and always asks when the sensor can answer.
+   */
+  confirmCritical: (reason: string) => Promise<boolean>;
   setAppLock: (on: boolean) => Promise<void>;
   setRequireForApprovals: (on: boolean) => Promise<void>;
 };
@@ -170,6 +175,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [requireForApprovals, usable, ask]
   );
 
+  /**
+   * For decisions where opt-in is the wrong default.
+   *
+   * `confirm` honours the approvals preference, which is right for an agent
+   * action like clearing build folders. It is wrong for the desk watch: clearing
+   * that alert is what stops a machine locking itself, so if it were gated by a
+   * preference the user never switched on, anyone holding the unlocked phone
+   * could dismiss it. This always asks when the sensor can answer.
+   *
+   * Still passes through when nothing is enrolled — a 30-second window is not the
+   * moment to discover the gate cannot open.
+   */
+  const confirmCritical = useCallback(
+    async (reason: string) => {
+      if (!usable) return true;
+      const outcome = await ask(reason, { strong: true, confirm: true });
+      if (!outcome.ok) setLastFailure(outcome.reason);
+      return outcome.ok;
+    },
+    [usable, ask]
+  );
+
   const setAppLock = useCallback(
     async (on: boolean) => {
       // Turning it on proves the sensor works before anything depends on it —
@@ -217,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastFailure,
       unlock,
       confirm,
+      confirmCritical,
       setAppLock,
       setRequireForApprovals,
     }),
@@ -230,6 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastFailure,
       unlock,
       confirm,
+      confirmCritical,
       setAppLock,
       setRequireForApprovals,
     ]

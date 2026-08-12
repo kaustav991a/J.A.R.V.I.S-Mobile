@@ -77,10 +77,21 @@ export async function prepare(): Promise<boolean> {
       });
     }
 
-    // answerable from the shade, so the desk can be told without opening the app
+    /**
+     * The two answers, as notification actions.
+     *
+     * Both open the app. `opensAppToForeground: false` would need a background
+     * task registered to actually answer the desk, and a button that appears to
+     * work while silently doing nothing is worse than one that opens the alert —
+     * this decides whether a machine stays unlocked.
+     *
+     * Android only shows these once the notification is **expanded**, and only if
+     * the category was registered before the notification was posted. That
+     * ordering is why `prepare()` runs at startup rather than lazily.
+     */
     await Notifications.setNotificationCategoryAsync(WATCH_CATEGORY, [
       { identifier: ACTION_ME, buttonTitle: 'It was me', options: { opensAppToForeground: true } },
-      { identifier: ACTION_LOCK, buttonTitle: 'Lock it now', options: { opensAppToForeground: false } },
+      { identifier: ACTION_LOCK, buttonTitle: 'Lock it now', options: { opensAppToForeground: true } },
     ]);
 
     const current = await Notifications.getPermissionsAsync();

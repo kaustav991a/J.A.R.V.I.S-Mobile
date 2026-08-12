@@ -93,8 +93,15 @@ export function tempoFor(status: string): Tempo {
   return TEMPO[key] ?? TEMPO.boot;
 }
 
-/** how long the ring takes to draw itself round */
-export const IGNITE_MS = 620;
+/**
+ * How long the ring takes to draw itself round.
+ *
+ * 620ms was the first value and it was too fast to read — the draw finished
+ * before the eye settled on it, so the ring simply looked like it had appeared.
+ * A power-on wants to be watched, and this is the one moment in the app where
+ * slower is better.
+ */
+export const IGNITE_MS = 1250;
 /** what rides in behind it, once the circuit is closed */
 const AFTERGLOW_MS = 260;
 

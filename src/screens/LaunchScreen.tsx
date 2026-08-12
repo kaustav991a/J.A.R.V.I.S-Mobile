@@ -28,13 +28,18 @@ const EXIT_MS = 420;
  * that fades up is a picture appearing; a ring that draws itself is a machine
  * starting, and that was the whole point.
  */
-const WASH_AT = 120;
-const WASH_MS = 520;
+/**
+ * The wash comes in behind the draw rather than over it. Earlier it started at
+ * 120ms and washed the ring out while it was still drawing, which is part of why
+ * the ignition was hard to see at all.
+ */
+const WASH_AT = 380;
+const WASH_MS = 700;
 /** after the circuit closes, so the bloom is not lighting an unlit ring */
-const RAIL_AT = 560;
-const RAIL_MS = 360;
-const STRIP_AT = 680;
-const STRIP_MS = 420;
+const RAIL_AT = 1250;
+const RAIL_MS = 380;
+const STRIP_AT = 1450;
+const STRIP_MS = 440;
 
 /** the choreography is finished once the tagline has settled */
 const SETTLE_AT = STRIP_AT + STRIP_MS;
