@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,14 @@ import type { ChatEntry } from '../state/hudReducer';
 import type { CommandsStackParams } from '../navigation/types';
 
 const SUGGESTIONS = ['system status', 'open browser', 'take screenshot', 'list files'];
+
+/**
+ * Roughly the length of Android's own keyboard animation, so the composer looks
+ * like it is riding the keyboard rather than chasing it. Decelerating, because it
+ * is following something that has already started moving.
+ */
+const KEYBOARD_MS = 220;
+const KEYBOARD_EASE = Easing.out(Easing.quad);
 
 const clock = (at: number): string => {
   const d = new Date(at);
@@ -39,7 +48,7 @@ export function ChatScreen() {
   const nav = useNavigation<NativeStackNavigationProp<CommandsStackParams>>();
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
-  const { accent } = useAppearance();
+  const { accent, animations } = useAppearance();
   const { hud, sendCommand, connected } = useJarvis();
   const toast = useToast();
   const list = useRef<FlatList<ChatEntry>>(null);
@@ -87,6 +96,28 @@ export function ChatScreen() {
   const bottom = typing
     ? lift + SPACE.xl
     : CHROME.tabBarHeight + Math.max(insets.bottom, CHROME.tabBarGap) + SPACE.sm;
+
+  /**
+   * Glide the composer to its new resting place instead of snapping to it.
+   *
+   * Applying `bottom` directly moved the composer the entire keyboard height in a
+   * single frame, which is the jump. This follows it instead.
+   *
+   * It is not keyboard-tracking: Android only reports `keyboardDidShow`, which
+   * fires once the keyboard has finished coming up, so the glide starts at the
+   * end of the system animation and trails it slightly. True 1:1 following needs
+   * reanimated's `useAnimatedKeyboard`, which disables Android's automatic resize
+   * for the *whole app* and takes over insets management — too broad a change to
+   * make for one screen without being able to test the other one.
+   */
+  const shift = useSharedValue(bottom);
+  useEffect(() => {
+    shift.value = animations
+      ? withTiming(bottom, { duration: KEYBOARD_MS, easing: KEYBOARD_EASE })
+      : bottom;
+  }, [bottom, animations, shift]);
+
+  const composerStyle = useAnimatedStyle(() => ({ paddingBottom: shift.value }));
 
   return (
     <View style={styles.root} testID="chat-screen">
@@ -149,7 +180,7 @@ export function ChatScreen() {
           />
         )}
 
-        <Glass radius={0} sheen style={[styles.composer, { paddingBottom: bottom }]}>
+        <Glass radius={0} sheen style={[styles.composer, composerStyle]}>
           <CommandBar
             placeholder="Message Jarvis…"
             leadingIcon="sparkles"

@@ -1,3 +1,4 @@
+import { Keyboard } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { CommandBar } from '../CommandBar';
 
@@ -61,5 +62,37 @@ describe('CommandBar', () => {
     const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} />);
     await fireEvent.press(getByTestId('command-voice'));
     expect(getByTestId('command-voice')).toBeTruthy();
+  });
+
+  describe('putting the keyboard away', () => {
+    // the return key blurs the field on its own, so SEND has to as well or the
+    // same action leaves the keyboard up or down depending which one you used
+    const dismiss = () => jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+
+    it('closes the keyboard when SEND is tapped', async () => {
+      const spy = dismiss();
+      const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} />);
+      await fireEvent.changeText(getByTestId('command-input'), 'system status');
+      await fireEvent.press(getByTestId('command-send'));
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('closes it on the return key too, by the same path', async () => {
+      const spy = dismiss();
+      const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} />);
+      await fireEvent.changeText(getByTestId('command-input'), 'system status');
+      await fireEvent(getByTestId('command-input'), 'submitEditing');
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('leaves the keyboard alone when there is nothing to send', async () => {
+      const spy = dismiss();
+      const { getByTestId } = await render(<CommandBar onSubmit={jest.fn()} />);
+      await fireEvent.press(getByTestId('command-send'));
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
   });
 });

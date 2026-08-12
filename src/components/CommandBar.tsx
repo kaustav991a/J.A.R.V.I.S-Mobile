@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLOR, SPACE, TYPE, glowBox } from '../theme/tokens';
 import { MicIcon } from './MicIcon';
@@ -32,6 +32,11 @@ export function CommandBar({
     if (disabled || !trimmed) return;
     onSubmit(trimmed);
     setText('');
+    // Sending from the return key blurs the field on its own — that is the
+    // single-line TextInput default — but the SEND button never did, so the same
+    // action left the keyboard up or down depending on which one you used.
+    // Dismissing here makes both paths the one behaviour.
+    Keyboard.dismiss();
   };
 
   const micColor = listening ? COLOR.green : COLOR.blue;
