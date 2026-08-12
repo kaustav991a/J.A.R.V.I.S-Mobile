@@ -201,6 +201,17 @@ approach as `splash-reactor.png`. To change the art, redraw or replace the files
 - `android-icon-monochrome.png` — white silhouette for Android 13+ themed icons
 - `favicon.png` — 196, downscaled from the full icon
 
+**Two files inside `android/` are gitignored and must be re-applied after every
+`expo prebuild --clean`:** `local.properties` (`sdk.dir=...`, else "SDK location not
+found") and `gradle.properties` `org.gradle.jvmargs` — Expo generates 2048m and a
+release build dies with OutOfMemoryError in R8; 6144m works. Worth moving both
+into `expo-build-properties` so they survive.
+
+A standalone release APK builds with `cd android && ./gradlew app:assembleRelease`
+— 38.6 MB versus 87.5 MB debug, JS bundled, no Metro. It is signed with the debug
+keystore (Expo generates it that way), so it cannot be installed over an
+EAS-signed build without uninstalling first.
+
 **Icons are native.** A reload does nothing; this needs a rebuild, and locally
 `expo prebuild --clean` first since `android/` already exists.
 
