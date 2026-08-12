@@ -80,6 +80,9 @@ export default function App() {
       // and a token is the address of *this install* — it belongs in the pairing
       // handshake once that exists, not on a screen to be read out. Until then
       // this line is how you confirm FCM actually resolved.
+      // Never log the token itself. It is the address of this install, app logs
+      // are readable by anything with adb, and it belongs in the pairing
+      // handshake so the desk gets it directly rather than via a copy-paste.
       console.log(`[jarvis] notifications granted=${granted} push=${pushToken ? 'ok' : 'none'}`);
     });
   }, [launching]);
