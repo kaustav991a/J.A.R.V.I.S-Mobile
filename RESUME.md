@@ -1,6 +1,171 @@
 # Resume point — jarvis-mobile
 
-Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11.
+Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11 and 2026-08-12.
+
+---
+
+## Start here (2026-08-12)
+
+**267 tests pass, `tsc --noEmit` clean. Nothing is committed yet** — everything
+in this session is in the working tree on `feat/mobile-hud`.
+
+### A dev build with the new native modules exists
+
+`a78df2e7` (development profile, 2026-08-12 13:07). It is the first build to
+carry `expo-local-authentication` and `expo-notifications`:
+
+```
+https://expo.dev/accounts/kaustav790/projects/jarvis-mobile/builds/a78df2e7-beb8-4dcc-96d2-e02097964291
+```
+
+EAS archives the **working directory**, not `git HEAD` — it uploaded 1.7 MB of
+project files and recomputed the fingerprint, so the uncommitted `app.json`
+plugin block went in. The `Commit` field on the build page names HEAD for
+provenance only; do not read it as what was built.
+
+Android permissions now resolved into the manifest, verified with
+`npx expo config --type introspect`: `POST_NOTIFICATIONS`, `USE_BIOMETRIC`,
+`USE_FINGERPRINT`.
+
+### This machine can now build Android locally, no Android Studio
+
+Installed to `C:\Users\Fortmindz\AppData\Local\Android\Sdk` (2.8 GB), versions
+taken from `node_modules/react-native/gradle/libs.versions.toml` rather than
+guessed: `platforms;android-36`, `build-tools;36.0.0`, `ndk;27.1.12297006`,
+`cmake;3.22.1`, `platform-tools`. JDK 17 was already present. `ANDROID_HOME`,
+`ANDROID_SDK_ROOT` and PATH are persisted at user scope.
+
+Two things worth knowing before using it:
+
+- **`eas build --local` does not run on Windows.** It is a bash pipeline; it
+  needs macOS/Linux or WSL2. On Windows the local route is `npx expo run:android`.
+- `expo run:android` runs `expo prebuild`, which writes `android/` (already
+  gitignored, so the repo stays clean). But this project's native config is
+  entirely plugin-driven — splash, local-auth, notifications — so **after any
+  `app.json` or plugin edit you must `expo prebuild --clean`** or the change
+  silently will not apply. That is the same class of silent native mismatch that
+  cost a day on the blur crash.
+
+### The reanimated trap that cost a device crash loop
+
+A worklet's closure is built from the identifiers in its **body**. A default
+parameter is not scanned:
+
+```ts
+// compiles, passes jest (JS thread, real closure), throws on the UI thread
+// once per frame: "Property 'MAGNET' doesn't exist"
+export function magnetize(raw: number, strength = MAGNET) { 'worklet'; … }
+```
+
+Default worklet parameters in the body, always. No other worklet in the
+codebase does this — it was checked.
+
+### The Android blur crash, finally diagnosed
+
+Not a version problem, not RenderScript, not the blur method. Captured from a dev
+build over adb (Xiaomi chenfeng, Android 16, arm64):
+
+```
+F libc: Fatal signal 11 (SIGSEGV), code 2 (SEGV_ACCERR) in tid (RenderThread)
+Cause: stack pointer is close to top of stack; likely stack overflow.
+512 total frames
+#00..#511  /system/lib64/libhwui.so
+           android::uirenderer::computeTransformImpl(DirtyStack const*, Matrix4*)
+```
+
+512 identical frames — HWUI's transform walk recursing until the RenderThread's
+stack is gone. **`BlurTargetView` wraps the whole app while the `BlurView` that
+samples it sits inside that subtree**, so the render-node graph has a cycle and
+walking the parent chain never terminates. `dimezisBlurViewSdk31Plus` was tried
+and changed nothing.
+
+Proven both ways in one sitting: flag on → process dies ~1s after first paint;
+flag off → alive. `TRY_ANDROID_BLUR` in `src/components/ui/Glass.tsx`, with the
+full tombstone in the comment.
+
+**The shape that would work:** the `BlurView` must not be a descendant of the
+`BlurTargetView` — target around the content only, blurring surface a sibling
+outside it. Awkward for the tab bar, since React Navigation renders a custom
+`tabBar` inside the same navigator as the scenes. Straightforward for a surface
+already a sibling of its content: the chat composer over its list, or Activity.
+
+Method: `adb logcat -c`, `am start -W`, poll `pidof`, then read the `F DEBUG`
+tombstone frames. A release APK still gives no diagnosis — a dev build plus adb
+is the whole difference.
+
+### What landed this session
+
+**Tab bar — fluid and magnetic, the iOS Camera dial properly.** The dial math is
+now pure exported functions with 31 tests (`src/navigation/__tests__/tabDial.test.ts`).
+
+- `centreAt` replaced centring on `Math.round(pos)`, which tripped the strip
+  ~60px sideways in one frame every time the dial crossed a boundary.
+- `magnetize` bends the drag toward the nearest detent — smootherstep blended
+  with identity, so the rate stays between 0.45× and 1.48× and the dial never
+  stalls under a moving finger. A dead stop reads as broken, not magnetic.
+- `projectDetent` replaced `clamp(-velocityX/1800, -1, 1)`, which capped a throw
+  at one detent so momentum died the instant the finger lifted.
+- `SNAP` went from damping 22/stiffness 78/mass 1.1 to 17/190/0.85 — the mass
+  read as syrup on device.
+- The tick moved off the drag onto the dial via `useAnimatedReaction`, so the
+  coast after release ticks too.
+- Knobs, all at the top of `GlassTabBar.tsx`: `MAGNET` 0.68, `DRAG` 1.45,
+  `COAST_S` 0.22.
+
+A test caught a real bug here: past the last tab, `widthAt` narrows the
+over-dragged edge tab and walks its own centre backwards, so the rubber band ran
+the wrong way. `centreAt` freezes the layout at the edge and shows overscroll as
+plain travel.
+
+**Biometric auth.** `expo-local-authentication`, class-3 enforced for decisions,
+device PIN left as fallback.
+
+- `src/lib/biometrics.ts` — probe, sensor naming, error mapping. Survives the
+  native module being wholly absent: on an older dev build every function is
+  `undefined`, so a bare call throws *synchronously* and a per-call `.catch`
+  never fires. That is what `ask()` in there is for.
+- `src/security/AuthProvider.tsx` — app lock, `RELOCK_AFTER_MS` 20s background
+  grace, approval confirmation. It never prompts by itself; the lock screen does,
+  so a system sheet cannot land over a half-drawn app.
+- `src/screens/LockScreen.tsx`, `src/screens/SecurityScreen.tsx` (Settings →
+  Security, no longer a SOON row).
+- Turning a gate **off** also demands a finger. Enabling one proves the sensor
+  works first. A phone with nothing enrolled never raises a gate it cannot open.
+
+**Desk watch — phone side complete, desk side specified and unbuilt.** Full
+contract in `../docs/desk-watch.md`.
+
+- `intruder` / `intruder_resolved` frames. The desk sends `expires_in` seconds,
+  never a timestamp, so the two clocks meet in exactly one place.
+- **The desk owns the countdown and locks on silence.** The phone's countdown is
+  a readout. A flat battery must not mean an open machine.
+- `WatchAlertScreen` sits above everything including the gate. "It was me" is
+  gated behind a strong biometric; "lock it now" is not — locking is what silence
+  does anyway, so a gate there would cost seconds and protect nothing.
+- Testable with no desk: send `test watch` in Chat with demo mode on.
+
+**Launch screen — ignition, and the sequenced arrival** (items 1, 2 and 4 of the
+four agreed on 2026-08-11).
+
+- `ArcReactor` takes `ignite` (opt-in, so Home and About are untouched). The tube
+  draws itself round from twelve o'clock via animated `strokeDashoffset` — the
+  one place in that component that animates an SVG attribute, because a circle
+  being drawn has no View equivalent. Rotation still lives on Views.
+- The reactor no longer fades or scales in at all. A ring that fades up is a
+  picture appearing; one that draws itself is a machine starting.
+- Arrival order: ring at 0, wash at 120ms, rail at 560ms, tagline at 680ms.
+- The two static halo rings became one dashed tick track.
+
+### Still owed
+
+1. **Push.** `expo-notifications` is installed and permitted but nothing
+   registers a token. Needs a Firebase project and `google-services.json` — a
+   user step — then another dev build. No code written for it yet.
+2. **Launch item 3**: hand off to Home's small reactor instead of cutting
+   (shared element).
+3. **A `preview` APK.** Still none since the blur fixes; the last published
+   (`0b0c84e`) still crashes.
+4. Everything in "Next steps" further down, unchanged.
 
 ---
 
