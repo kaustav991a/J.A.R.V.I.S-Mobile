@@ -28,6 +28,71 @@ export const cloudWsUrl = (e: Endpoints, token: string | null): string | null =>
   e.cloudBase ? withToken(`${toWs(e.cloudBase)}/app-link`, token) : null;
 
 export const TOKEN_KEY = 'jarvis_app_token';
+export const DESK_KEY = 'jarvis_desk_base';
+
+/**
+ * Clean up a desk address typed by hand, or reject it.
+ *
+ * Returns the address to store, or null if it is not usable. Pure, so the rules
+ * are testable without a device.
+ *
+ * People type `192.168.1.5:8000`, and a scheme-less address is not a mistake
+ * worth an error message — assume `http://`, since a desk on the LAN is not
+ * running TLS. A trailing slash is also not a mistake, but it has to go: every
+ * URL is built by concatenation (`${base}/ws`), so a slash left on the end
+ * produces `//ws` and a desk that never answers.
+ */
+export function normaliseBase(input: string): string | null {
+  const text = input.trim();
+  if (!text) return null;
+
+  const withScheme = /^https?:\/\//i.test(text) ? text : `http://${text}`;
+  const trimmed = withScheme.replace(/\/+$/, '');
+
+  const shape = /^(https?):\/\/([a-zA-Z0-9._-]+)(?::(\d{1,5}))?(\/[^\s]*)?$/i.exec(trimmed);
+  if (!shape) return null;
+
+  const port = shape[3];
+  if (port !== undefined && (Number(port) === 0 || Number(port) > 65535)) return null;
+
+  // the scheme is case-insensitive and the host effectively so; leave any path
+  // alone, since that half can be case-sensitive
+  return `${shape[1].toLowerCase()}://${shape[2].toLowerCase()}${port ? `:${port}` : ''}${shape[4] ?? ''}`;
+}
+
+/** the desk address the user set, or null to fall back to the build's default */
+export async function loadDeskBase(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    return await SecureStore.getItemAsync(DESK_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** pass null to forget it and go back to the default */
+export async function saveDeskBase(base: string | null): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    if (base === null) await SecureStore.deleteItemAsync(DESK_KEY);
+    else await SecureStore.setItemAsync(DESK_KEY, base);
+  } catch {
+    // an address that cannot be persisted still applies for this session
+  }
+}
+
+/**
+ * The endpoints to actually dial: the build's defaults, with the stored desk
+ * address taking precedence.
+ *
+ * The cloud base stays build-configured. It is one fixed gateway rather than
+ * something to point around, and giving it a field would invite pointing the
+ * phone at a brain that can answer as you.
+ */
+export async function loadEndpoints(): Promise<Endpoints> {
+  const stored = await loadDeskBase();
+  return stored ? { ...DEFAULT_ENDPOINTS, deskBase: stored } : DEFAULT_ENDPOINTS;
+}
 
 /** SecureStore is unavailable on web; the app degrades to no token there. */
 export async function loadToken(): Promise<string | null> {
@@ -42,4 +107,14 @@ export async function loadToken(): Promise<string | null> {
 export async function saveToken(token: string): Promise<void> {
   if (Platform.OS === 'web') return;
   await SecureStore.setItemAsync(TOKEN_KEY, token);
+}
+
+/** forget the pairing token — unpairing this phone from the desk */
+export async function clearToken(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {
+    // nothing stored is the state we wanted anyway
+  }
 }

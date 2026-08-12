@@ -12,8 +12,16 @@ import {
 import { hudReducer, initialHudState, HudState } from './hudReducer';
 import { demoFrames, demoReply } from './demoFeed';
 import { useLink } from '../link/useLink';
-import { DEFAULT_ENDPOINTS } from '../link/config';
-import type { LinkMode, LinkStatus } from '../link/config';
+import {
+  DEFAULT_ENDPOINTS,
+  clearToken,
+  loadEndpoints,
+  loadToken,
+  normaliseBase,
+  saveDeskBase,
+  saveToken,
+} from '../link/config';
+import type { Endpoints, LinkMode, LinkStatus } from '../link/config';
 import { createApi } from '../api/client';
 
 export type JarvisContextValue = {
@@ -47,6 +55,14 @@ export type JarvisContextValue = {
   /** locally kept command history, newest first */
   recent: string[];
   clearRecent: () => void;
+  /** the desk address in use, and whether a pairing token is held */
+  pairing: { deskBase: string; usingDefault: boolean; hasToken: boolean };
+  /**
+   * Point the phone at a desk and pair it. `base` is normalised, and an
+   * unusable one is rejected — the return says which. Pass null for either to
+   * forget it. Re-dials on success.
+   */
+  pair: (next: { base?: string | null; token?: string | null }) => Promise<boolean>;
   /** stand-in desk, for showing the app with no machine to talk to */
   demo: boolean;
   setDemo: (on: boolean) => void;
@@ -75,7 +91,31 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   // otherwise open on an empty HUD reporting failure
   const [demo, setDemo] = useState(true);
 
+  /**
+   * The desk address and token, owned here rather than read inside the link.
+   *
+   * `undefined` means "not loaded yet, use whatever is stored" — the same
+   * behaviour the app had before any screen could set these. Once loaded they are
+   * held here, so re-pairing re-dials without remounting anything.
+   */
+  const [endpoints, setEndpoints] = useState<Endpoints>(DEFAULT_ENDPOINTS);
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([loadEndpoints(), loadToken()]).then(([e, t]) => {
+      if (!alive) return;
+      setEndpoints(e);
+      setToken(t);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const link = useLink({
+    endpoints,
+    token,
     onFrame: (frame, at) => dispatch({ type: 'frame', frame, at }),
   });
 
@@ -119,13 +159,28 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     return () => clearInterval(timer);
   }, [demo, connected]);
 
+  // the live endpoints, not the build defaults: after re-pairing, REST has to
+  // follow the socket to the new desk rather than staying on the old address
   const base = useMemo(
-    () =>
-      link.mode === 'cloud' && DEFAULT_ENDPOINTS.cloudBase ? DEFAULT_ENDPOINTS.cloudBase : DEFAULT_ENDPOINTS.deskBase,
-    [link.mode]
+    () => (link.mode === 'cloud' && endpoints.cloudBase ? endpoints.cloudBase : endpoints.deskBase),
+    [link.mode, endpoints]
   );
 
-  const api = useMemo(() => createApi({ baseUrl: base, token: null }), [base]);
+  // the token goes on REST too. The socket carries it as a query parameter
+  // because React Native cannot set handshake headers; REST can use the header,
+  // and both routes the desk gates are reached this way.
+  const api = useMemo(() => createApi({ baseUrl: base, token: token ?? null }), [base, token]);
+
+  const pairing = useMemo(
+    () => ({
+      deskBase: endpoints.deskBase,
+      usingDefault: endpoints.deskBase === DEFAULT_ENDPOINTS.deskBase,
+      // whether one is held, never the value — nothing needs to read the secret
+      // back out to render, so it is not put on the context
+      hasToken: Boolean(token),
+    }),
+    [endpoints, token]
+  );
 
   const deskAsset = useCallback(
     (path: string | null) => {
@@ -200,6 +255,24 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'intruder_expired', id, at: Date.now() });
   }, []);
 
+  const pair = useCallback(async (next: { base?: string | null; token?: string | null }) => {
+    if (next.base !== undefined) {
+      // null forgets the address; anything unusable is refused rather than stored,
+      // because a stored address that cannot be dialled looks like a dead desk
+      const base = next.base === null ? null : normaliseBase(next.base);
+      if (next.base !== null && base === null) return false;
+      await saveDeskBase(base);
+      setEndpoints(base ? { ...DEFAULT_ENDPOINTS, deskBase: base } : DEFAULT_ENDPOINTS);
+    }
+    if (next.token !== undefined) {
+      const trimmed = next.token === null ? null : next.token.trim();
+      if (trimmed) await saveToken(trimmed);
+      else await clearToken();
+      setToken(trimmed || null);
+    }
+    return true;
+  }, []);
+
   const connect = useCallback(() => {
     // in demo the handshake is the thing being simulated, so re-run it
     if (simulated) setDemoPhase('probing');
@@ -220,6 +293,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       answerWatch,
       expireWatch,
       deskAsset,
+      pairing,
+      pair,
       recent,
       clearRecent: () => setRecent([]),
       demo,
@@ -240,6 +315,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       answerWatch,
       expireWatch,
       deskAsset,
+      pairing,
+      pair,
       recent,
       demo,
     ]

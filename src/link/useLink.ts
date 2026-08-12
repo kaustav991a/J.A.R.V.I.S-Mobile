@@ -7,6 +7,12 @@ import { JarvisFrame } from '../ws/frames';
 
 export type UseLinkOptions = {
   endpoints?: Endpoints;
+  /**
+   * The pairing token to present. Omit it and the stored one is read instead —
+   * which is what the app did before any screen could set one. Pass it (even as
+   * null) to take ownership, so re-pairing re-dials without a remount.
+   */
+  token?: string | null;
   onFrame: (frame: JarvisFrame, at: number) => void;
   /** test seam — inject a fake machine */
   machineFactory?: (deps: MachineDeps) => LinkMachine;
@@ -22,7 +28,7 @@ export type UseLinkResult = {
 };
 
 export function useLink(opts: UseLinkOptions): UseLinkResult {
-  const { endpoints = DEFAULT_ENDPOINTS, onFrame, machineFactory, tickMs = 5000 } = opts;
+  const { endpoints = DEFAULT_ENDPOINTS, token, onFrame, machineFactory, tickMs = 5000 } = opts;
 
   // keep the latest onFrame without rebuilding the machine on every render
   const onFrameRef = useRef(onFrame);
@@ -52,18 +58,28 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
     };
   }, [machine]);
 
-  // the desk token lives in SecureStore and is loaded after first paint
+  /**
+   * The token the machine presents.
+   *
+   * A caller-supplied token wins; otherwise the stored one is read after first
+   * paint, which is what happened before any screen could set one. Re-runs when
+   * the token changes, so re-pairing re-dials — and only reprobes when the value
+   * actually moved, or every render of a paired app would drop its connection.
+   */
   useEffect(() => {
     let cancelled = false;
-    void loadToken().then((token) => {
-      if (cancelled || !token) return;
-      (machine as unknown as { deps: MachineDeps }).deps.token = token;
+    const source = token === undefined ? loadToken() : Promise.resolve(token);
+    void source.then((next) => {
+      if (cancelled) return;
+      const deps = (machine as unknown as { deps: MachineDeps }).deps;
+      if (deps.token === (next ?? null)) return;
+      deps.token = next ?? null;
       void machine.reprobe();
     });
     return () => {
       cancelled = true;
     };
-  }, [machine]);
+  }, [machine, token]);
 
   useEffect(() => {
     const id = setInterval(() => {

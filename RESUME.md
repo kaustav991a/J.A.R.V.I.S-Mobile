@@ -188,10 +188,30 @@ The pattern so far has been to build the phone side and leave a wire hanging for
 whatever connects later. This is the list of hanging wires, ordered by what
 unblocks the most.
 
-1. **The pairing token, and a desk-endpoint field.** This is the blocker, and it
-   is the next thing to build. `saveToken`/`loadToken` exist in
-   `src/link/config.ts` and `useLink` reads a token, but **no screen ever writes
-   one**, so `?token=` is always absent. Both `docs/desk-watch.md` and
+1. **The pairing token, and a desk-endpoint field. Plumbing done and tested; only
+   the UI is left.**
+
+   Built: `normaliseBase()` (accepts `192.168.1.5:8000`, assumes `http://`,
+   strips trailing slashes — which would otherwise concatenate into `//ws` and a
+   desk that never answers, rejects impossible ports),
+   `loadEndpoints`/`saveDeskBase`/`clearToken` in `src/link/config.ts`, a `token`
+   option on `useLink` that re-dials on change without a remount, and
+   `pairing`/`pair({base, token})` on `JarvisProvider`. The context exposes
+   *whether* a token is held, never its value.
+
+   Two silent breakages fixed in passing: REST still pointed at the build's
+   default desk after re-pairing, and the API client carried no token — so the
+   very routes the desk gates would have gone out unauthenticated.
+
+   **Left to do:** two fields and a Save button on `ConnectionScreen`, calling
+   `pair()`. Manual entry, not QR — QR needs `expo-camera` and therefore another
+   dev build; it can layer on later.
+
+   Until that lands the desk address is still `.env.local` only, and changing it
+   needs a Metro restart, not a reload.
+
+   Why this one leads: `saveToken`/`loadToken` existed but **no screen ever wrote
+   one**, so `?token=` was always absent. Both `docs/desk-watch.md` and
    `docs/cloud-app-link.md` say plainly: do not expose their routes without it.
    `/api/watch/answer` decides whether a machine stays unlocked, and `/app-link`
    reaches a brain that can answer as you. So until a token can be set, **the desk
