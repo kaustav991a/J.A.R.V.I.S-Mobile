@@ -340,6 +340,14 @@ has no in-app field, push notifications are installed but unregistered, voice is
 an icon only, Scripts are fixture-backed, and the desk-side of the desk-watch
 feature does not exist.
 
-The desk contracts live outside this repo, in `../docs/` —
-`cloud-app-link.md` and `desk-watch.md`. **They are not version controlled**,
-which is worth fixing.
+Everything needed to understand the remaining work is in the repo:
+
+| File | What it holds |
+| --- | --- |
+| `RESUME.md` | Running log. Where the work stands, and what is owed next |
+| `ROADMAP.md` | The longer arc |
+| `docs/desk-watch.md` | What the desk owes for the intruder watch — frames, routes, the lock call, retention |
+| `docs/cloud-app-link.md` | What the Render gateway owes for cloud failover |
+| `docs/ui-reference-prompt.md` | The image-generator prompt for new reference mockups |
+| `docs/superpowers/specs/` | The original design |
+| `docs/superpowers/plans/` | The original 15-task plan. Partly superseded — read the Deviations section of `RESUME.md` before following it |

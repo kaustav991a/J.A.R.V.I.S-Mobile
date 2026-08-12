@@ -6,8 +6,9 @@ Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11 and 2026-08-1
 
 ## Start here (2026-08-12)
 
-**267 tests pass, `tsc --noEmit` clean. Nothing is committed yet** — everything
-in this session is in the working tree on `feat/mobile-hud`.
+**287 tests pass, `tsc --noEmit` clean, and it is all committed** on
+`feat/mobile-hud` — nine commits, ending with the README and this doc set. Read
+`README.md` first if this machine is new; it is a setup guide.
 
 ### A dev build with the new native modules exists
 
@@ -124,16 +125,41 @@ device PIN left as fallback.
   native module being wholly absent: on an older dev build every function is
   `undefined`, so a bare call throws *synchronously* and a per-call `.catch`
   never fires. That is what `ask()` in there is for.
-- `src/security/AuthProvider.tsx` — app lock, `RELOCK_AFTER_MS` 20s background
-  grace, approval confirmation. It never prompts by itself; the lock screen does,
-  so a system sheet cannot land over a half-drawn app.
+- `src/security/AuthProvider.tsx` — app lock and approval confirmation. It never
+  prompts by itself; the lock screen does, so a system sheet cannot land over a
+  half-drawn app.
 - `src/screens/LockScreen.tsx`, `src/screens/SecurityScreen.tsx` (Settings →
   Security, no longer a SOON row).
 - Turning a gate **off** also demands a finger. Enabling one proves the sensor
   works first. A phone with nothing enrolled never raises a gate it cannot open.
 
+Three bugs found on device, all fixed and all now pinned by tests. They are worth
+reading before touching this area, because each one presents as "the lock screen
+is stuck":
+
+1. **Android refuses `BIOMETRIC_WEAK | DEVICE_CREDENTIAL`.** It is rejected
+   outright, not degraded. With the device passcode kept as a fallback, asking for
+   `'weak'` meant no sheet appeared and the promise never settled — a spinner
+   nobody could get past. `authenticateAsync` now always asks for `'strong'`.
+2. **Minimising while the sheet is up leaves `authenticateAsync` unresolved.**
+   `Button` treats `busy` as inert, so the unlock button became a spinner blocking
+   its own press. `cancel()` settles a stale sheet before opening a new one, and
+   there is a 90s ceiling on the native call as a backstop.
+3. **A locked screen never unmounts**, so the one-shot mount prompt never fired
+   again — returning to a locked app showed a lock screen that would not ask for
+   anything. It now re-asks on every return to foreground, on `'active'` only:
+   cancelling as the app *leaves* would abort the sheet just opened. A 1.2s
+   recency guard separates a genuine return from the `'active'` that trails a cold
+   start.
+
+The gate closes when the app **leaves** the foreground, `'inactive'` included, so
+it is already up in the app-switcher snapshot. This replaced a 20s grace measured
+on return, which left the app open to anyone picking the phone up inside twenty
+seconds. Our own sheet also sends the app away on some devices, so authentication
+raises a flag the gate honours — without it, that is a prompt loop.
+
 **Desk watch — phone side complete, desk side specified and unbuilt.** Full
-contract in `../docs/desk-watch.md`.
+contract in `docs/desk-watch.md`.
 
 - `intruder` / `intruder_resolved` frames. The desk sends `expires_in` seconds,
   never a timestamp, so the two clocks meet in exactly one place.
@@ -156,16 +182,45 @@ four agreed on 2026-08-11).
 - Arrival order: ring at 0, wash at 120ms, rail at 560ms, tagline at 680ms.
 - The two static halo rings became one dashed tick track.
 
-### Still owed
+### Still owed — do these in this order
 
-1. **Push.** `expo-notifications` is installed and permitted but nothing
-   registers a token. Needs a Firebase project and `google-services.json` — a
-   user step — then another dev build. No code written for it yet.
-2. **Launch item 3**: hand off to Home's small reactor instead of cutting
-   (shared element).
-3. **A `preview` APK.** Still none since the blur fixes; the last published
-   (`0b0c84e`) still crashes.
-4. Everything in "Next steps" further down, unchanged.
+The pattern so far has been to build the phone side and leave a wire hanging for
+whatever connects later. This is the list of hanging wires, ordered by what
+unblocks the most.
+
+1. **The pairing token, and a desk-endpoint field.** This is the blocker, and it
+   is the next thing to build. `saveToken`/`loadToken` exist in
+   `src/link/config.ts` and `useLink` reads a token, but **no screen ever writes
+   one**, so `?token=` is always absent. Both `docs/desk-watch.md` and
+   `docs/cloud-app-link.md` say plainly: do not expose their routes without it.
+   `/api/watch/answer` decides whether a machine stays unlocked, and `/app-link`
+   reaches a brain that can answer as you. So until a token can be set, **the desk
+   watch cannot leave demo mode.** The endpoint is the same job: the desk address
+   lives only in `.env.local`, editable by hand and needing a Metro restart, and
+   it is stale whenever the LAN changes. Both belong on the Connection screen,
+   persisted with SecureStore the way `AuthProvider` already does it.
+2. **Local notifications.** No Firebase needed and they work today. This closes
+   the real gap in the desk watch: an alert that only travels down the WebSocket
+   arrives when the app is in the foreground, which is not where the phone is when
+   it matters. `expo-notifications` is installed and `POST_NOTIFICATIONS` is in
+   the manifest, but nothing requests the runtime permission, creates a channel,
+   or posts anything. Prove the surface locally before adding remote push.
+3. **Persist appearance settings.** `AppearanceProvider` is in-memory, so accent,
+   glow and animations reset on every launch. Small, and the SecureStore pattern
+   is already in the codebase.
+4. **Remote push.** Needs a Firebase project and `google-services.json` from the
+   user, then another dev build. Only worth doing after (2) proves the surface.
+5. **A `preview` APK.** Still none since the blur fixes; the last published
+   (`0b0c84e`) still crashes. Worth building now the app is healthy.
+6. **Real blur where it can work.** The shape is known (see above): the
+   `BlurView` must not be a descendant of the `BlurTargetView`. The tab bar cannot
+   satisfy that easily, but the chat composer over its list, and the Activity
+   sheet over Home, are already sibling-of-content.
+7. **The desk side.** Fully specified in `docs/desk-watch.md`, nothing built.
+   Python on the Windows machine, not this repo. This is where the product stops
+   being a convincing demo.
+8. Everything in "Next steps" further down, unchanged — smoke tests for the
+   remaining screens, the integration test, wiring Scripts off fixtures, and voice.
 
 ---
 
@@ -235,7 +290,7 @@ Then `ROADMAP.md` §1: persistence, the Connection endpoint field, pairing token
 
 ## Where the work stands
 
-The app was being built from `../docs/superpowers/plans/2026-08-10-jarvis-mobile-hud.md`
+The app was being built from `docs/superpowers/plans/2026-08-10-jarvis-mobile-hud.md`
 (15 tasks, single HUD canvas). Mid-plan the user supplied reference images in
 `C:\Users\Fortmindz\Downloads\Jarvis UI\` and redirected the design **twice**.
 The plan is now partly superseded — read "Deviations" below before following it.
