@@ -5,6 +5,55 @@ Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 a
 
 ---
 
+## Resume point — end of 2026-08-13, 19:00
+
+**Everything is pushed.** Mobile `feat/mobile-hud` at `666a4b1`; gateway
+`feat/cloud-gateway` at `9c37b4d`, deployed. 368 tests, `tsc --noEmit` clean.
+
+APK installed on the phone at **18:57:18** (full rebuild after `prebuild --clean`).
+Process starts, no crash, no tombstone. `RECORD_AUDIO` and `ACCESS_FINE_LOCATION`
+granted; `ACCESS_BACKGROUND_LOCATION` is not even declared.
+
+### Verified on the device today
+
+Pairing with the rotated token; CLOUD → FULL POWER when a desk attaches; local
+notification with the app open; **push to a sleeping phone, which buzzed**;
+**desk-watch alert reaching a closed app, and tapping it opening the alert screen**;
+chat surviving a force-stop; one socket per launch.
+
+### NOT verified — do these first
+
+1. **Nobody has spoken into the microphone.** The gesture, the timer, the meter and
+   the cancel/lock slides are all exercised; whether a clip actually transcribes is
+   unknown. Chat → hold the mic → speak → release.
+2. **The morning briefing has never fired.** Settings → Places → set Home while
+   standing in it, set a leaving time, then **PREVIEW THE BRIEFING** — do not wait
+   for tomorrow to find out.
+3. **The located weather answer has not been re-tested since the fix.** Ask "is it
+   raining here?" with sharing on. It should quote measured figures. If it says it
+   could not fetch, the phone's own lookup failed — check that sharing is on, since
+   without it no `where` is sent at all.
+4. **"How far to the office"** needs Office named first. It resolves against the
+   label with no geocoder call; unnamed destinations still go through Nominatim.
+
+The last attempt at (1)–(3) was blocked because the phone was behind its lock screen:
+`adb` can wake the display but not unlock it, so the app launched behind the keyguard
+and never reached the foreground. `apps_linked: 0` in that state means nothing.
+
+### Still owed, and not mine to do
+
+**Rotate `BRIDGE_SECRET`.** The old value appeared in Render's access log before the
+redaction landed, and it still opens `/desk-link` — a fake desk was connected with it
+repeatedly today while testing. Both ends change together: Render env and
+`jarvis-backend/.env` on the desk, so it needs the desk on.
+
+**Traffic needs a paid key.** Routing is OSRM's public server, which knows the road
+graph and not the road, so durations are free-flowing and the context says so.
+`_route_blocking` / `_route_to_blocking` are the only functions that change when
+there is a Mapbox or TomTom key.
+
+---
+
 ## Start here (2026-08-13)
 
 **The phone talks to the cloud brain, and both notification paths are proven on
