@@ -1,6 +1,100 @@
 # Resume point — jarvis-mobile
 
-Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11 and 2026-08-12.
+Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 and
+2026-08-13.
+
+---
+
+## Start here (2026-08-13)
+
+**The phone talks to the cloud brain, and both notification paths are proven on
+real hardware.** The gateway half is deployed; the phone half is committed on
+`feat/mobile-hud` but **not pushed**. 362 tests, `tsc --noEmit` clean.
+
+### It is paired, and the token was rotated
+
+`APP_TOKEN` is now its own value on Render rather than falling back to
+`BRIDGE_SECRET`, and the phone holds it. Verified: the new token is accepted, the
+old one is refused 403.
+
+**`BRIDGE_SECRET` still wants rotating.** The old shared value appeared in Render's
+access log (see below) and it still opens `/desk-link`. Both ends change together —
+Render env and `jarvis-backend/.env` on the desk — so it needs the desk on.
+
+### What the gateway grew (deployed, `feat/cloud-gateway`)
+
+- `WS /app-link` announces the desk arriving: `{"type":"desk","linked":true}`
+- `POST /app-push/register` — the phone's push address, gated by the same token
+- Push through Expo's relay, so a sleeping phone is reachable at all
+- Desk-watch alerts relayed to phones, and pushed when none is attached
+- **The pairing token was being written to the access log.** uvicorn logs the whole
+  request line and the token travels as a query parameter, because React Native
+  cannot set headers on a WebSocket handshake. `_RedactQuerySecrets` filters it now;
+  confirmed live as `?token=<redacted>`.
+
+### The bug worth knowing about
+
+**Every notification this app has ever posted went to Expo's fallback channel** —
+"Miscellaneous", `SILENT`, no vibration. `channelId` was being spread into
+`content`, which has no such field; it belongs on the *trigger*. That includes the
+desk-watch intruder alert, configured `AndroidImportance.MAX` precisely so it can
+interrupt, arriving mute the whole time. `tsc` cannot catch it: the spread that
+added the field turns off excess-property checking.
+
+The watch channel is now `desk-watch-v2` — Android freezes a channel's importance,
+vibration and light at creation, so an emergency vibration and a red light meant a
+new id, not an edit. `bypassDnd` cannot be used: it needs Notification Policy
+Access, and without it Android rejects the whole channel, leaving it absent.
+
+### Verified on the device, not just in tests
+
+- CLOUD → **FULL POWER** when the desk attaches, with the Connect tile at full
+  green wash (a fifth of it on plain cloud)
+- Local notification with the app open, on `channel=general`
+- **Push to a sleeping phone**, which buzzed
+- **Desk-watch alert to a closed app**, and tapping it opened the alert screen
+- Chat survives a force-stop: sent a turn, killed the app, the reply was still there
+- One socket per launch (`apps_linked: 1`), where it used to be two
+
+### Things learned the hard way today
+
+- `am force-stop` puts an app in Android's **stopped state**, where FCM is not
+  delivered at all. Backgrounding is not force-stopping; two of my push tests were
+  invalid for this reason.
+- Two notifications a second apart get folded into one Android auto-group, and the
+  second can vanish — the shade held an orphan `desk-watch` group summary with no
+  child. `sticky` on the local alert prevents it.
+- Expo's push API takes only `channelId`, `icon` and `tag` on Android. **No colour,
+  no sticky.** A pushed alert cannot be made red or unswipeable without a data-only
+  push plus a background task (`expo-task-manager`), which risks *no* notification
+  at all if the task does not run.
+- A phone cannot hold a WebSocket while dozing. `apps_linked: 0` with the screen off
+  is correct behaviour, and is the whole reason push exists.
+
+### Still owed
+
+1. **`BRIDGE_SECRET` rotation** — needs the desk on.
+2. **Voice is built but nobody has spoken into it.** `expo-audio` is wired to the
+   chat mic, hold-to-record, base64 envelope to the gateway, which already
+   transcribes. `android/` was regenerated for `RECORD_AUDIO`; **if you
+   `prebuild --clean` again, restore `local.properties` and the 6144m jvmargs.**
+3. **Scoped Android blur is written and switched off.** `BlurBehind` in `Glass.tsx`
+   puts the target around the content with the surface as a sibling — the shape the
+   old tombstone says would work. `TRY_SCOPED_ANDROID_BLUR = false`. Turning it on
+   needs a device and `adb logcat` watching for `F DEBUG` in `libhwui.so`, because
+   the failure mode is a segfault that kills the process silently.
+4. **The desk side of the watch** — still entirely unbuilt, still the only
+   simulated part. `docs/desk-watch.md` specifies it.
+5. **A pushed watch alert cannot raise the alert screen from cold if it has no
+   payload** — it does carry one now, but nothing fetches a *live* alert on connect,
+   so an alert that arrived while the app was dead and was never tapped is lost.
+6. Camera: photo-to-J.A.R.V.I.S. would need `expo-camera` plus a gateway route.
+   The vision path exists for Telegram photos; `/app-link` has no photo frame.
+
+### One thing not diagnosed
+
+A single run at 12:38 posted no notification despite the FULL POWER flip rendering
+correctly. Every run since worked. Written down rather than quietly forgotten.
 
 ---
 

@@ -1,4 +1,4 @@
-import { PropsWithChildren, RefObject, createContext, useContext, useRef } from 'react';
+import { PropsWithChildren, ReactNode, RefObject, createContext, useContext, useRef } from 'react';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, { AnimatedStyle } from 'react-native-reanimated';
 import { BlurTargetView, BlurView } from 'expo-blur';
@@ -84,6 +84,61 @@ export function BlurTargetProvider({ children }: PropsWithChildren) {
 }
 
 export const useBlurTarget = (): RefObject<View | null> | null => useContext(BlurTargetContext);
+
+/**
+ * Real Android blur, in the one arrangement that cannot recurse.
+ *
+ * The crash above happens because the `BlurView` samples a target it lives
+ * inside — the target contains a view whose content is the target, and HWUI's
+ * transform walk never terminates. The fix is structural, not a setting: the
+ * target wraps *only* the content being blurred, and the blurring surface is a
+ * **sibling** of it that still receives its ref.
+ *
+ * So this takes two slots rather than children. `content` goes inside the target;
+ * `surface` goes outside it, with the context pointing at the target so any
+ * `Glass` inside `surface` can sample it. A chat composer over its list is
+ * exactly this shape already, which is why it is the first place worth trying.
+ *
+ * Off by default, and deliberately: the failure mode is a segfault on the
+ * RenderThread — no JS error, nothing an ErrorBoundary sees, the kernel simply
+ * takes the process. Flipping `TRY_SCOPED_ANDROID_BLUR` needs a device and
+ * `adb logcat`, watching for `F DEBUG` frames in `libhwui.so`, not a jest run.
+ */
+const TRY_SCOPED_ANDROID_BLUR = false;
+const SCOPED_ANDROID_BLUR = !IOS && TRY_SCOPED_ANDROID_BLUR;
+
+export function BlurBehind({
+  content,
+  surface,
+  style,
+}: {
+  content: ReactNode;
+  surface: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const ref = useRef<View | null>(null);
+
+  // iOS blurs without a target at all, and Android with the flag off is the
+  // smoked-glass tint — either way this is a plain pair of siblings
+  if (!SCOPED_ANDROID_BLUR) {
+    return (
+      <View style={[styles.fill, style]}>
+        {content}
+        {surface}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.fill, style]}>
+      <BlurTargetView ref={ref} style={styles.fill}>
+        {content}
+      </BlurTargetView>
+      {/* outside the target, pointed at it: this is the whole point */}
+      <BlurTargetContext.Provider value={ref}>{surface}</BlurTargetContext.Provider>
+    </View>
+  );
+}
 
 export type GlassProps = PropsWithChildren<{
   /**
