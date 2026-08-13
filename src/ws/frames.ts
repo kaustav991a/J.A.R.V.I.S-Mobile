@@ -83,7 +83,18 @@ export type IntruderResolvedFrame = {
  */
 export type TranscriptFrame = { kind: 'transcript'; text: string };
 
+/**
+ * The desk attached to — or dropped off — the cloud gateway.
+ *
+ * Only the cloud sends this, and only it can: on a direct LAN link the desk is
+ * the thing being talked to, so the question does not arise. It is what turns a
+ * cloud session from the light brain into the full one mid-conversation, without
+ * the phone re-dialling or the user doing anything.
+ */
+export type DeskLinkFrame = { kind: 'desk_link'; linked: boolean };
+
 export type JarvisFrame =
+  | DeskLinkFrame
   | TranscriptFrame
   | StatusFrame
   | TelemetryFrame
@@ -179,6 +190,12 @@ export function parseFrame(raw: string | unknown): JarvisFrame | null {
   }
 
   switch (type) {
+    case 'desk': {
+      // absent `linked` is not "false" — a frame that cannot say which way the
+      // desk went must not be read as it having gone away
+      if (typeof o.linked !== 'boolean') return null;
+      return { kind: 'desk_link', linked: o.linked };
+    }
     case 'transcript': {
       const text = str(o.text).trim();
       // an empty transcript is not something you said — drop it rather than

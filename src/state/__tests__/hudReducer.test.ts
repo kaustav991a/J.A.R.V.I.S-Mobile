@@ -214,6 +214,52 @@ describe('hudReducer', () => {
   });
 });
 
+describe('a status that repeats', () => {
+  it('is not logged twice in a row', () => {
+    // the gateway greets every connect with the same sentence, and the phone
+    // re-dials on foreground, network change and watchdog — so the log filled up
+    // with one line repeated and nothing said in between
+    const greeting = { kind: 'status' as const, status: 'online', message: 'Cloud brain only.', user: 'KAUSTAV' };
+    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1 });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 2 });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 3 });
+    expect(s.chat).toEqual([{ from: 'jarvis', text: 'Cloud brain only.', at: 1 }]);
+    // the live status still tracks every frame; it is only the log that dedupes
+    expect(s.message).toBe('Cloud brain only.');
+  });
+
+  it('is logged again once something else has been said', () => {
+    // the same answer after other turns is information, not an echo
+    const greeting = { kind: 'status' as const, status: 'online', message: 'Cloud brain only.', user: null };
+    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1 });
+    s = hudReducer(s, { type: 'local_command', text: 'what time is it', at: 2 });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 3 });
+    expect(s.chat.map((c) => c.at)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('the desk attaching to the gateway', () => {
+  it('starts unknown rather than off, because nobody has said', () => {
+    // `false` is a claim that the desk is down. On a LAN session, or before the
+    // gateway has spoken, the app has been told nothing and must say nothing
+    expect(initialHudState.deskLinked).toBeNull();
+  });
+
+  it('records the change without narrating it into the chat', () => {
+    const s = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'desk_link', linked: true },
+      at: 4,
+    });
+    expect(s.deskLinked).toBe(true);
+    expect(s.chat).toEqual([]);
+
+    const off = hudReducer(s, { type: 'frame', frame: { kind: 'desk_link', linked: false }, at: 5 });
+    expect(off.deskLinked).toBe(false);
+    expect(off.chat).toEqual([]);
+  });
+});
+
 describe('a voice transcript', () => {
   it('is logged as him speaking, not as J.A.R.V.I.S.', () => {
     // a typed command gets its user entry from `local_command`; a spoken one has

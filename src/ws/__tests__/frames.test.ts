@@ -208,4 +208,19 @@ describe('parseFrame', () => {
       expect(parseFrame(j({ type: 'transcript' }))).toBeNull();
     });
   });
+
+  describe('the desk attaching to the gateway', () => {
+    it('reads both directions', () => {
+      expect(parseFrame(j({ type: 'desk', linked: true }))).toEqual({ kind: 'desk_link', linked: true });
+      expect(parseFrame(j({ type: 'desk', linked: false }))).toEqual({ kind: 'desk_link', linked: false });
+    });
+
+    it('is dropped when it does not say which way', () => {
+      // absent or mistyped, `linked` must not fall through to false: reading a
+      // malformed frame as "the desk went away" would strip PC control from a
+      // session that still has it
+      expect(parseFrame(j({ type: 'desk' }))).toBeNull();
+      expect(parseFrame(j({ type: 'desk', linked: 'yes' }))).toBeNull();
+    });
+  });
 });

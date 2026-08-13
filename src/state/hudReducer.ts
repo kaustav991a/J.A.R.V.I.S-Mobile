@@ -41,6 +41,15 @@ export type HudState = {
   chat: ChatEntry[];
   parked: ParkedAction[];
   intruder: IntruderAlert | null;
+  /**
+   * Whether the cloud gateway currently has the desk attached — full power,
+   * PC control and all — as opposed to answering out of the light cloud brain.
+   *
+   * `null` means nobody has said: a LAN session, or a cloud session that has not
+   * been told yet. It is deliberately not `false`, because "the desk is off" is a
+   * claim, and this app does not make claims it has not been given.
+   */
+  deskLinked: boolean | null;
   lastFrameAt: number | null;
 };
 
@@ -64,6 +73,7 @@ export const initialHudState: HudState = {
   chat: [],
   parked: [],
   intruder: null,
+  deskLinked: null,
   lastFrameAt: null,
 };
 
@@ -95,6 +105,12 @@ const upsertParked = (parked: ParkedAction[], next: ParkedAction): ParkedAction[
 
 function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
   switch (frame.kind) {
+    case 'desk_link':
+      // no chat line either way. The desk arriving is a change in what this
+      // session can do, not something J.A.R.V.I.S. said — the pill and the
+      // notification carry it, and a log line here would be the machine
+      // narrating its own plumbing
+      return { ...state, deskLinked: frame.linked };
     case 'transcript':
       // from: 'user' — these are his words coming back, not the machine's. Typed
       // commands get the same entry locally via `local_command`; a spoken one has
@@ -103,16 +119,33 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
         ...state,
         chat: cap([...state.chat, { from: 'user' as const, text: frame.text, at }], CHAT_CAP),
       };
-    case 'status':
+    case 'status': {
+      /**
+       * The same status twice in a row is not a second thing that happened.
+       *
+       * The gateway greets every connection with a line stating what this session
+       * can do — "Cloud brain only, so PC control is off until the desk wakes." —
+       * and the phone re-dials on every return to the foreground, every network
+       * change, and every watchdog fire. Appending each greeting turned the log
+       * into a column of the identical sentence with nothing said between them.
+       *
+       * Only *consecutive* duplicates are dropped, and only from J.A.R.V.I.S.:
+       * asking the same thing twice is a real thing a person does, and the same
+       * answer arriving after something else was said is information.
+       */
+      const last = state.chat[state.chat.length - 1];
+      const repeated = last?.from === 'jarvis' && last.text === frame.message;
       return {
         ...state,
         status: frame.status,
         message: frame.message,
         user: frame.user ?? state.user,
-        chat: frame.message
-          ? cap([...state.chat, { from: 'jarvis' as const, text: frame.message, at }], CHAT_CAP)
-          : state.chat,
+        chat:
+          frame.message && !repeated
+            ? cap([...state.chat, { from: 'jarvis' as const, text: frame.message, at }], CHAT_CAP)
+            : state.chat,
       };
+    }
     case 'telemetry':
       return { ...state, telemetry: { ...(state.telemetry ?? {}), ...frame.data } };
     case 'weather':

@@ -13,7 +13,7 @@ import { QuickMenu } from '../components/QuickMenu';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
 import { useToast } from '../components/ui/Toast';
-import { COLOR, SPACE, TYPE, glowText } from '../theme/tokens';
+import { COLOR, SPACE, TYPE, glowBox, glowText } from '../theme/tokens';
 import { greetingFor, msToNextMinute } from '../theme/greeting';
 import { ACCENTS, useAppearance } from '../theme/appearance';
 import { useJarvis } from '../state/JarvisProvider';
@@ -25,6 +25,22 @@ import type { HomeStackParams, TabParams } from '../navigation/types';
 const ADDRESS = 'SIR';
 
 const MODE_LABEL = { lan: 'WORKSPACE', cloud: 'CLOUD', offline: 'OFFLINE' } as const;
+
+/**
+ * How lit the link tile is, as hex alpha on `COLOR.green`.
+ *
+ * Full power gets the whole wash and a lit edge; a cloud session gets a fifth of
+ * it — present, clearly not the same thing. That ratio is the point: a cloud link
+ * holds no PC control and must never read as a full desk link.
+ *
+ * Alpha rather than a shadow because `glowBox` is **iOS-only** — Android draws no
+ * coloured shadow at all, so a glow expressed that way is invisible on the phone
+ * this is mostly used on. `glowBox` is still applied for iOS, where it is the
+ * better-looking half of the effect.
+ */
+const LINK_WASH = { full: '47', cloud: '0f' } as const;
+const LINK_EDGE = { full: 'ff', cloud: '4d' } as const;
+const LINK_GLOW = { full: 20, cloud: 4 } as const;
 
 type Action = {
   key: string;
@@ -55,7 +71,7 @@ const ACTIONS: Action[] = [
 export function HomeScreen() {
   // the third generic is the id `getParent` may be called with
   const nav = useNavigation<NativeStackNavigationProp<HomeStackParams, 'HomeMain', typeof TABS_ID>>();
-  const { accent, animations } = useAppearance();
+  const { accent, animations, glow } = useAppearance();
   const { hud, mode, connected, connecting, connect, sendCommand, decide } = useJarvis();
   const toast = useToast();
 
@@ -85,6 +101,14 @@ export function HomeScreen() {
     else if (key === 'reports') tabs?.navigate('Reports', { screen: 'ReportsHome' });
     else nav.navigate('Connection');
   };
+
+  /**
+   * A cloud session with the desk attached is not the same animal as a cloud
+   * session without one — the first has PC control, the second does not. Naming
+   * both CLOUD hid the only difference that matters.
+   */
+  const fullPower = connected && hud.deskLinked === true;
+  const transport = fullPower ? 'FULL POWER' : MODE_LABEL[mode];
 
   const linkLabel = connecting ? 'Connecting' : connected ? 'Connected' : 'Disconnected';
   const linkColor = connected ? COLOR.green : connecting ? COLOR.gold : COLOR.red;
@@ -160,25 +184,54 @@ export function HomeScreen() {
 
       <SectionLabel>Quick actions</SectionLabel>
       <View style={styles.grid}>
-        {ACTIONS.map((a) => (
-          <Touchable
-            key={a.key}
-            testID={`quick-${a.key}`}
-            accessibilityRole="button"
-            accessibilityLabel={a.title}
-            onPress={() => go(a.key)}
-            style={styles.card}
-          >
-            <View style={[styles.iconTile, { borderColor: a.tint, backgroundColor: `${a.tint}1f` }]}>
-              <Ionicons name={a.icon} size={19} color={a.tint} />
-            </View>
-            <Text style={styles.cardTitle}>{a.title}</Text>
-            <View style={styles.cardFoot}>
-              <Text style={styles.cardCaption}>{a.caption}</Text>
-              <Ionicons name="chevron-forward" size={14} color={COLOR.dim} />
-            </View>
-          </Touchable>
-        ))}
+        {ACTIONS.map((a) => {
+          // The link tile carries the link's own colour rather than a fixed one.
+          // Painted green whatever the state, it read as "connected" on a phone
+          // sitting dark — the one tile on this screen that must never flatter.
+          const isLink = a.key === 'connect';
+          const tint = isLink ? linkColor : a.tint;
+          const caption =
+            isLink && connected
+              ? fullPower
+                ? 'Full power — the desk is online'
+                : `Linked over ${MODE_LABEL[mode]}`
+              : a.caption;
+          const tone = fullPower ? 'full' : 'cloud';
+          const lit = isLink && connected;
+          return (
+            <Touchable
+              key={a.key}
+              testID={`quick-${a.key}`}
+              accessibilityRole="button"
+              accessibilityLabel={a.title}
+              onPress={() => go(a.key)}
+              style={
+                lit
+                  ? [
+                      styles.card,
+                      {
+                        backgroundColor: `${COLOR.green}${LINK_WASH[tone]}`,
+                        borderColor: `${COLOR.green}${LINK_EDGE[tone]}`,
+                      },
+                      glowBox(COLOR.green, glow * LINK_GLOW[tone]),
+                    ]
+                  : styles.card
+              }
+            >
+              <View style={[styles.iconTile, { borderColor: tint, backgroundColor: `${tint}1f` }]}>
+                <Ionicons name={isLink && connected ? 'link' : a.icon} size={19} color={tint} />
+              </View>
+              {/* the title stays the destination, not the state: this tile is a
+                  doorway to the Connection screen, and the Status card below
+                  already carries the reading */}
+              <Text style={styles.cardTitle}>{a.title}</Text>
+              <View style={styles.cardFoot}>
+                <Text style={styles.cardCaption}>{caption}</Text>
+                <Ionicons name="chevron-forward" size={14} color={COLOR.dim} />
+              </View>
+            </Touchable>
+          );
+        })}
       </View>
 
       {hud.parked.length > 0 ? (
@@ -216,7 +269,7 @@ export function HomeScreen() {
           style={styles.statusCol}
         >
           <Text style={[styles.statusValue, { color: accent }]}>{activity}</Text>
-          <Text style={styles.statusCaption}>{connected ? MODE_LABEL[mode] : 'Current Mode'}</Text>
+          <Text style={styles.statusCaption}>{connected ? transport : 'Current Mode'}</Text>
         </Touchable>
 
         <View style={styles.statusDivider} />

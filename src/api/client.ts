@@ -24,6 +24,16 @@ export type Api = {
   answerWatch(id: string, itWasMe: boolean): Promise<void>;
   tasks(): Promise<unknown>;
   presence(): Promise<unknown>;
+  /**
+   * Hand the cloud gateway this install's push address, so it can reach the
+   * phone when no socket exists.
+   *
+   * A socket only survives while the app is running: Android suspends a
+   * backgrounded process and the connection dies with it, which is exactly the
+   * state the phone is in when the desk wakes up at 2am. Push is the only way
+   * that news arrives. Gateway-only — the desk serves no such route.
+   */
+  registerPush(pushToken: string, platform: string): Promise<void>;
 };
 
 export function createApi(cfg: ApiConfig): Api {
@@ -72,5 +82,8 @@ export function createApi(cfg: ApiConfig): Api {
     },
     tasks: () => request('/api/tasks'),
     presence: () => request('/api/presence/state'),
+    registerPush: async (pushToken, platform) => {
+      await post('/app-push/register', { push_token: pushToken, platform });
+    },
   };
 }
