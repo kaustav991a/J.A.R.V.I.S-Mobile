@@ -6,13 +6,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { ArcReactor } from '../components/ArcReactor';
 import { HandoffAnchor } from '../components/ReactorHandoff';
-import { CommandBar } from '../components/CommandBar';
 import { GovernancePanel } from '../components/GovernancePanel';
 import { TypeLine } from '../components/TypeLine';
 import { QuickMenu } from '../components/QuickMenu';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
-import { useToast } from '../components/ui/Toast';
 import { COLOR, SPACE, TYPE, glowBox, glowText } from '../theme/tokens';
 import { greetingFor, msToNextMinute } from '../theme/greeting';
 import { ACCENTS, useAppearance } from '../theme/appearance';
@@ -72,8 +70,7 @@ export function HomeScreen() {
   // the third generic is the id `getParent` may be called with
   const nav = useNavigation<NativeStackNavigationProp<HomeStackParams, 'HomeMain', typeof TABS_ID>>();
   const { accent, animations, glow } = useAppearance();
-  const { hud, mode, connected, connecting, connect, sendCommand, decide } = useJarvis();
-  const toast = useToast();
+  const { hud, mode, connected, connecting, connect, decide, unread } = useJarvis();
 
   // the clock, not the session, decides the greeting — so it has to be re-read
   // while the screen is open, on the minute
@@ -110,17 +107,16 @@ export function HomeScreen() {
   const fullPower = connected && hud.deskLinked === true;
   const transport = fullPower ? 'FULL POWER' : MODE_LABEL[mode];
 
+  // the last thing said, either direction: enough to recognise the conversation
+  // you left without reproducing it on this screen
+  const lastSaid = hud.chat.length ? hud.chat[hud.chat.length - 1].text : null;
+
   const linkLabel = connecting ? 'Connecting' : connected ? 'Connected' : 'Disconnected';
   const linkColor = connected ? COLOR.green : connecting ? COLOR.gold : COLOR.red;
   const activity = hud.status === 'boot' ? 'IDLE' : hud.status.toUpperCase();
   const scriptLabel = SCRIPTS.length ? `${SCRIPTS.length} Scripts` : 'No Scripts';
 
   const [menu, setMenu] = useState(false);
-
-  const send = (text: string) => {
-    void sendCommand(text).catch(() => {});
-    toast.show(connected ? `Sent “${text}”` : 'No link — command queued', connected ? 'good' : 'bad');
-  };
 
   return (
     <Screen testID="home-screen" refreshing={connecting} onRefresh={connect}>
@@ -180,7 +176,43 @@ export function HomeScreen() {
         </HandoffAnchor>
       </View>
 
-      <CommandBar placeholder="Type a command…" leadingIcon="sparkles" onSubmit={send} onVoice={() => {}} />
+      {/**
+       * Where the command box used to be.
+       *
+       * Two boxes that both send to J.A.R.V.I.S. — this one and the chat's own
+       * composer — meant a reply to something typed here landed in a tab you were
+       * not on, and nothing on Home said so. Home is the place you come back to,
+       * so it now reports the conversation instead of starting a second one: the
+       * last thing said, and how many answers you have not read.
+       */}
+      <Touchable
+        testID="home-replies"
+        accessibilityRole="button"
+        accessibilityLabel={unread ? `${unread} unread replies` : 'Open chat'}
+        onPress={() => tabs?.navigate('Commands', { screen: 'CommandsHome' })}
+        style={[styles.replies, unread ? { borderColor: accent } : null]}
+      >
+        <View style={[styles.replyIcon, { borderColor: unread ? accent : COLOR.line }]}>
+          <Ionicons
+            name={unread ? 'chatbubble-ellipses' : 'chatbubble-outline'}
+            size={18}
+            color={unread ? accent : COLOR.dim}
+          />
+        </View>
+        <View style={styles.replyBody}>
+          <Text style={styles.replyTitle} numberOfLines={1}>
+            {unread ? `${unread} new ${unread === 1 ? 'reply' : 'replies'}` : 'Chat'}
+          </Text>
+          <Text style={styles.replyLine} numberOfLines={1}>
+            {lastSaid ?? 'Ask J.A.R.V.I.S. something'}
+          </Text>
+        </View>
+        {unread ? (
+          <View testID="home-unread-dot" style={[styles.replyDot, { backgroundColor: accent }]} />
+        ) : (
+          <Ionicons name="chevron-forward" size={14} color={COLOR.dim} />
+        )}
+      </Touchable>
 
       <SectionLabel>Quick actions</SectionLabel>
       <View style={styles.grid}>
@@ -308,6 +340,28 @@ const styles = StyleSheet.create({
   address: { ...TYPE.wordmark, fontSize: 28, letterSpacing: 4, marginTop: 2 },
   prompt: { ...TYPE.meta, fontSize: 13, color: COLOR.dim, marginTop: SPACE.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: SPACE.md },
+  replies: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.md,
+    backgroundColor: COLOR.panel,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLOR.line,
+    padding: SPACE.lg,
+  },
+  replyIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  replyBody: { flex: 1 },
+  replyTitle: { ...TYPE.dataValue, fontSize: 15, color: COLOR.white },
+  replyLine: { ...TYPE.meta, color: COLOR.dim, marginTop: 2 },
+  replyDot: { width: 9, height: 9, borderRadius: 999 },
   card: {
     width: '48%',
     backgroundColor: COLOR.panel,

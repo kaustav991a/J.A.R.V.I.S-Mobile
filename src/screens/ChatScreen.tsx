@@ -1,10 +1,10 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommandBar } from '../components/CommandBar';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
@@ -66,7 +66,27 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, connected } = useJarvis();
+  const { hud, sendCommand, connected, markChatRead, setChatFocused } = useJarvis();
+
+  /**
+   * On screen means read, and means no notification.
+   *
+   * `useFocusEffect` rather than a mount effect: this screen stays mounted while
+   * other tabs are shown, so mounting says nothing about whether it is being
+   * looked at. Marked read on the way in *and* on the way out — a reply that
+   * arrives while the chat is open has been seen, so leaving must not leave it
+   * counted as unread.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      setChatFocused(true);
+      markChatRead();
+      return () => {
+        setChatFocused(false);
+        markChatRead();
+      };
+    }, [markChatRead, setChatFocused])
+  );
   const toast = useToast();
   const list = useRef<FlatList<ChatEntry>>(null);
 
@@ -182,18 +202,11 @@ export function ChatScreen() {
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={thinking ? <Typing accent={accent} /> : null}
-            renderItem={({ item }) => (
-              <Bubble
-                entry={item}
-                accent={accent}
-                // a long reply is easier to read as terminal output
-                onPress={() =>
-                  item.from === 'jarvis'
-                    ? nav.navigate('CommandResult', { command: 'jarvis', output: item.text })
-                    : undefined
-                }
-              />
-            )}
+            // No tap target. A reply used to open the Command Result terminal
+            // view, which reads as a mis-tap: a chat bubble that navigates away is
+            // not what a chat bubble does, and the terminal framing suits a run's
+            // output rather than something J.A.R.V.I.S. said.
+            renderItem={({ item }) => <Bubble entry={item} accent={accent} />}
           />
         )}
 

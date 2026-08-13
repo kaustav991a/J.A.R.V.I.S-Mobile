@@ -8,6 +8,12 @@ const mockNavigate = jest.fn();
 const mockParentNavigate = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
+  // the chat marks itself read on focus, so the mock has to offer the hook —
+  // called immediately here, since in a test the screen is always the one on show
+  useFocusEffect: (cb: () => undefined | (() => void)) => {
+    const cleanup = cb();
+    return cleanup;
+  },
   useNavigation: () => ({
     navigate: mockNavigate,
     goBack: jest.fn(),
@@ -31,6 +37,11 @@ jest.mock('../../state/JarvisProvider', () => ({
     decide: jest.fn(),
     recent: [],
     clearRecent: jest.fn(),
+    unread: 0,
+    markChatRead: jest.fn(),
+    setChatFocused: jest.fn(),
+    forgetChat: jest.fn(),
+    disconnect: jest.fn(),
   }),
 }));
 

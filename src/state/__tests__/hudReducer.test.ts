@@ -12,12 +12,27 @@ describe('hudReducer', () => {
   });
 
   it('applies a status frame and logs the message to chat', () => {
-    const s = feed([{ kind: 'status', status: 'online', message: 'Systems nominal', user: 'sir' }]);
-    expect(s.status).toBe('online');
+    const s = feed([{ kind: 'status', status: 'speaking', message: 'Systems nominal', user: 'sir' }]);
+    expect(s.status).toBe('speaking');
     expect(s.message).toBe('Systems nominal');
     expect(s.user).toBe('sir');
     expect(s.chat).toEqual([{ from: 'jarvis', text: 'Systems nominal', at: 1000 }]);
     expect(s.lastFrameAt).toBe(1000);
+  });
+
+  it('keeps link notices out of the conversation', () => {
+    // `online` and `offline` are the link describing itself, not J.A.R.V.I.S.
+    // saying something. The gateway greets every connection with "Cloud brain
+    // only, so PC control is off…", and the phone re-dials often enough that the
+    // chat filled with a sentence nobody asked for. The state still tracks it;
+    // the Connection screen and Home's status card are where it belongs.
+    const s = feed([
+      { kind: 'status', status: 'online', message: 'Cloud brain only, so PC control is off.', user: 'sir' },
+      { kind: 'status', status: 'offline', message: 'SYSTEM OFFLINE // STANDBY', user: 'sir' },
+    ]);
+    expect(s.chat).toEqual([]);
+    expect(s.status).toBe('offline');
+    expect(s.message).toBe('SYSTEM OFFLINE // STANDBY');
   });
 
   it('does not log an empty status message to chat', () => {
@@ -219,21 +234,21 @@ describe('a status that repeats', () => {
     // the gateway greets every connect with the same sentence, and the phone
     // re-dials on foreground, network change and watchdog — so the log filled up
     // with one line repeated and nothing said in between
-    const greeting = { kind: 'status' as const, status: 'online', message: 'Cloud brain only.', user: 'KAUSTAV' };
-    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1 });
-    s = hudReducer(s, { type: 'frame', frame: greeting, at: 2 });
-    s = hudReducer(s, { type: 'frame', frame: greeting, at: 3 });
-    expect(s.chat).toEqual([{ from: 'jarvis', text: 'Cloud brain only.', at: 1 }]);
+    const said = { kind: 'status' as const, status: 'speaking', message: 'Working on it.', user: 'KAUSTAV' };
+    let s = hudReducer(initialHudState, { type: 'frame', frame: said, at: 1 });
+    s = hudReducer(s, { type: 'frame', frame: said, at: 2 });
+    s = hudReducer(s, { type: 'frame', frame: said, at: 3 });
+    expect(s.chat).toEqual([{ from: 'jarvis', text: 'Working on it.', at: 1 }]);
     // the live status still tracks every frame; it is only the log that dedupes
-    expect(s.message).toBe('Cloud brain only.');
+    expect(s.message).toBe('Working on it.');
   });
 
   it('is logged again once something else has been said', () => {
     // the same answer after other turns is information, not an echo
-    const greeting = { kind: 'status' as const, status: 'online', message: 'Cloud brain only.', user: null };
-    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1 });
+    const said = { kind: 'status' as const, status: 'speaking', message: 'Working on it.', user: null };
+    let s = hudReducer(initialHudState, { type: 'frame', frame: said, at: 1 });
     s = hudReducer(s, { type: 'local_command', text: 'what time is it', at: 2 });
-    s = hudReducer(s, { type: 'frame', frame: greeting, at: 3 });
+    s = hudReducer(s, { type: 'frame', frame: said, at: 3 });
     expect(s.chat.map((c) => c.at)).toEqual([1, 2, 3]);
   });
 });

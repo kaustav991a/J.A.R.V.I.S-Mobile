@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 import { hudReducer, initialHudState, HudState } from './hudReducer';
+import { clearChat, loadChat, saveChat } from './chatStore';
 import { demoFrames, demoReply } from './demoFeed';
 import { useLink } from '../link/useLink';
 import {
@@ -35,6 +36,7 @@ import {
   registerForPush,
 } from '../lib/notify';
 import { haptic } from '../lib/haptics';
+import { COLOR } from '../theme/tokens';
 
 export type JarvisContextValue = {
   /** everything the backend has told us */
@@ -69,6 +71,14 @@ export type JarvisContextValue = {
   /** locally kept command history, newest first */
   recent: string[];
   clearRecent: () => void;
+  /** replies since the chat was last opened */
+  unread: number;
+  /** the Chat screen came into focus: everything up to now has been seen */
+  markChatRead: () => void;
+  /** the Chat screen is (or is no longer) on screen — suppresses reply notifications */
+  setChatFocused: (focused: boolean) => void;
+  /** forget the whole conversation, on disk as well as in memory */
+  forgetChat: () => void;
   /** the addresses in use, and whether a pairing token is held */
   pairing: { deskBase: string; cloudBase: string | null; usingDefault: boolean; hasToken: boolean };
   /**
@@ -315,6 +325,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       // ongoing, so Android cannot fold it into an auto-group and a stray swipe
       // cannot clear the one notification with a countdown behind it
       sticky: true,
+      // red, not the app's blue: this is the only notification here that is not
+      // information but a decision with a clock on it
+      color: COLOR.red,
       data: {
         kind: 'intruder',
         id: alert.id,
@@ -333,6 +346,30 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       alive = false;
     };
   }, [alert?.id, alert]);
+
+  /**
+   * The conversation, read at launch and written as it changes.
+   *
+   * Restored before anything is sent so the log the user left is the log they come
+   * back to. Writing is debounced: a reply arrives as several frames in a row
+   * (`thinking`, `speaking`, `online`) and each one would otherwise be a disk
+   * write of the entire log.
+   */
+  useEffect(() => {
+    let alive = true;
+    void loadChat().then((chat) => {
+      if (alive && chat.length) dispatch({ type: 'hydrate', chat });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const chat = hud.chat;
+  useEffect(() => {
+    const timer = setTimeout(() => void saveChat(chat), 400);
+    return () => clearTimeout(timer);
+  }, [chat]);
 
   /**
    * Hand the gateway this install's push address, once, per cloud link.
@@ -399,6 +436,49 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       off();
     };
   }, []);
+
+  /**
+   * Replies you have not seen, and a notification for the ones that arrive while
+   * you are not looking.
+   *
+   * Sending from Home and walking away meant there was no way to know an answer
+   * had come back — the reply landed in a tab you were not on, silently. `unread`
+   * counts J.A.R.V.I.S. turns since the chat was last opened; `markChatRead` is
+   * called by the Chat screen when it comes into focus.
+   *
+   * The notification is deliberately not posted while the chat is on screen: you
+   * are watching the answer arrive, and buzzing about it is noise. Nor for a
+   * restored turn — `hydrate` brings back turns that were already seen, and
+   * launching the app must not replay yesterday's notifications.
+   */
+  const [readAt, setReadAt] = useState(() => Date.now());
+  const markChatRead = useCallback(() => setReadAt(Date.now()), []);
+  const unread = useMemo(
+    () => hud.chat.filter((c) => c.from === 'jarvis' && c.at > readAt).length,
+    [hud.chat, readAt]
+  );
+
+  const chatFocused = useRef(false);
+  const setChatFocused = useCallback((focused: boolean) => {
+    chatFocused.current = focused;
+  }, []);
+
+  const notifiedFor = useRef<number>(0);
+  useEffect(() => {
+    const newest = hud.chat[hud.chat.length - 1];
+    if (!newest || newest.from !== 'jarvis') return;
+    if (newest.at <= notifiedFor.current) return;
+    const first = notifiedFor.current === 0;
+    notifiedFor.current = newest.at;
+    // the first pass is whatever was already on screen or restored from disk, not
+    // news; and a reply being watched arrive needs no notification
+    if (first || chatFocused.current || simulated) return;
+    void postNow({
+      title: 'J.A.R.V.I.S. replied',
+      body: newest.text.length > 140 ? `${newest.text.slice(0, 139)}…` : newest.text,
+      data: { kind: 'reply' },
+    });
+  }, [hud.chat, simulated]);
 
   /**
    * The desk arriving is worth interrupting for; the desk leaving is not.
@@ -492,6 +572,13 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       pair,
       recent,
       clearRecent: () => setRecent([]),
+      unread,
+      markChatRead,
+      setChatFocused,
+      forgetChat: () => {
+        void clearChat();
+        dispatch({ type: 'reset' });
+      },
       demo,
       setDemo,
       simulated,
@@ -514,6 +601,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       pairing,
       pair,
       recent,
+      unread,
+      markChatRead,
+      setChatFocused,
       demo,
     ]
   );

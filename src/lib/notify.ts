@@ -17,7 +17,16 @@ import { Platform } from 'react-native';
  */
 
 /** Android needs a channel before anything can be posted, and before permission is asked */
-export const WATCH_CHANNEL = 'desk-watch';
+/**
+ * `-v2` because Android freezes a channel's importance, vibration and light the
+ * moment it is created: later changes are ignored, on the principle that the
+ * user's own settings win from then on. Getting an emergency vibration and a red
+ * light onto this alert therefore means a new channel id, not an edit. The old
+ * one is deleted below so it does not linger in the app's notification settings
+ * as a dead entry the user can still toggle.
+ */
+export const WATCH_CHANNEL = 'desk-watch-v2';
+const LEGACY_WATCH_CHANNEL = 'desk-watch';
 export const GENERAL_CHANNEL = 'general';
 
 /** the actionable category, so an alert can be answered from the shade */
@@ -68,9 +77,29 @@ export async function prepare(): Promise<boolean> {
         // MAX, not HIGH: this one is a 30-second window on whether a machine
         // stays unlocked, so it may interrupt
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 200, 250],
-        lightColor: '#3ea6ff',
+        // longer and harder than the old [0, 250, 200, 250]: this has to be
+        // distinguishable from an ordinary buzz through a pocket, without looking
+        // at the screen, because the whole point is the phone is not in your hand
+        vibrationPattern: [0, 500, 200, 500, 200, 500],
+        // red, not the app's blue. The channel light is the one piece of
+        // emergency colour that survives a *pushed* notification: Expo's push API
+        // takes channelId, icon and tag on Android and nothing else, so the
+        // notification's own tint cannot be set per message from the server.
+        lightColor: '#ff4d4f',
+        // No `bypassDnd`. It looks exactly right for this alert and it cannot be
+        // used: overriding Do Not Disturb needs Notification Policy Access, which
+        // this app does not hold, so Android rejects the whole channel and
+        // `prepare()`'s catch swallowed the failure — leaving the channel absent
+        // and every watch alert falling back to Expo's silent one. Proved on
+        // device: `desk-watch-v2` simply did not exist after a launch.
       });
+      // the pre-v2 channel, kept out of the user's settings list now that nothing
+      // posts to it
+      try {
+        await Notifications.deleteNotificationChannelAsync(LEGACY_WATCH_CHANNEL);
+      } catch {
+        // never created on this install, which is the state we wanted anyway
+      }
       await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL, {
         name: 'General',
         importance: Notifications.AndroidImportance.DEFAULT,
@@ -152,6 +181,8 @@ export async function postNow(opts: {
    * others is the same as no notification.
    */
   sticky?: boolean;
+  /** Android accent for the notification, e.g. red for the desk watch */
+  color?: string;
 }): Promise<string | null> {
   try {
     return await Notifications.scheduleNotificationAsync({
@@ -160,6 +191,7 @@ export async function postNow(opts: {
         body: opts.body,
         categoryIdentifier: opts.category,
         data: opts.data ?? {},
+        ...(opts.color ? { color: opts.color } : {}),
         ...(opts.sticky ? { sticky: true, autoDismiss: false } : {}),
       },
       /**

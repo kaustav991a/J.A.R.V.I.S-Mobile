@@ -72,10 +72,13 @@ export default function App() {
    * same thing `JarvisProvider` uses to raise the alert itself. Both read it; only
    * the provider acts on it.
    */
+  const [alertChecked, setAlertChecked] = useState(false);
   useEffect(() => {
     let alive = true;
     void alertFromLaunch().then((alert) => {
-      if (alive && alert) setLaunching(false);
+      if (!alive) return;
+      if (alert) setLaunching(false);
+      setAlertChecked(true);
     });
     return () => {
       alive = false;
@@ -110,7 +113,17 @@ export default function App() {
     });
   }, [launching]);
 
-  if (!loaded && !error) return null;
+  /**
+   * Nothing is rendered until it is known whether a watch alert opened the app.
+   *
+   * Setting `launching` false once the check resolves was not enough: the launch
+   * screen mounts on the first frame and the check is a native round trip, so the
+   * ignition flashed up and vanished on the one screen where every frame is part
+   * of a 30-second decision. The native splash is still up at this point, so
+   * holding here shows the user nothing new — it just declines to start an
+   * animation that is about to be thrown away.
+   */
+  if ((!loaded && !error) || !alertChecked) return null;
 
   // AppearanceProvider is outermost: the navigator itself reads the accent for
   // its header tint and tab bar.

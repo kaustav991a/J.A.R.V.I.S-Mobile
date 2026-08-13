@@ -17,6 +17,11 @@ jest.mock('../../state/JarvisProvider', () => ({
     decide: jest.fn().mockResolvedValue(undefined),
     recent: [],
     clearRecent: jest.fn(),
+    unread: 0,
+    markChatRead: jest.fn(),
+    setChatFocused: jest.fn(),
+    forgetChat: jest.fn(),
+    disconnect: jest.fn(),
     // Connection reads these to fill its address and token fields
     pairing: { deskBase: 'http://127.0.0.1:8787', cloudBase: null, usingDefault: true, hasToken: false },
     pair: jest.fn().mockResolvedValue(true),

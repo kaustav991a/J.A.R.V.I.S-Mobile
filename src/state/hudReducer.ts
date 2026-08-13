@@ -61,6 +61,14 @@ export type HudAction =
   | { type: 'intruder_resolving'; id: string }
   /** the countdown ran out on the phone with no answer from the desk */
   | { type: 'intruder_expired'; id: string; at: number }
+  /**
+   * The stored conversation, read at launch.
+   *
+   * Prepended rather than replacing: the socket can open and answer before the
+   * disk read finishes, and a restore that overwrote would delete a turn that had
+   * already happened. Anything already in state is newer by definition.
+   */
+  | { type: 'hydrate'; chat: ChatEntry[] }
   | { type: 'reset' };
 
 export const initialHudState: HudState = {
@@ -135,13 +143,28 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
        */
       const last = state.chat[state.chat.length - 1];
       const repeated = last?.from === 'jarvis' && last.text === frame.message;
+      /**
+       * `online` and `offline` are the link talking about itself, not
+       * J.A.R.V.I.S. saying something.
+       *
+       * The gateway greets every connection with "Cloud brain only, so PC control
+       * is off until the desk wakes." — true, useful, and not a conversational
+       * turn. It belongs where the link state is already shown: the Connection
+       * screen and Home's status card. In the chat it was a sentence the machine
+       * appeared to volunteer, unprompted, every time the socket moved.
+       *
+       * Everything else keeps its message. `speaking` is an answer, `waking`
+       * carries the desk's briefing, `error` is what went wrong — all of them are
+       * things that were said.
+       */
+      const linkNotice = frame.status === 'online' || frame.status === 'offline';
       return {
         ...state,
         status: frame.status,
         message: frame.message,
         user: frame.user ?? state.user,
         chat:
-          frame.message && !repeated
+          frame.message && !repeated && !linkNotice
             ? cap([...state.chat, { from: 'jarvis' as const, text: frame.message, at }], CHAT_CAP)
             : state.chat,
       };
@@ -271,6 +294,17 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
           TRACE_CAP
         ),
       };
+    case 'hydrate': {
+      if (action.chat.length === 0) return state;
+      // Restored turns go BEFORE whatever is already here. The socket can open and
+      // J.A.R.V.I.S. can answer before a disk read finishes, and replacing would
+      // throw away a turn that had already happened in this session.
+      // De-duplicated on (from, at): a relaunch that restores a log and then
+      // receives the same greeting again should not show it twice.
+      const seen = new Set(state.chat.map((c) => `${c.from}@${c.at}`));
+      const restored = action.chat.filter((c) => !seen.has(`${c.from}@${c.at}`));
+      return { ...state, chat: cap([...restored, ...state.chat], CHAT_CAP) };
+    }
     case 'reset':
       return initialHudState;
   }
