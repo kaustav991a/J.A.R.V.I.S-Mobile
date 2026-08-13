@@ -145,6 +145,13 @@ export async function postNow(opts: {
   channel?: string;
   category?: string;
   data?: Record<string, unknown>;
+  /**
+   * Ongoing: it cannot be swiped away and it does not get folded into Android's
+   * auto-group. For the desk watch, where the window is 30 seconds and silence
+   * means the machine locks, a notification quietly collapsed into a stack of
+   * others is the same as no notification.
+   */
+  sticky?: boolean;
 }): Promise<string | null> {
   try {
     return await Notifications.scheduleNotificationAsync({
@@ -153,12 +160,99 @@ export async function postNow(opts: {
         body: opts.body,
         categoryIdentifier: opts.category,
         data: opts.data ?? {},
-        ...(Platform.OS === 'android' ? { channelId: opts.channel ?? GENERAL_CHANNEL } : {}),
+        ...(opts.sticky ? { sticky: true, autoDismiss: false } : {}),
       },
-      trigger: null,
+      /**
+       * The channel goes on the TRIGGER. It was on `content` for a while, where
+       * it is silently ignored — `NotificationContentInput` has no such field —
+       * so every notification this app posted landed on Expo's fallback channel
+       * ("Miscellaneous", `AUTO_CANCEL|SILENT`, no vibration) instead of the
+       * channel it asked for. Proved on device: the record read
+       * `channel=expo_notifications_fallback_notification_channel`, which is why
+       * a desk-watch alert on a MAX-importance channel arrived silent.
+       *
+       * `tsc` cannot catch this. The field was added with an object spread, and a
+       * spread turns off excess-property checking.
+       *
+       * `{channelId}` alone is `ChannelAwareTriggerInput`, documented as
+       * delivering immediately — so this keeps `trigger: null`'s timing while
+       * naming a channel, which a schedulable trigger could not do.
+       */
+      trigger: Platform.OS === 'android' ? { channelId: opts.channel ?? GENERAL_CHANNEL } : null,
     });
   } catch {
     return null;
+  }
+}
+
+/**
+ * A desk-watch alert carried in a notification payload.
+ *
+ * The socket cannot deliver one to a phone that is asleep, so the push carries
+ * the whole alert and this rebuilds it when the notification is tapped. Without
+ * it the notification opens an app with nothing to show, which is worse than not
+ * notifying: it reads as the alert having been dealt with.
+ */
+export type TappedAlert = {
+  id: string;
+  /** seconds left *now*, worked out from the deadline the gateway sent */
+  expiresIn: number;
+  image: string | null;
+  user: string | null;
+  trigger: string;
+};
+
+/**
+ * Read an alert out of a notification's data, or return null.
+ *
+ * Null for anything that is not a watch alert, has no id, or whose window has
+ * already closed — a stale alert must never raise a live countdown, because the
+ * desk has already locked itself by then and the screen would be a lie.
+ */
+export function alertFromData(raw: unknown, now: number = Date.now()): TappedAlert | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const d = raw as Record<string, unknown>;
+  if (d.kind !== 'intruder') return null;
+  const id = typeof d.id === 'string' ? d.id : '';
+  if (!id) return null;
+  const deadline = typeof d.expires_at_ms === 'number' ? d.expires_at_ms : null;
+  if (deadline === null) return null;
+  const expiresIn = Math.round((deadline - now) / 1000);
+  if (expiresIn <= 0) return null;
+  return {
+    id,
+    expiresIn,
+    image: typeof d.image === 'string' && d.image ? d.image : null,
+    user: typeof d.user === 'string' && d.user ? d.user : null,
+    trigger: typeof d.trigger === 'string' && d.trigger ? d.trigger : 'unlock',
+  };
+}
+
+/**
+ * The alert that launched the app, if a watch notification is what opened it.
+ *
+ * Read once at startup: a notification tapped while the app was dead is not
+ * delivered to any listener, it is only recoverable from here.
+ */
+export async function alertFromLaunch(): Promise<TappedAlert | null> {
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    return alertFromData(response?.notification?.request?.content?.data ?? null);
+  } catch {
+    return null;
+  }
+}
+
+/** watch alerts tapped while the app is alive */
+export function onAlertTapped(cb: (alert: TappedAlert) => void): () => void {
+  try {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const alert = alertFromData(response?.notification?.request?.content?.data ?? null);
+      if (alert) cb(alert);
+    });
+    return () => sub.remove();
+  } catch {
+    return () => {};
   }
 }
 

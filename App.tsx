@@ -11,7 +11,7 @@ import { LockScreen } from './src/screens/LockScreen';
 import { WatchAlertScreen } from './src/screens/WatchAlertScreen';
 import { AuthProvider, useAuth } from './src/security/AuthProvider';
 import { ReactorHandoffProvider } from './src/components/ReactorHandoff';
-import { installHandler, probeNotify } from './src/lib/notify';
+import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { BlurTargetProvider } from './src/components/ui/Glass';
@@ -58,6 +58,29 @@ export default function App() {
   // the native splash hands off to this one, so the reactor never blinks out
   const [launching, setLaunching] = useState(true);
   const enter = useCallback(() => setLaunching(false), []);
+
+  /**
+   * A watch alert skips the launch screen entirely.
+   *
+   * The choreography is 2.4s, and the desk-watch window is 30 — so an app opened
+   * by tapping that notification would spend a twelfth of the time available
+   * watching a logo draw itself, on the one screen in this app that exists because
+   * a machine is about to lock and someone has to say whether that is right.
+   *
+   * Read here rather than from the reducer because this sits *above* the provider:
+   * `alertFromLaunch` reads the notification that opened the app, which is the
+   * same thing `JarvisProvider` uses to raise the alert itself. Both read it; only
+   * the provider acts on it.
+   */
+  useEffect(() => {
+    let alive = true;
+    void alertFromLaunch().then((alert) => {
+      if (alive && alert) setLaunching(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (loaded || error) void SplashScreen.hideAsync();
