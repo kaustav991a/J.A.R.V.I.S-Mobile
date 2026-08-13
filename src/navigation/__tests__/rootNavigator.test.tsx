@@ -4,6 +4,11 @@ import { RootNavigator } from '../RootNavigator';
 import { AppearanceProvider } from '../../theme/appearance';
 
 /** the transport is not under test here; the tabs are */
+// the chat screen holds the app-lock gate open around the microphone request
+jest.mock('../../security/AuthProvider', () => ({
+  useAuth: () => ({ holdGate: jest.fn() }),
+}));
+
 jest.mock('../../state/JarvisProvider', () => ({
   useJarvis: () => ({
     hud: jest.requireActual('../../state/hudReducer').initialHudState,
@@ -17,6 +22,10 @@ jest.mock('../../state/JarvisProvider', () => ({
     decide: jest.fn().mockResolvedValue(undefined),
     recent: [],
     clearRecent: jest.fn(),
+    shareLocation: false,
+    place: null,
+    refreshPlace: jest.fn().mockResolvedValue(undefined),
+    setShareLocation: jest.fn().mockResolvedValue(true),
     unread: 0,
     markChatRead: jest.fn(),
     setChatFocused: jest.fn(),

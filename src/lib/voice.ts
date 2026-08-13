@@ -14,7 +14,25 @@ import type { RecordingOptions } from 'expo-audio';
  * thing this socket ever carries. `HIGH_QUALITY` doubles the bytes for accuracy
  * nobody can hear.
  */
-export const RECORDING: RecordingOptions = RecordingPresets.LOW_QUALITY;
+export const RECORDING: RecordingOptions = {
+  ...RecordingPresets.LOW_QUALITY,
+  // the level meter follows the voice rather than being decorative, which is the
+  // only way it tells you the mic is actually hearing you
+  isMeteringEnabled: true,
+};
+
+/**
+ * Metering arrives in dBFS: 0 is clipping, and anything under about -60 is a quiet
+ * room. Mapped to 0..1 over that range, because a bar drawn from a negative
+ * logarithm directly barely moves while someone is talking.
+ */
+export const METER_FLOOR_DB = -60;
+
+export const meterLevel = (db: number | undefined): number => {
+  if (typeof db !== 'number' || !Number.isFinite(db)) return 0;
+  const clamped = Math.max(METER_FLOOR_DB, Math.min(0, db));
+  return (clamped - METER_FLOOR_DB) / -METER_FLOOR_DB;
+};
 
 /** what the gateway is told the clip is; must match the recorder's extension */
 export const CLIP_FORMAT = 'm4a';
@@ -82,3 +100,14 @@ export async function readClip(uri: string): Promise<VoiceClip | null> {
  * being asked a question nobody put to him.
  */
 export const MIN_CLIP_MS = 700;
+
+/**
+ * How far the finger travels to lock hands-free, and to throw the clip away.
+ *
+ * Shared between the recorder's logic and the mic that follows the finger, so the
+ * icon stops moving exactly where the threshold is — the travel *is* the progress
+ * bar, and a drag that keeps going after the gesture has committed reads as though
+ * nothing has happened yet.
+ */
+export const LOCK_SLIDE_PX = 64;
+export const CANCEL_SLIDE_PX = 96;

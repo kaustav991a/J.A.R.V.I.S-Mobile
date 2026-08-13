@@ -7,6 +7,12 @@ import { AppearanceProvider } from '../../theme/appearance';
 const mockNavigate = jest.fn();
 const mockParentNavigate = jest.fn();
 
+// the chat holds the app-lock gate open while it asks for the microphone, so the
+// screen reaches for auth; only that one call matters here
+jest.mock('../../security/AuthProvider', () => ({
+  useAuth: () => ({ holdGate: jest.fn() }),
+}));
+
 jest.mock('@react-navigation/native', () => ({
   // the chat marks itself read on focus, so the mock has to offer the hook —
   // called immediately here, since in a test the screen is always the one on show
@@ -37,6 +43,10 @@ jest.mock('../../state/JarvisProvider', () => ({
     decide: jest.fn(),
     recent: [],
     clearRecent: jest.fn(),
+    shareLocation: false,
+    place: null,
+    refreshPlace: jest.fn().mockResolvedValue(undefined),
+    setShareLocation: jest.fn().mockResolvedValue(true),
     unread: 0,
     markChatRead: jest.fn(),
     setChatFocused: jest.fn(),

@@ -45,6 +45,12 @@ export type Auth = {
   requireForApprovals: boolean;
   /** the gate is up right now */
   locked: boolean;
+  /**
+   * Hold the app-lock gate open across something that sends the app away by
+   * itself — a system permission dialog the app asked for. Call with true before,
+   * false after.
+   */
+  holdGate: (active: boolean) => void;
   /** why the last attempt did not open it, for the lock screen to say */
   lastFailure: AuthFailure | null;
   unlock: () => Promise<boolean>;
@@ -113,6 +119,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authing.current = false;
       }, SHEET_SETTLE_MS);
     }
+  }, []);
+
+  /**
+   * Hold the gate open across something else that sends the app away.
+   *
+   * The biometric sheet is not the only thing that looks like leaving: a system
+   * permission dialog does too, and the app is what raised it. Holding the mic put
+   * up the microphone request, the gate read that as the phone leaving your hand,
+   * and the answer to "may I record" was a fingerprint prompt over the top of it.
+   *
+   * Same flag, same settle delay — the trailing `AppState` change arrives after the
+   * dialog has already gone.
+   */
+  const holdGate = useCallback((active: boolean) => {
+    if (active) {
+      authing.current = true;
+      return;
+    }
+    setTimeout(() => {
+      authing.current = false;
+    }, SHEET_SETTLE_MS);
   }, []);
 
   useEffect(() => {
@@ -243,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       locked,
       lastFailure,
       unlock,
+      holdGate,
       confirm,
       confirmCritical,
       setAppLock,

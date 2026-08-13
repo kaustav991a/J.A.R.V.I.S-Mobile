@@ -14,9 +14,10 @@ import { Glass } from '../components/ui/Glass';
 import { useToast } from '../components/ui/Toast';
 import { CHROME, COLOR, RADIUS, SCRIM, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
-import { useAudioRecorder } from 'expo-audio';
-import { MIN_CLIP_MS, RECORDING, prepareToRecord, readClip } from '../lib/voice';
+import { useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { MIN_CLIP_MS, RECORDING, meterLevel, prepareToRecord, readClip } from '../lib/voice';
 import { haptic } from '../lib/haptics';
+import { useAuth } from '../security/AuthProvider';
 import { useJarvis } from '../state/JarvisProvider';
 import type { ChatEntry } from '../state/hudReducer';
 import type { CommandsStackParams } from '../navigation/types';
@@ -28,6 +29,12 @@ const SUGGESTIONS = ['system status', 'open browser', 'take screenshot', 'list f
  * like it is riding the keyboard rather than chasing it. Decelerating, because it
  * is following something that has already started moving.
  */
+/** how often the recorder is polled for its level; 100ms reads as continuous */
+const METER_MS = 100;
+/** slide distances, in points, for hands-free and for throwing the clip away */
+const LOCK_SLIDE_PX = 64;
+const CANCEL_SLIDE_PX = 96;
+
 const KEYBOARD_MS = 220;
 const KEYBOARD_EASE = Easing.out(Easing.quad);
 
@@ -90,6 +97,7 @@ export function ChatScreen() {
       };
     }, [markChatRead, setChatFocused])
   );
+  const { holdGate } = useAuth();
   const toast = useToast();
   const list = useRef<FlatList<ChatEntry>>(null);
 
@@ -142,15 +150,78 @@ export function ChatScreen() {
    * same sentence in the log twice.
    */
   const recorder = useAudioRecorder(RECORDING);
+  const recorderState = useAudioRecorderState(recorder, METER_MS);
   const [recording, setRecording] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [cancelProgress, setCancelProgress] = useState(0);
   const startedAt = useRef(0);
+  /** where the finger went down, so the slides are measured from it */
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  /** set when the gesture asked to throw the clip away, read by the release */
+  const cancelled = useRef(false);
+  const lockedRef = useRef(false);
 
-  const startRecording = async () => {
+  /**
+   * The timer is the app's own, not the recorder's.
+   *
+   * `recorderState.durationMillis` only updates as fast as the metering interval,
+   * which makes the seconds visibly stutter. Elapsed time is trivially derivable
+   * from when the press started, so it is.
+   */
+  useEffect(() => {
+    if (!recording) return;
+    const timer = setInterval(() => setElapsedMs(Date.now() - startedAt.current), 200);
+    return () => clearInterval(timer);
+  }, [recording]);
+
+  const level = meterLevel(recorderState.metering);
+
+  /**
+   * Slide up to go hands-free, slide left to throw it away.
+   *
+   * Measured from where the finger went down rather than from the button's
+   * position, so it works wherever the composer happens to be sitting — it moves
+   * with the keyboard.
+   *
+   * Cancel is only *armed* here; the clip is discarded on release. Dropping it
+   * mid-gesture would take the recorder away from under a finger still holding it,
+   * and there would be nothing left to change your mind about.
+   */
+  const onVoiceMove = (x: number, y: number) => {
+    if (!origin.current || lockedRef.current) return;
+    const dx = x - origin.current.x;
+    const dy = y - origin.current.y;
+    if (-dy > LOCK_SLIDE_PX && Math.abs(dx) < Math.abs(dy)) {
+      lockedRef.current = true;
+      setLocked(true);
+      setCancelProgress(0);
+      haptic.good();
+      return;
+    }
+    setCancelProgress(Math.max(0, Math.min(1, -dx / CANCEL_SLIDE_PX)));
+    cancelled.current = -dx >= CANCEL_SLIDE_PX;
+  };
+
+  const startRecording = async (x?: number, y?: number) => {
+    if (recording) return;
+    origin.current = x !== undefined && y !== undefined ? { x, y } : null;
+    cancelled.current = false;
+    lockedRef.current = false;
+    setLocked(false);
+    setCancelProgress(0);
+    setElapsedMs(0);
     if (!connected) {
       toast.show('No link — nothing to transcribe the clip', 'bad');
       return;
     }
-    if (!(await prepareToRecord())) {
+    // The microphone request is a system dialog, and the app-lock gate reads any
+    // departure as the phone leaving your hand — so asking to record answered
+    // itself with a fingerprint prompt. Held across the request, released after.
+    holdGate(true);
+    const allowed = await prepareToRecord();
+    holdGate(false);
+    if (!allowed) {
       toast.show('Microphone permission is off', 'bad');
       return;
     }
@@ -165,14 +236,30 @@ export function ChatScreen() {
     }
   };
 
-  const stopRecording = async () => {
+  /**
+   * End the recording, and either send it or bin it.
+   *
+   * `discard` comes from two places: the slide-left gesture, armed during the hold
+   * and read here, and the bin button while hands-free. Either way the recorder is
+   * always stopped first — an abandoned clip must not leave the microphone open.
+   */
+  const finishRecording = async (discard: boolean) => {
     if (!recording) return;
     setRecording(false);
+    setLocked(false);
+    lockedRef.current = false;
+    setCancelProgress(0);
+    origin.current = null;
     const held = Date.now() - startedAt.current;
     try {
       await recorder.stop();
     } catch {
       toast.show('Could not finish the recording', 'bad');
+      return;
+    }
+    if (discard) {
+      haptic.bad();
+      toast.show('Recording discarded');
       return;
     }
     // a tap that arrived as a press produces a few hundred ms of room noise, and
@@ -194,6 +281,17 @@ export function ChatScreen() {
     const sent = await sendVoice(clip);
     if (sent) haptic.good();
     else toast.show('No link — the clip was not sent', 'bad');
+  };
+
+  /**
+   * The finger lifted.
+   *
+   * Hands-free is the exception: lifting is what *arms* it, so the release must not
+   * also end the recording. From then on only the bin and send buttons do.
+   */
+  const onRelease = () => {
+    if (lockedRef.current) return;
+    void finishRecording(cancelled.current);
   };
 
   // iOS lifts the whole view itself, so only Android pays the keyboard height
@@ -282,12 +380,27 @@ export function ChatScreen() {
 
         <Glass radius={0} sheen style={[styles.composer, composerStyle]}>
           <CommandBar
-            placeholder={recording ? 'Listening — release to send' : 'Message Jarvis…'}
+            placeholder="Message Jarvis…"
             leadingIcon="sparkles"
             onSubmit={send}
             onVoiceStart={() => void startRecording()}
-            onVoiceEnd={() => void stopRecording()}
+            onVoiceEnd={onRelease}
+            onVoiceMove={(x, y) => {
+              // the first move is also where the press began: `onPressIn` carries
+              // no coordinates, so the origin is taken from the first touch instead
+              if (!origin.current) origin.current = { x, y };
+              else onVoiceMove(x, y);
+            }}
             listening={recording}
+            voice={{
+              active: recording,
+              locked,
+              elapsedMs,
+              level,
+              cancelProgress,
+              onCancel: () => void finishRecording(true),
+              onSend: () => void finishRecording(false),
+            }}
           />
         </Glass>
       </KeyboardAvoidingView>

@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { COLOR, SPACE, TYPE, glowBox } from '../theme/tokens';
 import { MicIcon } from './MicIcon';
+import { VoiceBar } from './VoiceBar';
+import { CANCEL_SLIDE_PX, LOCK_SLIDE_PX } from '../lib/voice';
 
 export type CommandBarProps = {
   onSubmit: (text: string) => void;
@@ -18,6 +21,22 @@ export type CommandBarProps = {
    */
   onVoiceStart?: () => void;
   onVoiceEnd?: () => void;
+  /**
+   * Live recording state. When `active`, this bar becomes the recorder — see the
+   * branch in the body. Supplied by whoever owns the recorder, since the timer and
+   * the meter come from it.
+   */
+  voice?: {
+    active: boolean;
+    locked: boolean;
+    elapsedMs: number;
+    level: number;
+    cancelProgress: number;
+    onCancel: () => void;
+    onSend: () => void;
+  };
+  /** the finger moved while holding the mic — drives lock and cancel */
+  onVoiceMove?: (dx: number, dy: number) => void;
   /** tints the mic and lights its capsule while capture is running */
   listening?: boolean;
   disabled?: boolean;
@@ -26,11 +45,15 @@ export type CommandBarProps = {
   leadingIcon?: keyof typeof Ionicons.glyphMap;
 };
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function CommandBar({
   onSubmit,
   onVoice,
   onVoiceStart,
   onVoiceEnd,
+  onVoiceMove,
+  voice,
   listening = false,
   disabled = false,
   placeholder = 'Speak or type…',
@@ -54,50 +77,154 @@ export function CommandBar({
 
   const micColor = listening ? COLOR.green : COLOR.blue;
 
-  return (
-    <View style={[styles.bar, disabled && styles.disabled]}>
-      {leadingIcon ? <Ionicons name={leadingIcon} size={17} color={COLOR.blue} /> : null}
-      <TextInput
-        testID="command-input"
-        style={styles.input}
-        value={text}
-        onChangeText={setText}
-        onSubmitEditing={submit}
-        placeholder={placeholder}
-        placeholderTextColor={COLOR.dim}
-        editable={!disabled}
-        returnKeyType="send"
-        autoCapitalize="none"
-        autoCorrect={false}
-        selectionColor={COLOR.blue}
-      />
+  /**
+   * The mic follows the finger.
+   *
+   * The gesture worked without this and felt stiff, because nothing moved: the
+   * thresholds were invisible until they fired. Dragging the icon makes the travel
+   * its own progress indicator — you can see how much further to go, and see it
+   * stop when the gesture has committed.
+   *
+   * Assigned directly rather than through `withTiming` while dragging: a tween
+   * between finger positions is a lag, not a smoothing. The spring is only for the
+   * return, where there is no finger left to follow.
+   */
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
+  const origin = useRef<{ x: number; y: number } | null>(null);
 
-      <Pressable
+  const micStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: dragX.value }, { translateY: dragY.value }],
+  }));
+
+  const settleMic = () => {
+    origin.current = null;
+    dragX.value = withSpring(0, { damping: 18, stiffness: 220 });
+    dragY.value = withSpring(0, { damping: 18, stiffness: 220 });
+  };
+
+  const trackTouch = (x: number, y: number) => {
+    if (!origin.current) origin.current = { x, y };
+    const dx = x - origin.current.x;
+    const dy = y - origin.current.y;
+    // only the two directions that mean something, and never past the threshold
+    dragX.value = Math.max(-CANCEL_SLIDE_PX, Math.min(0, dx));
+    dragY.value = Math.max(-LOCK_SLIDE_PX, Math.min(0, dy));
+    onVoiceMove?.(x, y);
+  };
+
+  /**
+   * While recording, the composer *is* the recorder.
+   *
+   * Leaving the text field in place and only tinting the mic said a recording had
+   * started and nothing else — not how long, not whether the mic could hear
+   * anything, not how to stop without sending. The whole row is given over to that
+   * instead, which is also what makes room for the cancel and lock targets.
+   */
+  const recordingNow = Boolean(voice?.active);
+
+  /**
+   * One tree for both states, and the mic keeps its place in it.
+   *
+   * The recorder UI used to be an early `return`, which unmounted this Pressable —
+   * and with it went the touch it owned. Releasing sent nothing and the slides
+   * reported nothing, because `onPressOut` and `onTouchMove` belong to a view that
+   * no longer existed. Only the bin button worked, since it was part of the
+   * replacement.
+   *
+   * So the middle of the bar changes and the mic does not. The keys are what
+   * guarantee that: React matches keyed children across renders regardless of how
+   * many siblings appear or vanish beside them.
+   */
+  return (
+    <View style={[styles.bar, disabled && styles.disabled, recordingNow && styles.recording]}>
+      {recordingNow && voice ? (
+        <VoiceBar
+          key="middle"
+          elapsedMs={voice.elapsedMs}
+          level={voice.level}
+          locked={voice.locked}
+          cancelProgress={voice.cancelProgress}
+          onCancel={voice.onCancel}
+          onSend={voice.onSend}
+        />
+      ) : (
+        <View key="middle" style={styles.typing}>
+          {leadingIcon ? <Ionicons name={leadingIcon} size={17} color={COLOR.blue} /> : null}
+          <TextInput
+            testID="command-input"
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            onSubmitEditing={submit}
+            placeholder={placeholder}
+            placeholderTextColor={COLOR.dim}
+            editable={!disabled}
+            returnKeyType="send"
+            autoCapitalize="none"
+            autoCorrect={false}
+            selectionColor={COLOR.blue}
+          />
+        </View>
+      )}
+
+      <AnimatedPressable
+        key="mic"
         testID="command-voice"
         accessibilityRole="button"
         accessibilityLabel={holdToTalk ? 'Hold to speak' : 'Voice command'}
         // `onPressOut` fires when the finger lifts *or* leaves the button, so a
         // drag away still ends the recording rather than leaving the mic live
         onPressIn={holdToTalk ? onVoiceStart : undefined}
-        onPressOut={holdToTalk ? onVoiceEnd : undefined}
+        onPressOut={
+          holdToTalk
+            ? () => {
+                settleMic();
+                onVoiceEnd?.();
+              }
+            : undefined
+        }
         onPress={holdToTalk ? undefined : onVoice}
+        // Where the slide gestures are read. `onTouchMove` rather than a
+        // gesture-handler Pan: the press already belongs to this Pressable, and a
+        // Pan competing for the same touch turns a quick hold into neither a press
+        // nor a pan. The coordinates are absolute, so the owner does its own
+        // arithmetic against where the finger started.
+        onTouchMove={
+          holdToTalk && onVoiceMove
+            ? (e) => trackTouch(e.nativeEvent.pageX, e.nativeEvent.pageY)
+            : undefined
+        }
         disabled={disabled}
         hitSlop={10}
-        style={[styles.mic, listening && { borderColor: COLOR.green }, listening && glowBox(COLOR.green, 10)]}
+        /**
+         * The press must survive the finger wandering.
+         *
+         * `onPressOut` fires as soon as the touch leaves the button, so sliding
+         * left to cancel — 96px away — ended the press long before the gesture
+         * reached its threshold, and the clip sent itself. This keeps the press
+         * alive across the whole area the slides use: generously left, where cancel
+         * lives, and well above, where lock does.
+         */
+        pressRetentionOffset={{ top: 160, bottom: 80, left: 220, right: 120 }}
+        style={[styles.mic, listening && { borderColor: COLOR.green }, listening && glowBox(COLOR.green, 10), micStyle]}
       >
         <MicIcon color={micColor} active={listening} />
-      </Pressable>
+      </AnimatedPressable>
 
-      <Pressable
-        testID="command-send"
-        accessibilityRole="button"
-        accessibilityLabel="Send command"
-        onPress={submit}
-        disabled={disabled}
-        hitSlop={10}
-      >
-        <Text style={[styles.send, !hasText && styles.sendIdle]}>SEND</Text>
-      </Pressable>
+      {recordingNow ? null : (
+        <Pressable
+          key="send"
+          testID="command-send"
+          accessibilityRole="button"
+          accessibilityLabel="Send command"
+          onPress={submit}
+          disabled={disabled}
+          hitSlop={10}
+        >
+          <Text style={[styles.send, !hasText && styles.sendIdle]}>SEND</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -115,6 +242,8 @@ const styles = StyleSheet.create({
     paddingRight: SPACE.md,
     paddingVertical: SPACE.sm,
   },
+  recording: { paddingLeft: SPACE.sm, paddingRight: SPACE.md },
+  typing: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
   disabled: { opacity: 0.4 },
   input: {
     flex: 1,

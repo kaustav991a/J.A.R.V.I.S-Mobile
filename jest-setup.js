@@ -25,6 +25,7 @@ jest.mock('expo-audio', () => ({
     uri: null,
     isRecording: false,
   }),
+  useAudioRecorderState: () => ({ isRecording: false, durationMillis: 0, metering: -60, canRecord: true }),
   requestRecordingPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
   getRecordingPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
   setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
