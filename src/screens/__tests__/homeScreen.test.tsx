@@ -5,6 +5,10 @@ import { AppearanceProvider } from '../../theme/appearance';
 import { greetingFor } from '../../theme/greeting';
 
 jest.mock('@react-navigation/native', () => ({
+  // Home and Chat both take a fresh reading / mark themselves read on focus, so
+  // the mock has to offer the hook. Called straight away: in a test the screen
+  // under test is always the one on show.
+  useFocusEffect: (cb: () => void) => cb(),
   useNavigation: () => ({ navigate: jest.fn(), getParent: () => ({ navigate: jest.fn() }) }),
 }));
 
@@ -21,6 +25,10 @@ jest.mock('../../state/JarvisProvider', () => ({
     decide: jest.fn().mockResolvedValue(undefined),
     recent: [],
     clearRecent: jest.fn(),
+    shareLocation: false,
+    place: null,
+    refreshPlace: jest.fn().mockResolvedValue(undefined),
+    setShareLocation: jest.fn().mockResolvedValue(true),
   }),
 }));
 

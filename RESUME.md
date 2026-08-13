@@ -71,6 +71,63 @@ Access, and without it Android rejects the whole channel, leaving it absent.
 - A phone cannot hold a WebSocket while dozing. `apps_linked: 0` with the screen off
   is correct behaviour, and is the whole reason push exists.
 
+### Later the same day: voice, location, places, briefing
+
+**Voice works.** Hold the mic in Chat, release to send. WhatsApp-shaped: slide up
+past 64px to go hands-free, slide left past 96px to bin it, live timer, and a level
+meter driven by real dBFS metering — a meter that does not move means the mic is not
+hearing you, which is worth seeing before sending silence to a transcriber. The mic
+follows the finger and clamps at the thresholds, so the travel is the progress
+indicator.
+
+Three faults found by using it, all mine: the recorder UI was an early `return`
+that **unmounted the mic**, taking the touch with it (release and both slides went
+dead, the bin still worked because it belonged to the replacement); `onPressOut`
+fires when the finger leaves the button, so the slides needed `pressRetentionOffset`;
+and holding the mic raised a **fingerprint prompt** — the app-lock gate treats any
+departure as the phone leaving your hand, and a system permission dialog *is* that.
+`AuthProvider.holdGate` now covers it, the same mechanism its own sheet uses.
+
+**Location, one-shot and foreground only.** Off until switched on in Settings →
+Privacy. No `ACCESS_BACKGROUND_LOCATION` — verified in the *merged* manifest, not
+just the config. Home shows the area at the top, refreshed when that tab is focused.
+
+**Weather was the interesting bug.** He asked if it was raining and was told it was
+not, while it was raining. That is the model answering from its weights. Fixed by
+sending measured figures and telling it not to answer from memory — and then fixed
+*again*, because the gateway's own lookup was answered `429 Too Many Requests`:
+Open-Meteo rate-limits per IP and Render's outbound address is shared. **The phone
+fetches it now**, from its own address, and the gateway prefers what it is handed.
+My pre-push check had stubbed the HTTP call, so the one line that failed in
+production was the one line never executed anywhere. Worth remembering.
+
+**Named places** (`src/lib/knownPlaces.ts`, `PlacesScreen`). Home and Office as
+fixed slots plus custom labels, set by standing somewhere — no address typing. They
+travel with each question so "how far to the office" resolves against a label
+before any geocoder is asked, and "am I at the office" works from 250m. Stored on
+the phone only.
+
+**Morning briefing** (`src/lib/commute.ts`, `commuteTask.ts`). A leaving time,
+weekdays by default, checked within half an hour of it. Forecast covers the
+departure hour and the two after — not the daily maximum. Advice from thresholds on
+real numbers, never the model: umbrella at ≥50% or ≥0.4mm, water at ≥35°C, jacket at
+≤12°C, wind at ≥40km/h, thunderstorms their own line. **Silence when there is
+nothing to say.** One per day. A PREVIEW button fires one now, because a briefing
+you cannot trigger is one you cannot trust.
+
+`expo-background-task` decides its own timing — 15 minutes is a floor, not a
+schedule, so the task re-checks the clock rather than trusting when it was woken.
+
+**Chat persists** now (last 100 turns, AsyncStorage), older turns carry a date, the
+Home command bar is gone in favour of a Chat card with an unread count, a reply
+raises a notification unless you are looking at the chat, and `online`/`offline`
+statuses no longer write chat lines — that greeting was filling the log.
+
+New deps this session: `@react-native-async-storage/async-storage`, `expo-audio`,
+`expo-location`, `expo-background-task`, `expo-task-manager`. Three of them added
+config plugins, so `android/` was regenerated twice — **restore `local.properties`
+and the 6144m jvmargs each time**.
+
 ### Still owed
 
 1. **`BRIDGE_SECRET` rotation** — needs the desk on.

@@ -1,10 +1,12 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Hint, Screen, SectionLabel } from '../components/ui/Atoms';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
+import { useToast } from '../components/ui/Toast';
+import { useJarvis } from '../state/JarvisProvider';
 import { COLOR, RADIUS, SPACE } from '../theme/tokens';
 import { APP_VERSION } from '../data/fixtures';
 import { TABS_ID } from '../navigation/types';
@@ -13,6 +15,8 @@ import type { SettingsStackParams, TabParams } from '../navigation/types';
 export function SettingsScreen() {
   const nav = useNavigation<NativeStackNavigationProp<SettingsStackParams, 'SettingsHome', typeof TABS_ID>>();
   const tabs = nav.getParent<BottomTabNavigationProp<TabParams>>(TABS_ID);
+  const { shareLocation, setShareLocation } = useJarvis();
+  const toast = useToast();
 
   return (
     <Screen testID="settings-screen">
@@ -51,6 +55,46 @@ export function SettingsScreen() {
           last
         />
       </View>
+
+      <SectionLabel>Privacy</SectionLabel>
+      <View style={styles.group}>
+        {/* Off until switched on, and one switch for one disclosure: the trail and
+            the fix are the same decision, and separating them is how people end up
+            sharing more than they meant to. */}
+        <SettingsRow
+          testID="settings-location"
+          icon="location-outline"
+          title="Share my location"
+          subtitle={
+            shareLocation
+              ? 'Questions carry where you are, and where you have been today'
+              : 'Off — J.A.R.V.I.S. answers without knowing where you are'
+          }
+          trailing={
+            <Switch
+              testID="settings-location-switch"
+              value={shareLocation}
+              onValueChange={(on) => {
+                void setShareLocation(on).then((ok) => {
+                  if (!ok) toast.show('Location permission was refused', 'bad');
+                });
+              }}
+            />
+          }
+        />
+        <SettingsRow
+          testID="settings-places"
+          icon="map-outline"
+          title="Places and morning briefing"
+          subtitle="Name home and the office, and get told to take an umbrella"
+          onPress={() => nav.navigate('Places')}
+          last
+        />
+      </View>
+      <Hint testID="settings-location-hint">
+        Taken one reading at a time, only while the app is open — never in the background. The
+        trail is kept on this phone, capped, and forgotten when you switch this off.
+      </Hint>
 
       <SectionLabel>Not built yet</SectionLabel>
       <View style={styles.group}>

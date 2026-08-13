@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { ArcReactor } from '../components/ArcReactor';
@@ -70,7 +70,8 @@ export function HomeScreen() {
   // the third generic is the id `getParent` may be called with
   const nav = useNavigation<NativeStackNavigationProp<HomeStackParams, 'HomeMain', typeof TABS_ID>>();
   const { accent, animations, glow } = useAppearance();
-  const { hud, mode, connected, connecting, connect, decide, unread } = useJarvis();
+  const { hud, mode, connected, connecting, connect, decide, unread, shareLocation, place, refreshPlace } =
+    useJarvis();
 
   // the clock, not the session, decides the greeting — so it has to be re-read
   // while the screen is open, on the minute
@@ -116,6 +117,19 @@ export function HomeScreen() {
   const activity = hud.status === 'boot' ? 'IDLE' : hud.status.toUpperCase();
   const scriptLabel = SCRIPTS.length ? `${SCRIPTS.length} Scripts` : 'No Scripts';
 
+  /**
+   * A fix when Home is on screen, not on a timer.
+   *
+   * The line is only read while this tab is open, so that is the only moment worth
+   * spending a GPS read on — anything periodic would be a background tracker with
+   * extra steps.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPlace();
+    }, [refreshPlace])
+  );
+
   const [menu, setMenu] = useState(false);
 
   return (
@@ -140,6 +154,30 @@ export function HomeScreen() {
         >
           <Ionicons name="menu" size={26} color={COLOR.white} />
         </Touchable>
+
+        {/**
+         * Where he is, the way a delivery app shows it.
+         *
+         * Only when sharing is on: an empty pin inviting a tap would be asking for
+         * a permission with nothing to show for it yet, and this screen already has
+         * a Settings row that explains the trade. Tapping refreshes the fix, which
+         * is what a stale line makes you want to do.
+         */}
+        {shareLocation ? (
+          <Touchable
+            testID="home-place"
+            accessibilityRole="button"
+            accessibilityLabel="Refresh location"
+            hitSlop={8}
+            onPress={() => void refreshPlace()}
+            style={styles.place}
+          >
+            <Ionicons name="location-sharp" size={13} color={accent} />
+            <Text style={styles.placeText} numberOfLines={1}>
+              {place ?? 'Locating…'}
+            </Text>
+          </Touchable>
+        ) : null}
 
         {/* the bell opens the timeline, not the machine's vitals: "what just
             happened" is a different question from "how is the desk" */}
@@ -340,6 +378,8 @@ const styles = StyleSheet.create({
   address: { ...TYPE.wordmark, fontSize: 28, letterSpacing: 4, marginTop: 2 },
   prompt: { ...TYPE.meta, fontSize: 13, color: COLOR.dim, marginTop: SPACE.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: SPACE.md },
+  place: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, maxWidth: '62%' },
+  placeText: { ...TYPE.dataLabel, color: COLOR.dim },
   replies: {
     flexDirection: 'row',
     alignItems: 'center',

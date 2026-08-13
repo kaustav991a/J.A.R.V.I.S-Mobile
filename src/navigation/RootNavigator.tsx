@@ -19,6 +19,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { AppearanceScreen } from '../screens/AppearanceScreen';
 import { AboutScreen } from '../screens/AboutScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
+import { PlacesScreen } from '../screens/PlacesScreen';
 import { TABS_ID } from './types';
 import type {
   CommandsStackParams,
@@ -113,6 +114,7 @@ function SettingsStackScreens() {
       <SettingsStack.Screen name="Connection" component={ConnectionScreen} />
       <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
       <SettingsStack.Screen name="Security" component={SecurityScreen} />
+      <SettingsStack.Screen name="Places" component={PlacesScreen} />
       <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>
   );

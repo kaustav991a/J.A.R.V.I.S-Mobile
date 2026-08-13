@@ -59,7 +59,8 @@
           "color": "#3ea6ff"
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-background-task"
     ],
     "extra": {
       "eas": {

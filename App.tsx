@@ -12,6 +12,10 @@ import { WatchAlertScreen } from './src/screens/WatchAlertScreen';
 import { AuthProvider, useAuth } from './src/security/AuthProvider';
 import { ReactorHandoffProvider } from './src/components/ReactorHandoff';
 import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
+// imported for its side effect: the task has to be defined before the OS can hand
+// work back to a process it just woke, which is before any component mounts
+import { setCommuteTask } from './src/lib/commuteTask';
+import { loadCommute } from './src/lib/commute';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { BlurTargetProvider } from './src/components/ui/Glass';

@@ -36,6 +36,19 @@ import {
   registerForPush,
 } from '../lib/notify';
 import { haptic } from '../lib/haptics';
+import {
+  askForLocation,
+  currentFix,
+  forgetTrail,
+  loadShareLocation,
+  loadTrail,
+  rememberPlace,
+  saveShareLocation,
+  weatherFor,
+} from '../lib/place';
+import type { TrailStep } from '../lib/place';
+import { loadKnown } from '../lib/knownPlaces';
+import type { KnownPlace } from '../lib/knownPlaces';
 import { COLOR } from '../theme/tokens';
 
 export type JarvisContextValue = {
@@ -89,6 +102,17 @@ export type JarvisContextValue = {
    * null for any of them to forget it. Re-dials on success.
    */
   pair: (next: { base?: string | null; cloud?: string | null; token?: string | null }) => Promise<boolean>;
+  /**
+   * Whether a question carries where it was asked from, and the recent trail.
+   * Turning it on asks for the permission; turning it off forgets the trail.
+   * Returns false when the permission was refused.
+   */
+  shareLocation: boolean;
+  setShareLocation: (on: boolean) => Promise<boolean>;
+  /** where he is, for the line at the top of Home. Null when sharing is off. */
+  place: string | null;
+  /** take a fresh fix — called when Home comes into focus */
+  refreshPlace: () => Promise<void>;
   /** stand-in desk, for showing the app with no machine to talk to */
   demo: boolean;
   setDemo: (on: boolean) => void;
@@ -124,6 +148,53 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   // on by default: a build handed to someone with no desk on the network would
   // otherwise open on an empty HUD reporting failure
   const [demo, setDemo] = useState(true);
+
+  /**
+   * Whether a question carries where it was asked from.
+   *
+   * Off until switched on, and persisted — sharing a location is a decision, not a
+   * default, and one made once should not have to be made again on every launch.
+   * The switch covers the trail too: they are the same disclosure, and two
+   * switches for one decision is how people end up sharing more than they meant.
+   */
+  const [shareLocation, setShareLocationState] = useState(false);
+  useEffect(() => {
+    void loadShareLocation().then(setShareLocationState);
+  }, []);
+
+  /**
+   * The place name to show at the top of Home.
+   *
+   * Held here rather than fetched by the screen so the fix is taken once and every
+   * surface reads the same one — and so it survives a tab change without spinning
+   * the GPS again. Refreshed when Home comes into focus, which is the only moment
+   * the answer is being looked at.
+   */
+  const [place, setPlace] = useState<string | null>(null);
+
+  const refreshPlace = useCallback(async () => {
+    if (!shareLocation) {
+      setPlace(null);
+      return;
+    }
+    const fix = await currentFix();
+    if (!fix) return;
+    setPlace(fix.place || `${fix.lat.toFixed(3)}, ${fix.lon.toFixed(3)}`);
+    void rememberPlace(fix);
+  }, [shareLocation]);
+
+  const setShareLocation = useCallback(async (on: boolean) => {
+    // asked for at the moment it is switched on, so the dialog has a reason the
+    // user can see, rather than arriving unexplained at startup
+    if (on && !(await askForLocation())) return false;
+    setShareLocationState(on);
+    await saveShareLocation(on);
+    if (!on) {
+      setPlace(null);
+      await forgetTrail();
+    }
+    return true;
+  }, []);
 
   /**
    * The desk address and token, owned here rather than read inside the link.
@@ -243,6 +314,50 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       if (!trimmed) return;
       dispatch({ type: 'local_command', text: trimmed, at: Date.now() });
       setRecent((r) => [trimmed, ...r.filter((c) => c !== trimmed)].slice(0, RECENT_CAP));
+
+      /**
+       * A question asked from a known place is answered from measurements.
+       *
+       * He asked about the weather where he was and was told there was no rain
+       * while it was raining. The gateway can fetch the real conditions for a
+       * coordinate, so when sharing is on the coordinate goes with the question —
+       * and with it the recent trail, so "where was I this morning" has an answer.
+       *
+       * Off unless switched on, taken one fix at a time, and never in the
+       * background. Failure is silent by design: no location simply means the
+       * question is asked the way it always was.
+       */
+      if (shareLocation) {
+        const fix = await currentFix();
+        if (fix) {
+          void rememberPlace(fix);
+          // Fetched here, not on the gateway. Open-Meteo rate-limits per IP and
+          // Render's outbound address is shared, so the gateway was answered
+          // `429 Too Many Requests` and J.A.R.V.I.S. had to say he could not check.
+          // A phone asks from its own address, a few times a day.
+          const [trail, weather, known] = await Promise.all([
+            loadTrail(),
+            weatherFor(fix.lat, fix.lon),
+            loadKnown(),
+          ]);
+          const envelope = JSON.stringify({
+            type: 'ask',
+            text: trimmed,
+            where: {
+              lat: fix.lat,
+              lon: fix.lon,
+              place: fix.place,
+              weather,
+              trail: trail.map((s: TrailStep) => ({ place: s.place, when: s.when })),
+              // only this phone knows what "the office" means, so the meaning
+              // travels with the question rather than being stored on the gateway
+              known: known.map((k: KnownPlace) => ({ label: k.label, lat: k.lat, lon: k.lon })),
+            },
+          });
+          if (link.send(envelope)) return;
+        }
+      }
+
       // the socket is the fast path; REST is what works when it is not open
       if (link.send(trimmed)) return;
       if (demo && !connected) {
@@ -251,7 +366,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       }
       await api.backdoor(trimmed);
     },
-    [api, link, demo, connected]
+    [api, link, demo, connected, shareLocation]
   );
 
   /**
@@ -600,6 +715,10 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         void clearChat();
         dispatch({ type: 'reset' });
       },
+      shareLocation,
+      setShareLocation,
+      place,
+      refreshPlace,
       demo,
       setDemo,
       simulated,
@@ -622,6 +741,10 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       pairing,
       pair,
       recent,
+      shareLocation,
+      setShareLocation,
+      place,
+      refreshPlace,
       unread,
       markChatRead,
       setChatFocused,
