@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 import { hudReducer, initialHudState, HudState } from './hudReducer';
 import { demoFrames, demoReply } from './demoFeed';
 import { useLink } from '../link/useLink';
@@ -24,7 +25,16 @@ import {
 } from '../link/config';
 import type { Endpoints, LinkMode, LinkStatus } from '../link/config';
 import { createApi } from '../api/client';
-import { WATCH_CATEGORY, WATCH_CHANNEL, dismiss, postNow } from '../lib/notify';
+import {
+  WATCH_CATEGORY,
+  WATCH_CHANNEL,
+  alertFromLaunch,
+  dismiss,
+  onAlertTapped,
+  postNow,
+  registerForPush,
+} from '../lib/notify';
+import { haptic } from '../lib/haptics';
 
 export type JarvisContextValue = {
   /** everything the backend has told us */
@@ -37,6 +47,8 @@ export type JarvisContextValue = {
   connecting: boolean;
   /** re-probe LAN then cloud and reconnect */
   connect: () => void;
+  /** switch the link off by hand; nothing automatic brings it back */
+  disconnect: () => void;
   /** send a text command; falls back to REST when the socket is not open */
   sendCommand: (text: string) => Promise<void>;
   /** allow or deny a parked agent action */
@@ -300,7 +312,19 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       body: `Was this you? The desk locks itself in ${Math.max(1, Math.round((alert.deadline - Date.now()) / 1000))}s.`,
       channel: WATCH_CHANNEL,
       category: WATCH_CATEGORY,
-      data: { kind: 'intruder', id: alert.id },
+      // ongoing, so Android cannot fold it into an auto-group and a stray swipe
+      // cannot clear the one notification with a countdown behind it
+      sticky: true,
+      data: {
+        kind: 'intruder',
+        id: alert.id,
+        // the same shape the gateway's push carries, so a tap rebuilds the alert
+        // by the one path rather than two
+        expires_at_ms: alert.deadline,
+        image: alert.image,
+        user: alert.user,
+        trigger: alert.trigger,
+      },
     }).then((id) => {
       if (alive) watchNote.current = id;
       else void dismiss(id);
@@ -309,6 +333,98 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       alive = false;
     };
   }, [alert?.id, alert]);
+
+  /**
+   * Hand the gateway this install's push address, once, per cloud link.
+   *
+   * Only over cloud: the desk serves no such route, and only the gateway knows
+   * when the desk attaches. Registration is deliberately silent — a gateway that
+   * does not serve the route yet answers 404, which is not something to put in
+   * front of the user, and the next connect tries again.
+   */
+  useEffect(() => {
+    if (simulated || link.mode !== 'cloud' || link.status !== 'open') return;
+    let alive = true;
+    void registerForPush().then((push) => {
+      if (!alive || !push) return;
+      // Silent on failure, and unguarded on purpose. Registering is idempotent
+      // server-side — it keys on the address — so re-sending costs one small POST
+      // per connect and buys the only recovery there is from the gateway losing
+      // its list. It does lose it: Render's free disk is wiped on every redeploy,
+      // and a "register once per address" guard left the phone unreachable by push
+      // until the app was restarted. It also went stale on a rotated token, since
+      // the address had not changed but the credential had.
+      void api.registerPush(push, Platform.OS).catch(() => {});
+    });
+    return () => {
+      alive = false;
+    };
+  }, [api, link.mode, link.status, simulated]);
+
+  /**
+   * A watch alert tapped in the notification shade raises the answer screen.
+   *
+   * A sleeping phone holds no socket, so it never received the frame — the push
+   * carried the alert instead, and this puts it back into the reducer as though
+   * the socket had delivered it. Both routes matter: `alertFromLaunch` covers a
+   * notification tapped while the app was dead, which no listener ever sees, and
+   * the listener covers one tapped while it was merely in the background.
+   *
+   * `alertFromData` refuses an alert whose window has already closed, so a
+   * notification found sitting in the shade an hour later cannot raise a live
+   * countdown against a desk that locked itself long ago.
+   */
+  useEffect(() => {
+    const raise = (alert: { id: string; expiresIn: number; image: string | null; user: string | null; trigger: string }) =>
+      dispatch({
+        type: 'frame',
+        frame: {
+          kind: 'intruder',
+          id: alert.id,
+          expiresIn: alert.expiresIn,
+          image: alert.image,
+          user: alert.user,
+          trigger: alert.trigger,
+        },
+        at: Date.now(),
+      });
+
+    let alive = true;
+    void alertFromLaunch().then((alert) => {
+      if (alive && alert) raise(alert);
+    });
+    const off = onAlertTapped(raise);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
+  /**
+   * The desk arriving is worth interrupting for; the desk leaving is not.
+   *
+   * A cloud session answers out of the light brain until the desk attaches to the
+   * gateway, at which point the same socket reaches the real machine — PC control
+   * and all. That is a change in what the app can do, so it earns a notification.
+   * The reverse is a quiet downgrade: the pill says so, and buzzing a pocket to
+   * report that a machine went to sleep is noise.
+   *
+   * Guarded on the previous value rather than fired on every `true`, because the
+   * gateway restates desk state on every reconnect — and a re-dial is not news.
+   */
+  const wasLinked = useRef<boolean | null>(null);
+  const deskLinked = hud.deskLinked;
+  useEffect(() => {
+    const arrived = deskLinked === true && wasLinked.current !== true;
+    wasLinked.current = deskLinked;
+    if (!arrived || simulated) return;
+    haptic.good();
+    void postNow({
+      title: 'J.A.R.V.I.S. is on full power',
+      body: 'The desk is online. PC control, files and terminal are available again.',
+      data: { kind: 'desk_link' },
+    });
+  }, [deskLinked, simulated]);
 
   const pair = useCallback(async (next: { base?: string | null; cloud?: string | null; token?: string | null }) => {
     if (next.base !== undefined) {
@@ -344,6 +460,19 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     link.reprobe();
   }, [simulated, link]);
 
+  /**
+   * Switch the link off deliberately, and turn the stand-in off with it.
+   *
+   * Demo mode is on by default, and `simulated` is `demo && !connected` — so
+   * disconnecting would otherwise hand the screens a simulated desk the moment
+   * the real one went away, which reads as "still connected" and makes the button
+   * look broken. Asking for no link means no link, of either kind.
+   */
+  const disconnect = useCallback(() => {
+    setDemo(false);
+    link.disconnect();
+  }, [link]);
+
   const value = useMemo<JarvisContextValue>(
     () => ({
       hud,
@@ -353,6 +482,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       connected: shownConnected,
       connecting: shownConnecting,
       connect,
+      disconnect,
       sendCommand,
       decide,
       answerWatch,
@@ -375,6 +505,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       shownConnecting,
       simulated,
       connect,
+      disconnect,
       sendCommand,
       decide,
       answerWatch,

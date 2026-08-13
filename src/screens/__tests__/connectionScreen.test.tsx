@@ -6,6 +6,7 @@ import { AppearanceProvider } from '../../theme/appearance';
 
 const pair = jest.fn().mockResolvedValue(true);
 const connect = jest.fn();
+const disconnect = jest.fn();
 const ctx: Record<string, unknown> = {};
 
 jest.mock('../../state/JarvisProvider', () => ({
@@ -29,9 +30,11 @@ const mount = () =>
 beforeEach(() => {
   jest.clearAllMocks();
   Object.assign(ctx, {
+    hud: { deskLinked: null },
     connected: false,
     connecting: false,
     connect,
+    disconnect,
     mode: 'offline',
     lastError: null,
     simulated: false,
@@ -72,6 +75,50 @@ describe('ConnectionScreen', () => {
     await fireEvent.press(getByTestId('connection-save'));
     await waitFor(() => expect(pair).toHaveBeenCalled());
     expect(pair.mock.calls[0][0]).not.toHaveProperty('token');
+  });
+
+  it('offers no way to disconnect when there is nothing connected', async () => {
+    const { queryByTestId } = await mount();
+    expect(queryByTestId('connection-disconnect')).toBeNull();
+  });
+
+  it('can switch a live link off by hand', async () => {
+    ctx.connected = true;
+    const { getByTestId } = await mount();
+    await fireEvent.press(getByTestId('connection-disconnect'));
+    expect(disconnect).toHaveBeenCalled();
+  });
+
+  it('saves from the keyboard, because the button can sit under it', async () => {
+    // Android is in `resize` mode and `KeyboardAvoidingView` gets no `behavior`
+    // there, so with the keyboard up SAVE & RECONNECT is below the fold — and the
+    // token field is the last thing on the screen. The return key is the only
+    // route that does not depend on reaching the button.
+    const { getByTestId } = await mount();
+    await fireEvent.changeText(getByTestId('connection-token-input'), 'sekrit');
+    await fireEvent(getByTestId('connection-token-input'), 'submitEditing');
+    await waitFor(() => expect(pair).toHaveBeenCalled());
+    expect(pair.mock.calls[0][0].token).toBe('sekrit');
+  });
+
+  it('will not re-dial the old address while an edit is sitting unsaved', async () => {
+    // the top button re-dials with the STORED settings and never reads these
+    // fields, so leaving it live answered a tap by reconnecting to the address
+    // the user had just replaced — silently, which reads as the fix being ignored
+    const { getByTestId, findByTestId } = await mount();
+    await fireEvent.changeText(getByTestId('connection-cloud-input'), 'https://gw.onrender.com');
+    expect(await findByTestId('connection-dirty')).toBeTruthy();
+    await fireEvent.press(getByTestId('connection-connect'));
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('does not count a blank token box as an unsaved edit', async () => {
+    // blank means "keep the one you have", so it must not disable the re-dial
+    ctx.pairing = { deskBase: 'http://d:8000', cloudBase: 'https://gw', usingDefault: false, hasToken: true };
+    const { getByTestId, queryByTestId } = await mount();
+    expect(queryByTestId('connection-dirty')).toBeNull();
+    await fireEvent.press(getByTestId('connection-connect'));
+    expect(connect).toHaveBeenCalled();
   });
 
   it('reports an address it could not use instead of pretending it saved', async () => {

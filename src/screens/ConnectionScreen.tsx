@@ -44,6 +44,7 @@ function Field({
   onChange,
   testID,
   secret = false,
+  onSubmit,
 }: {
   label: string;
   hint: string;
@@ -51,6 +52,8 @@ function Field({
   onChange: (next: string) => void;
   testID: string;
   secret?: boolean;
+  /** the keyboard's own return key saves, so the button need not be reachable */
+  onSubmit?: () => void;
 }) {
   return (
     <View style={styles.field}>
@@ -64,6 +67,15 @@ function Field({
         autoCapitalize="none"
         autoCorrect={false}
         secureTextEntry={secret}
+        /**
+         * Submitting from the keyboard is not a convenience here, it is the only
+         * reliable route. Android is in `resize` mode and `KeyboardAvoidingView`
+         * does nothing without a `behavior`, so with the keyboard up the Save
+         * button sits below the fold — and the field being typed into is the last
+         * thing on the screen. Return key saves; the keyboard closes with it.
+         */
+        returnKeyType={onSubmit ? 'done' : 'default'}
+        onSubmitEditing={onSubmit}
         style={styles.input}
       />
     </View>
@@ -73,7 +85,10 @@ function Field({
 export function ConnectionScreen() {
   const { width } = useWindowDimensions();
   const { accent } = useAppearance();
-  const { connected, connecting, connect, mode, lastError, simulated, pairing, pair } = useJarvis();
+  const { hud, connected, connecting, connect, disconnect, mode, lastError, simulated, pairing, pair } = useJarvis();
+
+  /** the desk reached through the gateway — a cloud link with PC control */
+  const fullPower = connected && hud.deskLinked === true;
 
   const [desk, setDesk] = useState(pairing.deskBase);
   const [cloud, setCloud] = useState(pairing.cloudBase ?? '');
@@ -83,6 +98,21 @@ export function ConnectionScreen() {
 
   const color = connected ? COLOR.green : accent;
   const state = connecting ? 'Connecting…' : connected ? 'Connected' : 'Disconnected';
+
+  /**
+   * Something typed below differs from what is stored.
+   *
+   * The button at the top re-dials with the SAVED settings — it does not read
+   * these fields. Left live while an edit is pending it answers a tap by
+   * reconnecting to the old address, with no error and nothing to read, so the
+   * fix looks like it was applied and ignored. It is disabled until the edit is
+   * saved or reverted. An empty token box is not an edit: blank means "keep the
+   * one you have".
+   */
+  const dirty =
+    desk.trim() !== pairing.deskBase ||
+    cloud.trim() !== (pairing.cloudBase ?? '') ||
+    token.trim() !== '';
 
   /**
    * Save, then re-dial.
@@ -110,7 +140,7 @@ export function ConnectionScreen() {
   };
 
   return (
-    <Screen testID="connection-screen">
+    <Screen testID="connection-screen" liftOnKeyboard>
       <ScreenTitle title="CONNECTION" />
       <View style={styles.hero}>
         <LinkRings size={Math.min(width * 0.55, 230)} color={color} connected={connected} />
@@ -131,7 +161,11 @@ export function ConnectionScreen() {
         {simulated
           ? 'Demo data is on, so this link is a stand-in. Turn it off in the Home menu to reach a real desk.'
           : connected
-            ? `Linked to the desk over ${mode.toUpperCase()}.`
+            ? fullPower
+              ? 'Full power — the desk is attached to the gateway, so PC control is live.'
+              : mode === 'cloud'
+                ? 'Cloud brain only. The desk is off, so PC control is unavailable.'
+                : `Linked to the desk over ${mode.toUpperCase()}.`
             : connecting
               ? 'Probing the local network, then the cloud gateway.'
               : 'Connect to reach the desk. The phone and the desk must be on the same network.'}
@@ -142,8 +176,28 @@ export function ConnectionScreen() {
         label={connecting ? 'CONNECTING' : connected ? 'RECONNECT' : 'CONNECT'}
         onPress={connect}
         busy={connecting}
+        disabled={dirty}
         style={styles.button}
       />
+      {dirty ? (
+        <Text testID="connection-dirty" style={styles.note}>
+          Unsaved changes below. SAVE &amp; RECONNECT applies them.
+        </Text>
+      ) : null}
+
+      {/* Offered only when there is something to switch off. Nothing automatic
+          brings the link back afterwards — not a foreground, not a network
+          change — so the state the user chose is the state they keep. */}
+      {connected || connecting ? (
+        <Button
+          testID="connection-disconnect"
+          label="DISCONNECT"
+          onPress={disconnect}
+          variant="ghost"
+          tint={COLOR.red}
+          style={styles.disconnect}
+        />
+      ) : null}
 
       <Text testID="connection-endpoint" style={styles.endpoint}>
         {connected && mode === 'cloud' ? (pairing.cloudBase ?? DEFAULT_ENDPOINTS.deskBase) : pairing.deskBase}
@@ -175,9 +229,16 @@ export function ConnectionScreen() {
         value={token}
         onChange={setToken}
         secret
+        onSubmit={save}
       />
 
-      <Button testID="connection-save" label={saving ? 'SAVING' : 'SAVE & RECONNECT'} onPress={save} busy={saving} />
+      <Button
+        testID="connection-save"
+        label={saving ? 'SAVING' : 'SAVE & RECONNECT'}
+        onPress={save}
+        busy={saving}
+        style={styles.save}
+      />
       {note ? (
         <Text testID="connection-note" style={styles.note}>
           {note}
@@ -211,6 +272,10 @@ const styles = StyleSheet.create({
   },
   button: { marginTop: SPACE.xl },
   field: { marginTop: SPACE.md },
+  // the action has to sit clear of the last field, or the token box and the
+  // button read as one control and the button looks like part of the input
+  save: { marginTop: SPACE.xl },
+  disconnect: { marginTop: SPACE.md },
   fieldLabel: { ...TYPE.dataLabel, color: COLOR.dim, marginBottom: SPACE.xs },
   input: {
     ...TYPE.meta,

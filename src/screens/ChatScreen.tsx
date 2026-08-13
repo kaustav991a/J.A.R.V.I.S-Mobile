@@ -28,9 +28,26 @@ const SUGGESTIONS = ['system status', 'open browser', 'take screenshot', 'list f
 const KEYBOARD_MS = 220;
 const KEYBOARD_EASE = Easing.out(Easing.quad);
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A time for today's turns, a date and time for anything older.
+ *
+ * A bare `14:32` is unambiguous only while the log dies with the app. Once it
+ * survives a restart, the same string could be from any day, so the date has to
+ * appear — but only where it carries information: stamping today's turns with
+ * today's date is noise on every line.
+ */
 const clock = (at: number): string => {
   const d = new Date(at);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const now = new Date();
+  const sameDay =
+    d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  if (sameDay) return time;
+  const stamp = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  // the year only when it is not this one — it is almost never the useful part
+  return d.getFullYear() === now.getFullYear() ? `${stamp}, ${time}` : `${stamp} ${d.getFullYear()}, ${time}`;
 };
 
 /**
