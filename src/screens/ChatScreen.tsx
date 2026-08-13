@@ -14,6 +14,9 @@ import { Glass } from '../components/ui/Glass';
 import { useToast } from '../components/ui/Toast';
 import { CHROME, COLOR, RADIUS, SCRIM, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
+import { useAudioRecorder } from 'expo-audio';
+import { MIN_CLIP_MS, RECORDING, prepareToRecord, readClip } from '../lib/voice';
+import { haptic } from '../lib/haptics';
 import { useJarvis } from '../state/JarvisProvider';
 import type { ChatEntry } from '../state/hudReducer';
 import type { CommandsStackParams } from '../navigation/types';
@@ -66,7 +69,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, connected, markChatRead, setChatFocused } = useJarvis();
+  const { hud, sendCommand, sendVoice, connected, markChatRead, setChatFocused } = useJarvis();
 
   /**
    * On screen means read, and means no notification.
@@ -124,6 +127,73 @@ export function ChatScreen() {
   const send = (text: string) => {
     void sendCommand(text).catch(() => {});
     if (!connected) toast.show('No link — answered locally', 'bad');
+  };
+
+  /**
+   * Hold the mic to record, release to send.
+   *
+   * Tap-to-start/tap-to-stop was the alternative and is worse here: a recording
+   * left running because the second tap missed is a live microphone the user
+   * thinks is off. A press that ends when the finger lifts cannot be left on.
+   *
+   * The clip goes as a base64 envelope and nothing is written to the chat — the
+   * gateway transcribes it and sends the transcript back as its own frame, which
+   * the reducer logs as *him* speaking. A local placeholder turn would put the
+   * same sentence in the log twice.
+   */
+  const recorder = useAudioRecorder(RECORDING);
+  const [recording, setRecording] = useState(false);
+  const startedAt = useRef(0);
+
+  const startRecording = async () => {
+    if (!connected) {
+      toast.show('No link — nothing to transcribe the clip', 'bad');
+      return;
+    }
+    if (!(await prepareToRecord())) {
+      toast.show('Microphone permission is off', 'bad');
+      return;
+    }
+    try {
+      await recorder.prepareToRecordAsync(RECORDING);
+      recorder.record();
+      startedAt.current = Date.now();
+      setRecording(true);
+      haptic.tap();
+    } catch {
+      toast.show('Could not start recording', 'bad');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    setRecording(false);
+    const held = Date.now() - startedAt.current;
+    try {
+      await recorder.stop();
+    } catch {
+      toast.show('Could not finish the recording', 'bad');
+      return;
+    }
+    // a tap that arrived as a press produces a few hundred ms of room noise, and
+    // Whisper answers that with either nothing or an invented sentence
+    if (held < MIN_CLIP_MS) {
+      toast.show('Hold the mic to speak', 'bad');
+      return;
+    }
+    const uri = recorder.uri;
+    if (!uri) {
+      toast.show('The recording came back empty', 'bad');
+      return;
+    }
+    const clip = await readClip(uri);
+    if (!clip) {
+      toast.show('Could not read the recording', 'bad');
+      return;
+    }
+    const sent = await sendVoice(clip);
+    if (sent) haptic.good();
+    else toast.show('No link — the clip was not sent', 'bad');
   };
 
   // iOS lifts the whole view itself, so only Android pays the keyboard height
@@ -212,10 +282,12 @@ export function ChatScreen() {
 
         <Glass radius={0} sheen style={[styles.composer, composerStyle]}>
           <CommandBar
-            placeholder="Message Jarvis…"
+            placeholder={recording ? 'Listening — release to send' : 'Message Jarvis…'}
             leadingIcon="sparkles"
             onSubmit={send}
-            onVoice={() => toast.show('Voice is not wired up yet')}
+            onVoiceStart={() => void startRecording()}
+            onVoiceEnd={() => void stopRecording()}
+            listening={recording}
           />
         </Glass>
       </KeyboardAvoidingView>

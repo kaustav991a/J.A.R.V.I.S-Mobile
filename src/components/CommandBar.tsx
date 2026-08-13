@@ -6,8 +6,18 @@ import { MicIcon } from './MicIcon';
 
 export type CommandBarProps = {
   onSubmit: (text: string) => void;
-  /** tapping the mic. Voice capture itself is not wired up yet. */
+  /** tapping the mic, where there is nothing to hold — e.g. a screen with no recorder */
   onVoice?: () => void;
+  /**
+   * Hold to record, release to send.
+   *
+   * A press pair rather than a tap toggle: a recording left running because the
+   * second tap missed is a live microphone the user believes is off. A press that
+   * ends when the finger lifts cannot be left on. When these are given, `onVoice`
+   * is ignored.
+   */
+  onVoiceStart?: () => void;
+  onVoiceEnd?: () => void;
   /** tints the mic and lights its capsule while capture is running */
   listening?: boolean;
   disabled?: boolean;
@@ -19,6 +29,8 @@ export type CommandBarProps = {
 export function CommandBar({
   onSubmit,
   onVoice,
+  onVoiceStart,
+  onVoiceEnd,
   listening = false,
   disabled = false,
   placeholder = 'Speak or type…',
@@ -26,6 +38,7 @@ export function CommandBar({
 }: CommandBarProps) {
   const [text, setText] = useState('');
   const hasText = text.trim().length > 0;
+  const holdToTalk = Boolean(onVoiceStart && onVoiceEnd);
 
   const submit = () => {
     const trimmed = text.trim();
@@ -62,8 +75,12 @@ export function CommandBar({
       <Pressable
         testID="command-voice"
         accessibilityRole="button"
-        accessibilityLabel="Voice command"
-        onPress={onVoice}
+        accessibilityLabel={holdToTalk ? 'Hold to speak' : 'Voice command'}
+        // `onPressOut` fires when the finger lifts *or* leaves the button, so a
+        // drag away still ends the recording rather than leaving the mic live
+        onPressIn={holdToTalk ? onVoiceStart : undefined}
+        onPressOut={holdToTalk ? onVoiceEnd : undefined}
+        onPress={holdToTalk ? undefined : onVoice}
         disabled={disabled}
         hitSlop={10}
         style={[styles.mic, listening && { borderColor: COLOR.green }, listening && glowBox(COLOR.green, 10)]}

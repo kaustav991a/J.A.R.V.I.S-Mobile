@@ -21,7 +21,9 @@
       },
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize",
-      "permissions": ["android.permission.POST_NOTIFICATIONS"],
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -56,7 +58,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#3ea6ff"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "extra": {
       "eas": {

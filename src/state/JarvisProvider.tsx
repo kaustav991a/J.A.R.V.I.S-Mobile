@@ -53,6 +53,8 @@ export type JarvisContextValue = {
   disconnect: () => void;
   /** send a text command; falls back to REST when the socket is not open */
   sendCommand: (text: string) => Promise<void>;
+  /** send a recorded clip; the far end transcribes it and answers */
+  sendVoice: (clip: { base64: string; format: string }) => Promise<boolean>;
   /** allow or deny a parked agent action */
   decide: (id: string, approved: boolean) => Promise<void>;
   /**
@@ -250,6 +252,24 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       await api.backdoor(trimmed);
     },
     [api, link, demo, connected]
+  );
+
+  /**
+   * Send a recorded clip for the far end to transcribe and answer.
+   *
+   * Nothing is written to the chat here. The transcript comes back as its own
+   * frame and is logged as *him* speaking — writing a local "…" turn as well
+   * would put the same utterance in the log twice, once as a placeholder that
+   * never resolves.
+   */
+  const sendVoice = useCallback(
+    async (clip: { base64: string; format: string }) => {
+      const envelope = JSON.stringify({ type: 'voice', format: clip.format, audio: clip.base64 });
+      // the socket is the only route: there is no REST endpoint that transcribes,
+      // and a clip queued for a dead link would arrive answering nothing
+      return link.send(envelope);
+    },
+    [link]
   );
 
   const decide = useCallback(
@@ -564,6 +584,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       connect,
       disconnect,
       sendCommand,
+      sendVoice,
       decide,
       answerWatch,
       expireWatch,
