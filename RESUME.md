@@ -5,6 +5,72 @@ Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 a
 
 ---
 
+## START HERE on a fresh machine — 2026-08-14, evening
+
+Two repos, both pushed. Clone them **side by side**, because the docs cross-refer:
+
+```bash
+git clone -b feat/mobile-hud     https://github.com/kaustav991a/J.A.R.V.I.S-Mobile.git jarvis-mobile
+git clone -b feat/cloud-gateway  https://github.com/kaustav991a/J.A.R.V.I.S.git        jarvis-brain
+cd jarvis-mobile && npm install
+```
+
+The gateway is **already deployed and live** on Render from `feat/cloud-gateway`, so
+nothing needs running locally for the phone to work — only `npx expo start -c` if you
+want to change the app.
+
+### What is live right now
+
+| Thing | State |
+| --- | --- |
+| Cloud brain | deployed, `/health` reports everything below |
+| Persistent memory | Supabase (ap-south-1), `memory.ready: true` |
+| Facts about him | 12 stored, `facts_known: 12`, survive restarts |
+| Text brain | Groq `llama-3.3-70b-versatile` |
+| Vision + voice | Gemini `gemini-3.5-flash` |
+| Phone build on device | **debug** APK — needs Metro on the machine that built it |
+
+Check state with one call, which is the fastest way to know where you are:
+
+```bash
+curl -s https://jarvis-cloud-gateway.onrender.com/health | python -m json.tool
+```
+
+Read `brains.usage` for whether Gemini is answering or falling back to Groq, and
+`memory` for whether anything is being remembered.
+
+### Env that must exist on Render (values are in the dashboard, not here)
+
+`APP_TOKEN`, `BRIDGE_SECRET`, `GROQ_API_KEYS`, `GEMINI_API_KEYS`, `DATABASE_URL`,
+`TAVILY_API_KEY`, `PUBLIC_URL`, `LLM_PROVIDER_VISION=gemini`,
+`LLM_PROVIDER_AUDIO=gemini`.
+
+### The three things to do first
+
+1. **Rotate `APP_TOKEN` and `BRIDGE_SECRET`.** Both passed through a chat transcript
+   or Render's access log today. Rotating `APP_TOKEN` means re-pairing the phone
+   (Connection → PAIRING TOKEN); the facts and history are in Supabase and survive it.
+2. **Test the microphone.** `brains.usage.audio` is still `0`. It is the original
+   complaint and holds the last unverified guess: the phone records m4a and Google
+   documents `audio/aac` but not `audio/mp4`. A `fell_back` with
+   `last_error_was_quota: false` means the mime type is wrong — a one-line fix.
+3. **Bring the desk up once.** `has_desk_key: false`, and 39 cloud turns were already
+   sealed and dropped for want of its public key. The sync machinery is complete on
+   both sides; it needs one handshake.
+
+### For a build you can carry
+
+Today's APK is `assembleDebug`, which does **not** embed the JS bundle — it loads
+from Metro over the network and will not run away from this machine. For a standalone
+one: `cd android && ./gradlew assembleRelease` (release signs with the debug keystore,
+so it builds locally), or `eas build -p android --profile preview`.
+
+**After any `prebuild --clean`, restore `android/local.properties` and the 6144m
+jvmargs in `android/gradle.properties`.** Prebuild resets jvmargs to 2048m and that
+is documented here because it has cost time twice.
+
+---
+
 ## Resume point — 2026-08-14: the question now says when and where
 
 **Not pushed. Not yet on a phone.** 410 tests, `tsc --noEmit` clean. Nothing

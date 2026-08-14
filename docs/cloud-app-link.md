@@ -95,6 +95,85 @@ async def app_link(websocket: WebSocket):
         print("[CLOUD] app-link closed", flush=True)
 ```
 
+## The photo frame (added 2026-08-14)
+
+```json
+{"type": "photo", "image": "<base64 JPEG, no data-URI prefix>", "text": "<caption, may be empty>"}
+```
+
+Answered by `see()`, which already existed for Telegram photos and shares
+`think()`'s rolling memory — so "what is this" about the picture and the turn
+after it are one conversation. Handled **before** the desk hand-off and never
+forwarded: the vision model is on the cloud side and the desk has no route that
+takes an image.
+
+The phone shrinks to 1280px on the long edge at quality 0.65, which is the whole
+reason this works. An unshrunk 12MP capture is ~4 MB, ~5.5 MB once base64 has
+added its third, and it travels as a single WebSocket text frame — big enough to
+bounce off a frame limit or to sit on a mobile uplink until the socket is dropped
+under it.
+
+## `POST /app-say` — J.A.R.V.I.S. speaking first (added 2026-08-14)
+
+```
+POST /app-say
+Authorization: Bearer <APP_TOKEN>
+{"message": "The 8am briefing found rain. Take an umbrella.", "title": "J.A.R.V.I.S."}
+```
+
+Delivers to attached phones as a `speaking` frame, and pushes **only** when none
+are attached — a listening phone told twice for one event is something you feel in
+your pocket. The message is written into the same rolling history as a normal turn,
+because an unprompted line the model cannot remember saying makes the next turn
+incoherent: "what did you mean by that" would be answered by a brain that never
+said it.
+
+Gated by `APP_TOKEN` because it writes into the conversation *as the assistant*. An
+open version lets anyone put words in its mouth, which is worse than letting them
+read.
+
+Deliberately dumb — it delivers what it is given and does not think about it. A
+caller wanting a considered message asks the brain first and posts the answer. That
+way a scheduled reminder costs no LLM call and cannot fail on an exhausted quota.
+
+The phone needs nothing for this: `hudReducer` already logs a `speaking` frame as a
+J.A.R.V.I.S. turn and raises a notification unless the chat is on screen.
+
+## `POST /app-fact` — what it knows about him
+
+```
+POST /app-fact          Authorization: Bearer <APP_TOKEN>
+{"fact": "Kaustav lives in Ichapur, West Bengal"}   -> add
+{"forget": "…"}                                     -> remove
+{}                                                  -> list
+```
+
+Every response returns the full list, plus `persistent` — false when the gateway has
+no `DATABASE_URL` and the facts die with its next restart. `stored` on an add says
+the same thing for that one write. Surfaced rather than hidden: telling someone their
+assistant will remember something when it will not is worse than admitting it cannot.
+
+These are **not** chat history. A turn history scrolls away in `CLOUD_MAX_TURNS`
+messages; facts go into the system prompt on every turn, which is what makes a
+question about his dog answerable a week later. That is also why the route is gated:
+anything that can write here decides what is true about the operator.
+
+Capped at 60 — it is a page about a person, not a log.
+
+The model writes them itself with `[[REMEMBER: …]]`, naming him rather than saying
+"he": several people appear in the store, so a pronoun stops being unambiguous, and
+first or second person inside a system prompt reads as being about the assistant.
+
+The phone's **Settings → Memory** screen is a view onto this route.
+
+## `[[LOOKUP: …]]` — the model asking for a search
+
+Not a wire frame; it never leaves the gateway. The model ends a reply with the
+marker, `think()` runs the search and asks again with the results, and the marker is
+stripped from whatever is finally returned. It exists because the keyword gate that
+decides whether to search pre-emptively missed `"what's"` while holding `"what is"`,
+and the model, left with nothing, promised a lookup it could not perform.
+
 ## What that gets you, and what it does not
 
 Working immediately: the phone finds the gateway, connects, and every command

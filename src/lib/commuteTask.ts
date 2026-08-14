@@ -9,6 +9,7 @@ import {
   loadCommute,
   markBriefed,
 } from './commute';
+import { hourLabel } from './commute';
 import type { Departure } from './commute';
 import { currentFix, hasLocation, loadShareLocation } from './place';
 import { loadKnown } from './knownPlaces';
@@ -150,12 +151,25 @@ export async function previewBriefing(placeId: string): Promise<string | null> {
   if (!at) return `Set ${departure.label} on this screen first, or turn on location sharing`;
 
   const briefing = await commuteBriefing(at.lat, at.lon, departure);
-  if (!briefing) return 'Nothing worth warning about in that window';
+  /**
+   * A preview always posts, even when there is nothing to warn about.
+   *
+   * The scheduled briefing is right to stay silent — a notification every morning
+   * saying "it's fine" is one you stop reading. A *preview* is the opposite: it is
+   * pressed to find out whether any of this works, and answering it with a toast
+   * that fades in three seconds is how "I pressed preview and got nothing" came to
+   * mean both "it is broken" and "there was nothing to say". Those need to look
+   * different, and only the notification path proves the channel, the permission
+   * and the delivery all the way through.
+   */
   await postNow({
-    title: briefing.title,
-    body: briefing.body,
+    title: briefing ? briefing.title : `Nothing to report for ${departure.label}`,
+    body:
+      briefing?.body ??
+      `No rain, heat or wind worth mentioning between ${hourLabel(departure.hour)} and ` +
+        `${hourLabel((departure.hour + 3) % 24)}. A real briefing would have stayed quiet.`,
     channel: GENERAL_CHANNEL,
-    data: { kind: 'commute', placeId: departure.placeId },
+    data: { kind: 'commute', placeId: departure.placeId, preview: true },
   });
   return null;
 }
