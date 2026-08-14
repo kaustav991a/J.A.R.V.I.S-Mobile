@@ -12,10 +12,10 @@ import { WatchAlertScreen } from './src/screens/WatchAlertScreen';
 import { AuthProvider, useAuth } from './src/security/AuthProvider';
 import { ReactorHandoffProvider } from './src/components/ReactorHandoff';
 import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
-// imported for its side effect: the task has to be defined before the OS can hand
-// work back to a process it just woke, which is before any component mounts
-import { setCommuteTask } from './src/lib/commuteTask';
-import { loadCommute } from './src/lib/commute';
+// Also imported for its side effect: the task has to be *defined* before the OS
+// can hand work back to a process it just woke, which is before any component
+// mounts. Registering it is the separate job the effect below does.
+import { syncCommuteTask } from './src/lib/commuteTask';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { BlurTargetProvider } from './src/components/ui/Glass';
@@ -115,6 +115,19 @@ export default function App() {
       // handshake so the desk gets it directly rather than via a copy-paste.
       console.log(`[jarvis] notifications granted=${granted} push=${pushToken ? 'ok' : 'none'}`);
     });
+  }, [launching]);
+
+  /**
+   * Re-register the briefing at every launch, from the stored setting.
+   *
+   * `setCommuteTask` was imported here and never called, so the switch on the
+   * Places screen was the only thing that ever registered the task. Why that is
+   * not enough is written at `syncCommuteTask`. Deferred with the rest: it is a
+   * native round trip, and the launch animation has already been starved once.
+   */
+  useEffect(() => {
+    if (launching) return;
+    void syncCommuteTask();
   }, [launching]);
 
   /**

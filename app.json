@@ -22,7 +22,8 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -60,7 +61,14 @@
         }
       ],
       "expo-audio",
-      "expo-background-task"
+      "expo-background-task",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow JARVIS to take a photo to look at.",
+          "photosPermission": "Allow JARVIS to open a photo for you to send."
+        }
+      ]
     ],
     "extra": {
       "eas": {

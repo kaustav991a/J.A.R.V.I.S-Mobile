@@ -120,4 +120,24 @@ describe('RootNavigator', () => {
     fireEvent.press(await findByTestId('home-menu'));
     expect(await findByTestId('quick-menu')).toBeTruthy();
   });
+
+  it('puts Home in the MIDDLE of the five, not at the left end', async () => {
+    /**
+     * A deliberate arrangement, and one a refactor could silently undo by
+     * reordering JSX children. Home is the screen you come back to, so it belongs
+     * under the thumb rather than in a corner — and a dial whose resting position
+     * is at one end can only be travelled in one direction. Chat sits beside it
+     * because it is opened most.
+     */
+    const { findByTestId, getAllByTestId } = await mount();
+    await findByTestId('home-screen');
+    // `tab-bar` is the container these sit in, and matches the same prefix
+    const order = getAllByTestId(/^tab-/)
+      .map((n) => String(n.props.testID))
+      .filter((id) => id !== 'tab-bar');
+    expect(order).toEqual(['tab-Scripts', 'tab-Chat', 'tab-Home', 'tab-Reports', 'tab-Settings']);
+    // and it is still what the app opens on, which needs initialRouteName now
+    // that Home is no longer the first child
+    expect(order[2]).toBe('tab-Home');
+  });
 });

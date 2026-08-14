@@ -85,9 +85,16 @@ export function SettingsScreen() {
         <SettingsRow
           testID="settings-places"
           icon="map-outline"
-          title="Places and morning briefing"
-          subtitle="Name home and the office, and get told to take an umbrella"
+          title="Places and leaving times"
+          subtitle="Name home and the office, set when you leave each, take an umbrella"
           onPress={() => nav.navigate('Places')}
+        />
+        <SettingsRow
+          testID="settings-memory"
+          icon="bookmark-outline"
+          title="Memory"
+          subtitle="What he knows about you — read it, add to it, take things back"
+          onPress={() => nav.navigate('Memory')}
           last
         />
       </View>

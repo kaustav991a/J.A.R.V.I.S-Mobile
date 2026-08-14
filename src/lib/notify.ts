@@ -27,7 +27,12 @@ import { Platform } from 'react-native';
  */
 export const WATCH_CHANNEL = 'desk-watch-v2';
 const LEGACY_WATCH_CHANNEL = 'desk-watch';
-export const GENERAL_CHANNEL = 'general';
+/**
+ * `-v2` because the original was silent and a channel cannot be un-silenced.
+ * See the comment where it is created.
+ */
+export const GENERAL_CHANNEL = 'general-v2';
+const LEGACY_GENERAL_CHANNEL = 'general';
 
 /** the actionable category, so an alert can be answered from the shade */
 export const WATCH_CATEGORY = 'desk-watch-alert';
@@ -100,10 +105,44 @@ export async function prepare(): Promise<boolean> {
       } catch {
         // never created on this install, which is the state we wanted anyway
       }
+      /**
+       * The everyday channel — briefings, replies — and it was mute.
+       *
+       * `importance: DEFAULT` alone is not enough. Proved on device: a preview
+       * briefing posted as
+       *
+       *     channel=general flags=AUTO_CANCEL|SILENT vibrate=null sound=null
+       *
+       * so the leaving briefing had been arriving correctly, silently, into a shade
+       * nobody had reason to look at. It read exactly like the feature not working.
+       *
+       * A channel needs to be *told* to make noise; a bare importance leaves the
+       * pattern and the sound null and Android honours that. So both are named here,
+       * which is the same treatment the watch channel already had — and the reason
+       * that one buzzed while this one never did.
+       *
+       * **`general-v2`, not `general`.** Android freezes importance, vibration and
+       * light when a channel is created, so editing the old one changes nothing on
+       * an install that already has it. Every phone that ever ran this app has a
+       * silent `general`, and only a new id can escape it.
+       */
       await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL, {
-        name: 'General',
+        name: 'J.A.R.V.I.S.',
         importance: Notifications.AndroidImportance.DEFAULT,
+        // shorter and softer than the watch pattern: this is "look at me when you
+        // get a moment", not "a machine is about to lock"
+        vibrationPattern: [0, 220],
+        enableVibrate: true,
+        sound: 'default',
+        lightColor: '#3ea6ff',
       });
+      // the silent original, removed so it stops appearing in the user's
+      // notification settings for a channel nothing posts to any more
+      try {
+        await Notifications.deleteNotificationChannelAsync(LEGACY_GENERAL_CHANNEL);
+      } catch {
+        // absent on a fresh install, which is the state we wanted anyway
+      }
     }
 
     /**

@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { COLOR, SPACE, TYPE, glowBox } from '../theme/tokens';
 import { MicIcon } from './MicIcon';
+import { Touchable } from './ui/Touchable';
 import { VoiceBar } from './VoiceBar';
 import { CANCEL_SLIDE_PX, LOCK_SLIDE_PX } from '../lib/voice';
 
@@ -43,6 +44,11 @@ export type CommandBarProps = {
   placeholder?: string;
   /** optional glyph before the field, e.g. the sparkle on the Home tab */
   leadingIcon?: keyof typeof Ionicons.glyphMap;
+  /**
+   * Offer a camera in place of the leading glyph. Absent on screens that have
+   * nothing to do with photos, which is most of them.
+   */
+  onCamera?: () => void;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -58,6 +64,7 @@ export function CommandBar({
   disabled = false,
   placeholder = 'Speak or type…',
   leadingIcon,
+  onCamera,
 }: CommandBarProps) {
   const [text, setText] = useState('');
   const hasText = text.trim().length > 0;
@@ -150,7 +157,24 @@ export function CommandBar({
         />
       ) : (
         <View key="middle" style={styles.typing}>
-          {leadingIcon ? <Ionicons name={leadingIcon} size={17} color={COLOR.blue} /> : null}
+          {/* The camera takes the leading glyph's place rather than adding a
+              fourth thing to the row: a bar with an icon, a field, a camera and a
+              mic has no room left for the field, which is what people came for.
+              Screens that pass no `onCamera` keep the plain sparkle. */}
+          {onCamera ? (
+            <Touchable
+              testID="command-camera"
+              accessibilityRole="button"
+              accessibilityLabel="Send a photo"
+              hitSlop={10}
+              disabled={disabled}
+              onPress={onCamera}
+            >
+              <Ionicons name="camera-outline" size={19} color={COLOR.blue} />
+            </Touchable>
+          ) : leadingIcon ? (
+            <Ionicons name={leadingIcon} size={17} color={COLOR.blue} />
+          ) : null}
           <TextInput
             testID="command-input"
             style={styles.input}

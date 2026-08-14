@@ -19,6 +19,7 @@ import { MIN_CLIP_MS, RECORDING, meterLevel, prepareToRecord, readClip } from '.
 import { haptic } from '../lib/haptics';
 import { useAuth } from '../security/AuthProvider';
 import { useJarvis } from '../state/JarvisProvider';
+import { takeShot } from '../lib/vision';
 import type { ChatEntry } from '../state/hudReducer';
 import type { CommandsStackParams } from '../navigation/types';
 
@@ -38,6 +39,15 @@ const CANCEL_SLIDE_PX = 96;
 const KEYBOARD_MS = 220;
 const KEYBOARD_EASE = Easing.out(Easing.quad);
 
+/**
+ * How long the dots wait before admitting nothing is coming.
+ *
+ * Past a cold start on Render's free tier — which spins down after fifteen minutes
+ * idle and costs the better part of a minute on the next request — and well past
+ * inference on top of it.
+ */
+const REPLY_TIMEOUT_MS = 120_000;
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 /**
@@ -50,15 +60,42 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
  */
 const clock = (at: number): string => {
   const d = new Date(at);
-  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const now = new Date();
-  const sameDay =
-    d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  if (sameDay) return time;
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+/** which calendar day a turn belongs to, for grouping */
+const dayOf = (at: number): string => {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+
+/**
+ * The heading over a day's turns.
+ *
+ * Every line used to carry its own date once the log outlived the app, which put
+ * `12 Aug, 14:32` on twenty consecutive lines from the same afternoon. A date is
+ * information the first time a day changes and noise every time after, so it
+ * moved to a rule between the days and the lines went back to a bare time.
+ *
+ * Named while a name is more use than a number: yesterday and last Tuesday are how
+ * people hold recent days, and a date is only easier once the day has stopped being
+ * recent.
+ */
+export function dayHeading(at: number, now: Date = new Date()): string {
+  const d = new Date(at);
+  const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const daysBack = Math.round((midnight(now) - midnight(d)) / 86_400_000);
+  if (daysBack <= 0) return 'Today';
+  if (daysBack === 1) return 'Yesterday';
+  // inside a week the weekday alone places it; beyond that it stops being useful,
+  // because "Tuesday" could be any Tuesday
+  if (daysBack < 7) return WEEKDAYS[d.getDay()];
   const stamp = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
   // the year only when it is not this one — it is almost never the useful part
-  return d.getFullYear() === now.getFullYear() ? `${stamp}, ${time}` : `${stamp} ${d.getFullYear()}, ${time}`;
-};
+  return d.getFullYear() === now.getFullYear() ? stamp : `${stamp} ${d.getFullYear()}`;
+}
 
 /**
  * The conversation, both directions, as it happens.
@@ -76,7 +113,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, sendVoice, connected, markChatRead, setChatFocused } = useJarvis();
+  const { hud, sendCommand, sendVoice, sendPhoto, connected, markChatRead, setChatFocused } = useJarvis();
 
   /**
    * On screen means read, and means no notification.
@@ -104,6 +141,38 @@ export function ChatScreen() {
   // newest first, because the list is inverted
   const turns = [...hud.chat].reverse();
   const thinking = hud.status === 'thinking' || hud.status === 'agent';
+
+  /**
+   * Waiting on a reply we have asked for, whatever the far end has said about it.
+   *
+   * Cleared by the answer arriving rather than by a timer: the newest turn being
+   * his is the only thing that actually means the wait is over. A voice clip
+   * clears it too, since its transcript comes back as a turn.
+   */
+  const [pending, setPending] = useState(false);
+  const newest = turns[0];
+  useEffect(() => {
+    if (newest?.from === 'jarvis') setPending(false);
+  }, [newest]);
+
+  /**
+   * Give up eventually, and say so.
+   *
+   * Dots that never stop are a worse lie than no dots: they claim an answer is
+   * coming from a socket that may have dropped without anyone noticing. Two
+   * minutes is past a cold start on Render's free tier and well past inference, so
+   * anything still outstanding is not on its way.
+   */
+  useEffect(() => {
+    if (!pending) return;
+    const giveUp = setTimeout(() => {
+      setPending(false);
+      toast.show('No reply — the brain may be asleep', 'bad');
+    }, REPLY_TIMEOUT_MS);
+    return () => clearTimeout(giveUp);
+  }, [pending, toast]);
+
+  const waiting = thinking || pending;
 
   useEffect(() => {
     if (turns.length) list.current?.scrollToOffset({ offset: 0, animated: true });
@@ -133,8 +202,51 @@ export function ChatScreen() {
   const typing = keyboardHeight > 0;
 
   const send = (text: string) => {
+    // Dots from the moment it is sent, not from the moment the far end admits it
+    // is working. Render's free tier spins down after fifteen minutes idle, so the
+    // first message of an evening waits the better part of a minute before any
+    // `thinking` frame arrives — and a chat that shows nothing at all in that gap
+    // reads as a message that was never delivered.
+    setPending(true);
     void sendCommand(text).catch(() => {});
     if (!connected) toast.show('No link — answered locally', 'bad');
+  };
+
+  /**
+   * Take a photo and send it for J.A.R.V.I.S. to look at.
+   *
+   * `holdGate` around the whole thing, for the reason the microphone needed it: the
+   * app-lock gate treats any departure as the phone leaving your hand, and the
+   * camera is a full-screen system activity — without this, opening the camera
+   * raised a fingerprint prompt over it, and coming back raised another.
+   *
+   * There is no separate caption step. A photo is usually the question, and asking
+   * someone to type before they can send one is a step they will not take; the
+   * caption is whatever was already in the field, if anything.
+   */
+  const sendShot = async () => {
+    // Deliberately no pre-flight link check. There was one, and it refused before
+    // the camera had even opened — which is the wrong call twice over: the link is
+    // usually about to come back, and the camera itself is what takes it away, so
+    // the state before is not the state that matters. `sendPhoto` waits instead.
+    holdGate(true);
+    const result = await takeShot('camera');
+    holdGate(false);
+    if (!result.ok) {
+      // changing your mind is not a failure and gets no toast
+      if (!result.cancelled) toast.show(result.problem, 'bad');
+      return;
+    }
+    const sent = await sendPhoto(result.shot, '');
+    if (sent) {
+      setPending(true);
+      haptic.good();
+    } else {
+      // Named distinctly from every other failure on this screen. Both photo
+      // failures used to say "No link", so a report of "it says no link" could not
+      // say which had happened — and that cost a diagnosis.
+      toast.show('Photo not sent — the link never came back', 'bad');
+    }
   };
 
   /**
@@ -279,8 +391,11 @@ export function ChatScreen() {
       return;
     }
     const sent = await sendVoice(clip);
-    if (sent) haptic.good();
-    else toast.show('No link — the clip was not sent', 'bad');
+    if (sent) {
+      // the transcript comes back as a turn, so the same wait applies
+      setPending(true);
+      haptic.good();
+    } else toast.show('No link — the clip was not sent', 'bad');
   };
 
   /**
@@ -369,12 +484,28 @@ export function ChatScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={thinking ? <Typing accent={accent} /> : null}
+            ListHeaderComponent={waiting ? <Typing accent={accent} /> : null}
             // No tap target. A reply used to open the Command Result terminal
             // view, which reads as a mis-tap: a chat bubble that navigates away is
             // not what a chat bubble does, and the terminal framing suits a run's
             // output rather than something J.A.R.V.I.S. said.
-            renderItem={({ item }) => <Bubble entry={item} accent={accent} />}
+            renderItem={({ item, index }) => (
+              <>
+                <Bubble entry={item} accent={accent} />
+                {/* The rule goes on the *oldest* turn of each day — a later index
+                    is an older turn, so the boundary is where the next index is a
+                    different day.
+
+                    It is the LAST child, which looks backwards and is not. An
+                    inverted list flips each cell as well as their order, so a
+                    cell's children are laid out top-to-bottom and then turned
+                    over: the last child is the one that ends up on top. Written
+                    first, the heading rendered *underneath* the day it introduced. */}
+                {index === turns.length - 1 || dayOf(turns[index + 1].at) !== dayOf(item.at) ? (
+                  <DayRule at={item.at} />
+                ) : null}
+              </>
+            )}
           />
         )}
 
@@ -382,6 +513,7 @@ export function ChatScreen() {
           <CommandBar
             placeholder="Message Jarvis…"
             leadingIcon="sparkles"
+            onCamera={() => void sendShot()}
             onSubmit={send}
             onVoiceStart={() => void startRecording()}
             onVoiceEnd={onRelease}
@@ -432,6 +564,22 @@ function Bubble({ entry, accent, onPress }: { entry: ChatEntry; accent: string; 
   );
 }
 
+/**
+ * A rule with the day's name in it, between one day's turns and the next.
+ *
+ * A line rather than a floating label: the point is to say the conversation
+ * stopped and started again, and a rule is what a break looks like.
+ */
+function DayRule({ at }: { at: number }) {
+  return (
+    <View style={styles.dayRule} testID={`chat-day-${dayOf(at)}`}>
+      <View style={styles.dayLine} />
+      <Text style={styles.dayLabel}>{dayHeading(at)}</Text>
+      <View style={styles.dayLine} />
+    </View>
+  );
+}
+
 /** three dots while the desk is working, so a slow answer never looks dropped */
 function Typing({ accent }: { accent: string }) {
   return (
@@ -474,6 +622,16 @@ const styles = StyleSheet.create({
   text: { ...TYPE.meta, fontSize: 13, lineHeight: 20, color: COLOR.white },
   textMine: { color: COLOR.white },
   time: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.dim, marginTop: 4, letterSpacing: 1 },
+  dayRule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.md,
+    alignSelf: 'stretch',
+    marginTop: SPACE.lg,
+    marginBottom: SPACE.md,
+  },
+  dayLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: COLOR.line },
+  dayLabel: { ...TYPE.dataLabel, fontSize: 10, color: COLOR.dim, letterSpacing: 1.5 },
   typing: { flexDirection: 'row', gap: 5, paddingVertical: SPACE.md + 2 },
   typingDot: { width: 6, height: 6, borderRadius: 3 },
   composer: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm },

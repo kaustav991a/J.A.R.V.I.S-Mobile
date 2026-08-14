@@ -39,6 +39,8 @@ export type SettingsStackParams = {
   Appearance: undefined;
   Security: undefined;
   Places: undefined;
+  /** what the cloud brain holds as true about him, and the way to correct it */
+  Memory: undefined;
   About: undefined;
 };
 

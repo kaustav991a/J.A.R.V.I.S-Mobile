@@ -13,8 +13,16 @@ import { useJarvis } from '../state/JarvisProvider';
 import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
-import { DEFAULT_COMMUTE, loadCommute, saveCommute } from '../lib/commute';
-import type { CommuteSettings } from '../lib/commute';
+import {
+  DAY_INITIALS,
+  DAY_NAMES,
+  DEFAULT_COMMUTE,
+  clockLabel,
+  hourLabel,
+  loadCommute,
+  saveCommute,
+} from '../lib/commute';
+import type { CommuteSettings, Departure } from '../lib/commute';
 import { commuteTaskAvailable, previewBriefing, setCommuteTask } from '../lib/commuteTask';
 import { haptic } from '../lib/haptics';
 
@@ -69,16 +77,26 @@ export function PlacesScreen() {
   const persist = async (next: CommuteSettings) => {
     setCommute(next);
     await saveCommute(next);
-    await setCommuteTask(next.on);
+    // one registration serves both departures; the task decides which is due
+    await setCommuteTask(next.departures.some((d) => d.on));
   };
 
-  const shift = (field: 'hour' | 'minute', by: number) => {
+  const setDeparture = (placeId: string, patch: Partial<Departure>) =>
+    persist({
+      ...commute,
+      departures: commute.departures.map((d) => (d.placeId === placeId ? { ...d, ...patch } : d)),
+    });
+
+  const shift = (placeId: string, field: 'hour' | 'minute', by: number) => {
+    const d = commute.departures.find((x) => x.placeId === placeId);
+    if (!d) return;
     const wrap = field === 'hour' ? 24 : 60;
     const step = field === 'minute' ? by * 15 : by;
-    void persist({ ...commute, [field]: (commute[field] + step + wrap) % wrap });
+    void setDeparture(placeId, { [field]: (d[field] + step + wrap) % wrap });
   };
 
-  const clock = `${String(commute.hour).padStart(2, '0')}:${String(commute.minute).padStart(2, '0')}`;
+  const toggleDay = (index: number) =>
+    persist({ ...commute, days: commute.days.map((on, i) => (i === index ? !on : on)) });
 
   return (
     <Screen testID="places-screen">
@@ -180,61 +198,110 @@ export function PlacesScreen() {
       </View>
 
       <SectionLabel>Before you leave</SectionLabel>
-      <View style={styles.group}>
-        <View style={styles.row}>
-          <Ionicons name="umbrella-outline" size={19} color={commute.on ? accent : COLOR.dim} />
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Morning briefing</Text>
-            <Text style={styles.rowSub}>Rain, heat and wind for your way out</Text>
-          </View>
-          <Switch
-            testID="commute-switch"
-            value={commute.on}
-            onValueChange={(on) => void persist({ ...commute, on })}
-          />
-        </View>
+      {commute.departures.map((d) => {
+        const named = places.some((p) => p.id === d.placeId);
+        return (
+          <View key={d.placeId} style={[styles.group, styles.departure]}>
+            <View style={styles.row}>
+              <Ionicons name="umbrella-outline" size={19} color={d.on ? accent : COLOR.dim} />
+              <View style={styles.rowText}>
+                {/* named, not "Morning briefing": it fires at whatever hour is set,
+                    and calling it morning is half of why an evening time looked
+                    right on the screen that set it */}
+                <Text style={styles.rowTitle}>Leaving {d.label}</Text>
+                <Text style={styles.rowSub}>
+                  {named
+                    ? `Rain, heat and wind at ${d.label}`
+                    : `Set ${d.label} above — otherwise this needs a live fix and will not run in the background`}
+                </Text>
+              </View>
+              <Switch
+                testID={`commute-switch-${d.placeId}`}
+                value={d.on}
+                onValueChange={(on) => void setDeparture(d.placeId, { on })}
+              />
+            </View>
 
-        <View style={styles.row}>
-          <Ionicons name="time-outline" size={19} color={COLOR.dim} />
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Leaving at {clock}</Text>
-            <Text style={styles.rowSub}>The forecast covers this hour and the two after</Text>
-          </View>
-          <View style={styles.steppers}>
-            <Stepper testID="commute-hour" label="hr" onDown={() => shift('hour', -1)} onUp={() => shift('hour', 1)} />
-            <Stepper testID="commute-min" label="min" onDown={() => shift('minute', -1)} onUp={() => shift('minute', 1)} />
-          </View>
-        </View>
+            <View style={styles.row}>
+              <Ionicons name="time-outline" size={19} color={COLOR.dim} />
+              <View style={styles.rowText}>
+                {/* 8 PM was set as 08:00 and every label agreed with it right up
+                    until the briefing did not arrive. The meridiem is the point. */}
+                <Text style={styles.rowTitle} testID={`commute-clock-${d.placeId}`}>
+                  {clockLabel(d.hour, d.minute)}
+                </Text>
+                <Text style={styles.rowSub}>
+                  Forecast covers {hourLabel(d.hour)}–{hourLabel((d.hour + 3) % 24)}
+                </Text>
+              </View>
+              <View style={styles.steppers}>
+                <Stepper
+                  testID={`commute-hour-${d.placeId}`}
+                  label="hr"
+                  onDown={() => shift(d.placeId, 'hour', -1)}
+                  onUp={() => shift(d.placeId, 'hour', 1)}
+                />
+                <Stepper
+                  testID={`commute-min-${d.placeId}`}
+                  label="min"
+                  onDown={() => shift(d.placeId, 'minute', -1)}
+                  onUp={() => shift(d.placeId, 'minute', 1)}
+                />
+              </View>
+            </View>
 
-        <View style={[styles.row, styles.lastRow]}>
-          <Ionicons name="calendar-outline" size={19} color={COLOR.dim} />
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Weekdays only</Text>
-            <Text style={styles.rowSub}>A Sunday umbrella warning is noise</Text>
+            <View style={[styles.row, styles.lastRow]}>
+              <Ionicons name="notifications-outline" size={19} color={COLOR.dim} />
+              <View style={styles.rowText}>
+                <Text style={styles.rowSub}>Send this one now, to see what it says</Text>
+              </View>
+              <Touchable
+                testID={`commute-preview-${d.placeId}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Preview the ${d.label} briefing`}
+                hitSlop={8}
+                onPress={() => {
+                  void previewBriefing(d.placeId).then((problem) => {
+                    if (problem) toast.show(problem, 'bad');
+                  });
+                }}
+              >
+                <Text style={[styles.action, { color: accent }]}>PREVIEW</Text>
+              </Touchable>
+            </View>
           </View>
-          <Switch
-            testID="commute-weekdays"
-            value={commute.weekdaysOnly}
-            onValueChange={(weekdaysOnly) => void persist({ ...commute, weekdaysOnly })}
-          />
-        </View>
+        );
+      })}
+
+      <SectionLabel>On these days</SectionLabel>
+      <View style={styles.days}>
+        {DAY_INITIALS.map((initial, index) => (
+          <Touchable
+            key={DAY_NAMES[index]}
+            testID={`commute-day-${index}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: commute.days[index] }}
+            accessibilityLabel={DAY_NAMES[index]}
+            onPress={() => void toggleDay(index)}
+          >
+            <View
+              style={[
+                styles.day,
+                commute.days[index] ? { backgroundColor: accent, borderColor: accent } : null,
+              ]}
+            >
+              <Text style={[styles.dayText, commute.days[index] ? styles.dayTextOn : null]}>{initial}</Text>
+            </View>
+          </Touchable>
+        ))}
       </View>
-
-      <Button
-        testID="commute-preview"
-        label="PREVIEW THE BRIEFING"
-        variant="ghost"
-        style={styles.preview}
-        onPress={() => {
-          void previewBriefing().then((problem) => {
-            if (problem) toast.show(problem, 'bad');
-          });
-        }}
-      />
+      <Hint testID="commute-days-hint">
+        The weekend is off. Tap Saturday when you are working one — it stays on until you tap it again.
+      </Hint>
 
       <Hint testID="places-hint">
         {bgReady
-          ? 'Android decides when background checks run, so the briefing arrives within about half an hour of your time — not on the dot. Preview sends one now.'
+          ? 'Android decides when background checks run, so a briefing arrives within about half an hour of your time — not on the dot. Preview sends one now.'
           : 'Background work is disabled for this app in Android settings, so the briefing cannot run. Preview still works while the app is open.'}
       </Hint>
     </Screen>
@@ -302,5 +369,18 @@ const styles = StyleSheet.create({
   steppers: { flexDirection: 'row', gap: SPACE.md },
   stepper: { alignItems: 'center' },
   stepperLabel: { ...TYPE.dataLabel, color: COLOR.dim },
-  preview: { marginTop: SPACE.lg },
+  departure: { marginBottom: SPACE.md },
+  days: { flexDirection: 'row', justifyContent: 'space-between' },
+  day: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLOR.line,
+    backgroundColor: COLOR.panel,
+  },
+  dayText: { ...TYPE.dataValue, fontSize: 14, color: COLOR.dim },
+  dayTextOn: { color: COLOR.bg },
 });

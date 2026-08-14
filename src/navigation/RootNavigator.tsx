@@ -20,6 +20,7 @@ import { AppearanceScreen } from '../screens/AppearanceScreen';
 import { AboutScreen } from '../screens/AboutScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
 import { PlacesScreen } from '../screens/PlacesScreen';
+import { MemoryScreen } from '../screens/MemoryScreen';
 import { TABS_ID } from './types';
 import type {
   CommandsStackParams,
@@ -115,6 +116,7 @@ function SettingsStackScreens() {
       <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
       <SettingsStack.Screen name="Security" component={SecurityScreen} />
       <SettingsStack.Screen name="Places" component={PlacesScreen} />
+      <SettingsStack.Screen name="Memory" component={MemoryScreen} />
       <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>
   );
@@ -133,14 +135,24 @@ export function RootNavigator() {
   return (
     <View style={styles.root}>
       <NavigationContainer theme={navTheme}>
+        {/* Home sits in the MIDDLE of five, not at the left end.
+            It is the screen you return to, so it belongs under the thumb rather
+            than in the corner — and a dial with the resting position at one end
+            can only ever be travelled in one direction. Chat is next to it because
+            it is the one that gets opened most.
+
+            `initialRouteName` is required now that Home is no longer the first
+            child: without it the app would open on Scripts, which is a fixture
+            file. */}
         <Tabs.Navigator
           id={TABS_ID}
+          initialRouteName="Home"
           tabBar={(props) => <GlassTabBar {...props} icons={TAB_ICON} />}
           screenOptions={{ headerShown: false, sceneStyle: styles.scene }}
         >
-          <Tabs.Screen name="Home" component={HomeStackScreens} />
           <Tabs.Screen name="Scripts" component={ScriptsStackScreens} />
           <Tabs.Screen name="Commands" component={CommandsStackScreens} options={{ tabBarLabel: 'Chat' }} />
+          <Tabs.Screen name="Home" component={HomeStackScreens} />
           <Tabs.Screen name="Reports" component={ReportsStackScreens} />
           <Tabs.Screen name="Settings" component={SettingsStackScreens} />
         </Tabs.Navigator>

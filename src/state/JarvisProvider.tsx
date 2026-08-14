@@ -26,6 +26,7 @@ import {
 } from '../link/config';
 import type { Endpoints, LinkMode, LinkStatus } from '../link/config';
 import { createApi } from '../api/client';
+import type { Api } from '../api/client';
 import {
   WATCH_CATEGORY,
   WATCH_CHANNEL,
@@ -37,6 +38,7 @@ import {
 } from '../lib/notify';
 import { haptic } from '../lib/haptics';
 import {
+  FIX_TTL_MS,
   askForLocation,
   currentFix,
   forgetTrail,
@@ -47,7 +49,9 @@ import {
   weatherFor,
 } from '../lib/place';
 import type { TrailStep } from '../lib/place';
-import { loadKnown } from '../lib/knownPlaces';
+import { buildAsk } from '../lib/ask';
+import type { AskWhere } from '../lib/ask';
+import { loadKnown, nameFor } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { COLOR } from '../theme/tokens';
 
@@ -68,6 +72,8 @@ export type JarvisContextValue = {
   sendCommand: (text: string) => Promise<void>;
   /** send a recorded clip; the far end transcribes it and answers */
   sendVoice: (clip: { base64: string; format: string }) => Promise<boolean>;
+  /** send a photo for the far end to look at; the caption may be empty */
+  sendPhoto: (shot: { base64: string; uri: string }, caption: string) => Promise<boolean>;
   /** allow or deny a parked agent action */
   decide: (id: string, approved: boolean) => Promise<void>;
   /**
@@ -94,6 +100,14 @@ export type JarvisContextValue = {
   setChatFocused: (focused: boolean) => void;
   /** forget the whole conversation, on disk as well as in memory */
   forgetChat: () => void;
+  /**
+   * The REST client, for screens that need a route the socket does not carry.
+   *
+   * Exposed rather than rebuilt per screen: it holds the pairing token and the
+   * cloud address, and a second instance would drift from the live one the moment
+   * either changed.
+   */
+  api: Api;
   /** the addresses in use, and whether a pairing token is held */
   pairing: { deskBase: string; cloudBase: string | null; usingDefault: boolean; hasToken: boolean };
   /**
@@ -145,9 +159,19 @@ const RECENT_CAP = 12;
 export function JarvisProvider({ children }: PropsWithChildren) {
   const [hud, dispatch] = useReducer(hudReducer, initialHudState);
   const [recent, setRecent] = useState<string[]>([]);
-  // on by default: a build handed to someone with no desk on the network would
-  // otherwise open on an empty HUD reporting failure
-  const [demo, setDemo] = useState(true);
+  /**
+   * The stand-in desk, off by default.
+   *
+   * It was on, so a build handed to someone with no desk on the network would not
+   * open on an empty HUD reporting failure. That reasoning expired the day there
+   * was a cloud brain to talk to: invented telemetry and `Acknowledged: …` replies
+   * sitting next to real ones are indistinguishable from the assistant making
+   * things up, which is the exact complaint this app is trying to answer.
+   *
+   * An empty panel that says nothing is honest. Turn it back on from Settings when
+   * showing the app to someone.
+   */
+  const [demo, setDemo] = useState(false);
 
   /**
    * Whether a question carries where it was asked from.
@@ -283,7 +307,12 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   // the token goes on REST too. The socket carries it as a query parameter
   // because React Native cannot set handshake headers; REST can use the header,
   // and both routes the desk gates are reached this way.
-  const api = useMemo(() => createApi({ baseUrl: base, token: token ?? null }), [base, token]);
+  // `cloudUrl` is passed separately from `base`: the gateway-only routes must not
+  // follow the live link onto the desk, which does not serve them
+  const api = useMemo(
+    () => createApi({ baseUrl: base, cloudUrl: endpoints.cloudBase, token: token ?? null }),
+    [base, endpoints.cloudBase, token]
+  );
 
   const pairing = useMemo(
     () => ({
@@ -323,43 +352,47 @@ export function JarvisProvider({ children }: PropsWithChildren) {
        * coordinate, so when sharing is on the coordinate goes with the question —
        * and with it the recent trail, so "where was I this morning" has an answer.
        *
-       * Off unless switched on, taken one fix at a time, and never in the
-       * background. Failure is silent by design: no location simply means the
-       * question is asked the way it always was.
+       * Location is off unless switched on, taken one fix at a time, and never in
+       * the background. Failure is silent by design.
+       *
+       * The *envelope*, though, is unconditional. It used to be built only inside
+       * this branch, so a question asked with sharing off went as bare text and
+       * lost the clock and the named places along with the coordinate — three
+       * things dropped to withhold one.
        */
+      // only this phone knows what "the office" means, so the meaning travels with
+      // the question rather than being stored on the gateway
+      const places = await loadKnown();
+      const known = places.map((k: KnownPlace) => ({ label: k.label, lat: k.lat, lon: k.lon }));
+      let where: AskWhere | null = null;
+
       if (shareLocation) {
-        const fix = await currentFix();
+        // a recent fix rather than a new one: the GPS read and the reverse geocode
+        // ran before every message left the phone, and that wait reads as the cloud
+        // brain being slow. Nobody moves between two turns of a conversation.
+        const fix = await currentFix(FIX_TTL_MS);
         if (fix) {
           void rememberPlace(fix);
           // Fetched here, not on the gateway. Open-Meteo rate-limits per IP and
           // Render's outbound address is shared, so the gateway was answered
           // `429 Too Many Requests` and J.A.R.V.I.S. had to say he could not check.
           // A phone asks from its own address, a few times a day.
-          const [trail, weather, known] = await Promise.all([
-            loadTrail(),
-            weatherFor(fix.lat, fix.lon),
-            loadKnown(),
-          ]);
-          const envelope = JSON.stringify({
-            type: 'ask',
-            text: trimmed,
-            where: {
-              lat: fix.lat,
-              lon: fix.lon,
-              place: fix.place,
-              weather,
-              trail: trail.map((s: TrailStep) => ({ place: s.place, when: s.when })),
-              // only this phone knows what "the office" means, so the meaning
-              // travels with the question rather than being stored on the gateway
-              known: known.map((k: KnownPlace) => ({ label: k.label, lat: k.lat, lon: k.lon })),
-            },
-          });
-          if (link.send(envelope)) return;
+          const [trail, weather] = await Promise.all([loadTrail(), weatherFor(fix.lat, fix.lon)]);
+          where = {
+            lat: fix.lat,
+            lon: fix.lon,
+            place: fix.place,
+            // a place he named by standing in it, if this is one of them — the
+            // geocoder's answer for the same desk drifted across four turns
+            label: nameFor(fix, places),
+            weather,
+            trail: trail.map((s: TrailStep) => ({ place: s.place, when: s.when })),
+          };
         }
       }
 
       // the socket is the fast path; REST is what works when it is not open
-      if (link.send(trimmed)) return;
+      if (link.send(buildAsk({ text: trimmed, known, where }))) return;
       if (demo && !connected) {
         dispatch({ type: 'frame', frame: demoReply(trimmed), at: Date.now() });
         return;
@@ -377,14 +410,62 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    * would put the same utterance in the log twice, once as a placeholder that
    * never resolves.
    */
+  /**
+   * Send down the socket, waiting for it if it is between lives.
+   *
+   * The camera and the microphone permission sheet are full-screen system
+   * activities: the app is backgrounded while they are up, and Android is free to
+   * take the WebSocket with it. So a send issued the instant the user comes back
+   * lands in the gap between `close` and the re-probe finishing, `send()` returns
+   * false, and the app reports no link while the network is perfectly fine.
+   *
+   * Read through a ref rather than the captured `link`, since the machine is
+   * replaced on every re-dial and a closure would keep sending into the old one.
+   */
+  const linkRef = useRef(link);
+  useEffect(() => {
+    linkRef.current = link;
+  }, [link]);
+
+  const sendWhenOpen = useCallback(async (payload: string, waitMs = 20000): Promise<boolean> => {
+    const started = Date.now();
+    for (;;) {
+      if (linkRef.current.send(payload)) return true;
+      if (Date.now() - started > waitMs) return false;
+      // the re-probe runs on a 5s tick, so this has to outlast at least two of them
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+  }, []);
+
   const sendVoice = useCallback(
     async (clip: { base64: string; format: string }) => {
       const envelope = JSON.stringify({ type: 'voice', format: clip.format, audio: clip.base64 });
-      // the socket is the only route: there is no REST endpoint that transcribes,
-      // and a clip queued for a dead link would arrive answering nothing
-      return link.send(envelope);
+      // the socket is the only route: there is no REST endpoint that transcribes
+      return sendWhenOpen(envelope);
     },
-    [link]
+    [sendWhenOpen]
+  );
+
+  /**
+   * Send a photo for the far end to look at, with an optional caption.
+   *
+   * Unlike a voice clip, this *does* write a local turn. A clip comes back as a
+   * transcript frame that is logged as him speaking, so writing one here would
+   * duplicate it — a photo has no such echo, and a chat that showed nothing until
+   * the reply arrived would look like the send had failed.
+   *
+   * The socket is the only route: `/api/backdoor` takes a command string, and
+   * there is no REST endpoint on either end that accepts an image.
+   */
+  const sendPhoto = useCallback(
+    async (shot: { base64: string; uri: string }, caption: string) => {
+      const said = caption.trim();
+      dispatch({ type: 'local_command', text: said ? `📷 ${said}` : '📷 Photo', at: Date.now() });
+      // waits for the socket: the camera it just came back from is exactly what
+      // takes the socket away
+      return sendWhenOpen(JSON.stringify({ type: 'photo', image: shot.base64, text: said }));
+    },
+    [sendWhenOpen]
   );
 
   const decide = useCallback(
@@ -700,6 +781,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       disconnect,
       sendCommand,
       sendVoice,
+      sendPhoto,
+      api,
       decide,
       answerWatch,
       expireWatch,
@@ -734,6 +817,12 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       connect,
       disconnect,
       sendCommand,
+      // both were omitted while only `sendCommand` was listed. They close over
+      // `link`, so a memo that does not refresh with them hands a screen a sender
+      // pointing at a socket that has since been replaced.
+      sendVoice,
+      sendPhoto,
+      api,
       decide,
       answerWatch,
       expireWatch,

@@ -70,6 +70,8 @@ export async function hasLocation(): Promise<boolean> {
   }
 }
 
+let fixCache: { fix: Fix; at: number } | null = null;
+
 /**
  * A single fix, with a name on it.
  *
@@ -77,8 +79,20 @@ export async function hasLocation(): Promise<boolean> {
  * here" and "what is nearby", where a hundred metres is irrelevant and the highest
  * setting spins the GPS for seconds. The name is best-effort — a fix with no
  * address is still a usable fix.
+ *
+ * `maxAgeMs` accepts a recent fix instead of taking a new one, and defaults to 0
+ * — every existing caller still gets a fresh reading, because naming the place you
+ * are standing in must not be answered from where you were.
+ *
+ * Chat passes a value, and that is where it matters: a GPS fix plus a reverse
+ * geocode ran *before* every message left the phone, so each turn paid seconds of
+ * silence that looked like the cloud brain thinking. Nobody moves far enough
+ * between two messages of a conversation for the coordinate to have changed.
  */
-export async function currentFix(): Promise<Fix | null> {
+export const FIX_TTL_MS = 3 * 60 * 1000;
+
+export async function currentFix(maxAgeMs = 0): Promise<Fix | null> {
+  if (maxAgeMs > 0 && fixCache && Date.now() - fixCache.at <= maxAgeMs) return fixCache.fix;
   try {
     const position = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
@@ -88,14 +102,27 @@ export async function currentFix(): Promise<Fix | null> {
     try {
       const [found] = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (found) {
-        place = [found.district || found.subregion || found.city, found.region]
+        /**
+         * Neighbourhood, then city, then the administrative region — in that
+         * order, and `subregion` last of all.
+         *
+         * `subregion` used to come second, so one desk in Kolkata was reported
+         * across four turns as Bidhannagar, Kankurgachi, and twice as **Presidency
+         * Division** — an administrative division covering millions of people,
+         * offered as though it were an address. Android fills these fields
+         * inconsistently between calls, so the order decides what gets said, and
+         * a coarse field ranked above a precise one produces exactly that drift.
+         */
+        place = [found.district || found.city || found.subregion, found.region]
           .filter(Boolean)
           .join(', ');
       }
     } catch {
       // an unnamed fix is still worth sending; the gateway prints coordinates
     }
-    return { lat: latitude, lon: longitude, place };
+    const fix = { lat: latitude, lon: longitude, place };
+    fixCache = { fix, at: Date.now() };
+    return fix;
   } catch {
     return null;
   }
@@ -192,21 +219,37 @@ export async function weatherFor(lat: number, lon: number): Promise<string | nul
     const res = await fetch(url);
     if (!res.ok) return weatherCache?.key === key ? weatherCache.line : null;
     const data: {
-      current?: Record<string, number>;
+      current?: Record<string, number> & { time?: string };
       daily?: { precipitation_probability_max?: number[] };
     } = await res.json();
+    // Open-Meteo stamps `current` with the local time of the observation
+    const observedAt = data.current?.time;
     const now = data.current ?? {};
     const said = WMO[now.weather_code as number] ?? 'unclear conditions';
     const chance = data.daily?.precipitation_probability_max?.[0];
+    /**
+     * Every figure says what it is, in full, at the cost of being wordy.
+     *
+     * The terse version cost more than it saved. `27.8°C (feels 33.7°C)` came back
+     * two turns later as "the conditions I have are from a bit earlier — 27.6°C",
+     * with the two numbers presented as a correction rather than as the same
+     * reading twice; and `rain chance today 98%` was repeatedly reported as a 98%
+     * chance of rain *now*. A label that can be dropped will be dropped, so the
+     * qualifier is inside the phrase rather than beside it.
+     */
     const parts = [
       said,
-      `${now.temperature_2m}°C (feels ${now.apparent_temperature}°C)`,
+      `air temperature ${now.temperature_2m}°C`,
+      `feels like ${now.apparent_temperature}°C`,
       `humidity ${now.relative_humidity_2m}%`,
       `wind ${now.wind_speed_10m} km/h`,
     ];
     // the figure that settles "is it raining": measured, in the last hour
     if (typeof now.precipitation === 'number') parts.push(`precipitation ${now.precipitation} mm in the last hour`);
-    if (typeof chance === 'number') parts.push(`rain chance today ${chance}%`);
+    if (typeof chance === 'number') parts.push(`chance of rain at some point later today ${chance}%`);
+    // Stamped, because without one the model invented the age of the reading —
+    // "from a bit earlier, Sir" was said about figures fetched seconds before.
+    if (typeof observedAt === 'string') parts.push(`measured at ${observedAt}`);
     const line = parts.join(', ');
     weatherCache = { key, at: Date.now(), line };
     return line;

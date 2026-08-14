@@ -86,3 +86,69 @@ describe('createApi', () => {
     await expect(api.telemetry()).rejects.toMatchObject({ status: 0 });
   });
 });
+
+/**
+ * The gateway-only routes.
+ *
+ * `baseUrl` follows the live link and becomes the *desk* once the desk attaches,
+ * and the desk serves none of these. `registerPush` was sent to `baseUrl` for that
+ * reason and stopped renewing the phone's push address the moment a desk connected
+ * — a 404 that looks like a broken feature rather than a wrong address.
+ */
+describe('gateway-only routes', () => {
+  const cloud = 'https://gateway.example.com';
+
+  it('sends facts to the gateway even while the link points at the desk', async () => {
+    const { calls, fetchImpl } = recorder(200, { facts: ['he has a dog'], persistent: true });
+    const api = createApi({ baseUrl: 'http://desk:8000', cloudUrl: cloud, token: 't', fetchImpl });
+    const out = await api.facts();
+    expect(calls[0].url).toBe(`${cloud}/app-fact`);
+    expect(out).toEqual({ facts: ['he has a dog'], persistent: true });
+  });
+
+  it('registers push against the gateway, not whatever is answering', async () => {
+    const { calls, fetchImpl } = recorder();
+    const api = createApi({ baseUrl: 'http://desk:8000', cloudUrl: cloud, token: 't', fetchImpl });
+    await api.registerPush('ExponentPushToken[x]', 'android');
+    expect(calls[0].url).toBe(`${cloud}/app-push/register`);
+  });
+
+  it('reports a missing gateway as its own failure rather than calling the desk', async () => {
+    // not a network error to retry: the route does not exist, and the screen
+    // should say so instead of showing a spinner
+    const { calls, fetchImpl } = recorder();
+    const api = createApi({ baseUrl: 'http://desk:8000', cloudUrl: null, token: 't', fetchImpl });
+    await expect(api.facts()).rejects.toThrow(/no cloud gateway/i);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('passes a fact to remember and reads back whether it was stored', async () => {
+    const { calls, fetchImpl } = recorder(200, { stored: true, persistent: true, facts: ['a', 'b'] });
+    const api = createApi({ baseUrl: 'http://desk:8000', cloudUrl: cloud, token: 't', fetchImpl });
+    const out = await api.remember('his dog is Kitty');
+    expect(JSON.parse(String(calls[0].init!.body))).toEqual({ fact: 'his dog is Kitty' });
+    expect(out.stored).toBe(true);
+    expect(out.facts).toEqual(['a', 'b']);
+  });
+
+  it('reads stored:false as held-not-saved rather than as success', async () => {
+    // the gateway says this when it has no DATABASE_URL: the fact is live now and
+    // gone on the next restart, which is not what "remember" means to a person
+    const { fetchImpl } = recorder(200, { stored: false, persistent: false, facts: ['a'] });
+    const api = createApi({ baseUrl: 'http://d', cloudUrl: cloud, token: 't', fetchImpl });
+    expect((await api.remember('x')).stored).toBe(false);
+  });
+
+  it('sends a forget as its own field so it cannot be mistaken for an add', async () => {
+    const { calls, fetchImpl } = recorder(200, { forgotten: true, facts: [] });
+    const api = createApi({ baseUrl: 'http://d', cloudUrl: cloud, token: 't', fetchImpl });
+    await api.forget('his dog is Kitty');
+    expect(JSON.parse(String(calls[0].init!.body))).toEqual({ forget: 'his dog is Kitty' });
+  });
+
+  it('survives a gateway that answers without a facts array', async () => {
+    const { fetchImpl } = recorder(200, { persistent: true });
+    const api = createApi({ baseUrl: 'http://d', cloudUrl: cloud, token: 't', fetchImpl });
+    expect((await api.facts()).facts).toEqual([]);
+  });
+});

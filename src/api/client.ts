@@ -8,7 +8,23 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiConfig = { baseUrl: string; token: string | null; fetchImpl?: typeof fetch };
+export type ApiConfig = {
+  baseUrl: string;
+  /**
+   * The cloud gateway, when one is configured, for the routes only it serves.
+   *
+   * `baseUrl` follows the live link, so it becomes the *desk* the moment the desk
+   * attaches — and the desk serves no `/app-fact` or `/app-push/register`. Sending
+   * a gateway-only request to whichever machine happens to be answering is a 404
+   * that looks like a broken feature.
+   */
+  cloudUrl?: string | null;
+  token: string | null;
+  fetchImpl?: typeof fetch;
+};
+
+/** what J.A.R.V.I.S. holds as true about him, and whether it will survive a restart */
+export type Facts = { facts: string[]; persistent: boolean };
 
 export type Api = {
   healthSummary(): Promise<unknown>;
@@ -34,6 +50,20 @@ export type Api = {
    * that news arrives. Gateway-only — the desk serves no such route.
    */
   registerPush(pushToken: string, platform: string): Promise<void>;
+  /**
+   * What the cloud brain believes about him, and the two ways to change it.
+   *
+   * Gateway-only, and gated by the pairing token there — these go into the system
+   * prompt on every turn, so anything that can write here can decide what is true
+   * about the operator.
+   *
+   * `persistent` false means the gateway has no database and the list dies with its
+   * next restart. Surfaced rather than hidden: a memory that will quietly forget is
+   * worse than one that admits it cannot remember.
+   */
+  facts(): Promise<Facts>;
+  remember(fact: string): Promise<Facts & { stored: boolean }>;
+  forget(fact: string): Promise<Facts>;
 };
 
 export function createApi(cfg: ApiConfig): Api {
@@ -69,6 +99,44 @@ export function createApi(cfg: ApiConfig): Api {
       body: JSON.stringify(body),
     });
 
+  /**
+   * POST to the gateway specifically, wherever the live link happens to point.
+   *
+   * A named failure rather than a request to the wrong machine: with no gateway
+   * configured this is not a network problem to retry, it is a route that does not
+   * exist, and the screen should say so.
+   */
+  const postCloud = async (path: string, body: unknown): Promise<unknown> => {
+    if (!cfg.cloudUrl) throw new ApiError('no cloud gateway is configured', 0);
+    let res: Response;
+    try {
+      res = await doFetch(`${cfg.cloudUrl}${path}`, {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      throw new ApiError(e instanceof Error ? e.message : 'network error', 0);
+    }
+    if (!res.ok) throw new ApiError(`${path} failed with ${res.status}`, res.status);
+    const text = await res.text();
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      return text;
+    }
+  };
+
+  /** the gateway answers every fact route with the full list, so one reader does */
+  const readFacts = (raw: unknown): Facts => {
+    const o = (raw ?? {}) as { facts?: unknown; persistent?: unknown };
+    return {
+      facts: Array.isArray(o.facts) ? o.facts.filter((f): f is string => typeof f === 'string') : [],
+      persistent: o.persistent === true,
+    };
+  };
+
   return {
     healthSummary: () => request('/api/health/summary'),
     telemetry: () => request('/api/telemetry'),
@@ -82,8 +150,17 @@ export function createApi(cfg: ApiConfig): Api {
     },
     tasks: () => request('/api/tasks'),
     presence: () => request('/api/presence/state'),
+    // Gateway-only, and previously sent to `baseUrl` — so once the desk attached,
+    // the phone was registering its push address with a machine that has no such
+    // route, and push silently stopped being renewed.
     registerPush: async (pushToken, platform) => {
-      await post('/app-push/register', { push_token: pushToken, platform });
+      await postCloud('/app-push/register', { push_token: pushToken, platform });
     },
+    facts: async () => readFacts(await postCloud('/app-fact', {})),
+    remember: async (fact) => {
+      const raw = await postCloud('/app-fact', { fact });
+      return { ...readFacts(raw), stored: (raw as { stored?: unknown })?.stored === true };
+    },
+    forget: async (fact) => readFacts(await postCloud('/app-fact', { forget: fact })),
   };
 }

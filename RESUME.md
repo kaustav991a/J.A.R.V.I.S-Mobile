@@ -5,6 +5,365 @@ Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 a
 
 ---
 
+## Resume point — 2026-08-14: the question now says when and where
+
+**Not pushed. Not yet on a phone.** 410 tests, `tsc --noEmit` clean. Nothing
+native changed, so this ships in a JS reload — no rebuild, no `prebuild`.
+
+**On upgrade** the stored setting becomes the departure from Home, keeping its
+switch state and its 8:00 — which will now be labelled *8:00 AM*, and that label is
+the bug this session found. The Office departure arrives off, defaulted to 7 PM.
+Open Places, switch Office on, and press PREVIEW on each: the notification title
+names the door it is about.
+
+He reported no briefing at 20:00 with the time and the places both set, and
+J.A.R.V.I.S. still answering some questions from the model's weights. Three
+things were built; the first two are the hallucination half, the third is one of
+four candidate causes for the silent 20:00.
+
+### 1. The question carries a clock (`src/lib/ask.ts`, new)
+
+Nothing in the envelope said *when* it was asked, so "today", "tomorrow" and
+"tonight" were answered against a date the model invented from its training data.
+`localClock()` sends local wall time with its offset — `2026-08-14T20:04:13+05:30`
+— plus the IANA zone and the weekday.
+
+Local reading, not `toISOString()`. A `Z` timestamp makes the model do the
+timezone arithmetic before it can tell whether it is morning, and that is the step
+it gets wrong. `Intl` is guarded: it is a Hermes build option, not a guarantee,
+and a missing zone must cost the zone name only — `offset` comes from `Date` and
+is always there.
+
+### 2. The envelope is unconditional (`JarvisProvider.sendCommand`)
+
+It used to be built only inside `if (shareLocation)`, so a question asked with
+sharing off fell through to `link.send(trimmed)` — bare text. That dropped the
+clock and the named places along with the coordinate: **three things withheld to
+withhold one.** Now `{type:'ask', text, when, known}` always goes, and `where` is
+the only optional part. Its absence is the honest answer to "where was this asked
+from"; an empty `where` would be a different claim.
+
+**`known` is deliberately sent twice.** Top-level is canonical; `where.known` is
+mirrored for the gateway deployed on 08-13, which reads that path. Delete the
+mirror once the gateway reads the top level — the comment at `ask.ts` says so, and
+a test pins it so the removal is a decision rather than an accident.
+
+### 3. The briefing re-registers at launch (`syncCommuteTask`)
+
+`App.tsx` imported `setCommuteTask` and **never called it**, so the switch on the
+Places screen was the only thing that ever registered the task. A registration
+lives in Android's WorkManager database, not in this app's storage — so the
+`prebuild --clean` reinstall on 08-13 wiped it while the setting survived in
+AsyncStorage. The switch read ON with nothing behind it, and no code disagreed.
+`syncCommuteTask()` now reads the setting at every launch and registers *or*
+unregisters, so the two cannot drift apart in either direction.
+
+### Why 20:00 was silent — found, and it was none of the mechanisms
+
+PREVIEW produced a briefing whose window label read **`(8:00–11:00)`**. That label
+is built from `s.hour`, so the setting was **hour 8 — eight in the morning**, on a
+briefing he had set believing it was eight at night. It was never going to fire at
+20:00. Nothing was broken; the screen let a wrong number look right.
+
+Everything printed the time in 24-hour digits — the stepper, the row, the
+notification body — so all three agreed with the mistake, and the feature was
+called *Morning briefing*, which agreed with it too. **Every clock this feature
+prints now carries a meridiem** (`clockLabel`, `hourLabel` in `commute.ts`), and
+the window names both ends even when they share one: `8 AM–11 AM`, not `08:00`.
+
+The other three candidates were real mechanisms and are still worth knowing, but
+none of them was the cause. Two are now dealt with anyway — see the departures
+work below, which removes the background-location dependency entirely.
+
+### Departures are a list, and they name a place
+
+He leaves home at 8 AM and the office at 7 PM. One time could not say that.
+
+- `Departure { placeId, label, on, hour, minute }`, and `CommuteSettings` is
+  `{ departures[], days[7] }`. `briefingDue` became `dueDeparture`, returning
+  *which* door is due.
+- **`days` is seven booleans indexed the way `getDay()` counts**, replacing
+  `weekdaysOnly`. The weekend is off, and a worked Saturday can be switched on
+  without dragging Sunday with it — which was the actual requirement.
+- **The dedup key is per departure.** A single day-stamp would have let the 8 AM
+  briefing mark the day done and silence the 7 PM one. That failure would have
+  looked exactly like the evening briefing being broken, and only ever after the
+  morning had worked.
+- **The forecast is for the place being left, not for where the phone is.** A
+  named place already has coordinates on disk, so the common path needs no
+  location read at all — which is what kills the `ACCESS_BACKGROUND_LOCATION`
+  problem rather than working around it. It is also just correct: at 7 PM the
+  forecast that matters is the office's.
+- `loadCommute` migrates the old single-time shape onto the home departure, and
+  the old bare-string sent-log parses as "not yet briefed" — worst case one extra
+  briefing on upgrade day.
+- Places screen: a card per departure with its own switch, steppers and PREVIEW,
+  and a row of day chips.
+
+### Chat felt slow because the phone was busy, not the brain
+
+`currentFix()` — a GPS read plus a reverse geocode — ran **before every message
+left the phone**, and the wait reads as the cloud brain thinking. Weather was
+already cached for 10 minutes; the fix was not cached at all. `currentFix` now
+takes `maxAgeMs`, defaulting to 0 so every existing caller still gets a fresh
+reading (naming the place you are standing in must not be answered from where you
+were). Chat passes `FIX_TTL_MS`, 3 minutes.
+
+That is the phone's share of the latency only. The rest is Render's free tier
+spinning down after 15 minutes idle, which costs ~50s on the next request, then
+model inference. Neither is visible from this repo.
+
+### The chat reads like a chat now
+
+- **Demo mode is off by default** (`JarvisProvider`, was `useState(true)`). It
+  existed so a build with no desk on the network did not open on an empty HUD
+  reporting failure. That reasoning expired the day there was a cloud brain:
+  invented telemetry and `Acknowledged: …` replies sitting beside real ones are
+  indistinguishable from the assistant making things up, which is the complaint
+  this app is trying to answer. Still switchable from Settings for demos.
+- **A rule between the days**, labelled Today / Yesterday / the weekday inside a
+  week / a date beyond it (`dayHeading`, exported and tested). Every line used to
+  carry its own date once the log outlived the app, which put `12 Aug, 14:32` on
+  twenty consecutive lines from one afternoon; the lines are back to a bare time.
+  In an inverted list the heading goes on the *oldest* turn of each day.
+- **The dots start when you send**, not when the far end admits it is working.
+  With Render cold-starting there was nothing on screen for the better part of a
+  minute, which reads as a message that never left. They stop when the answer
+  lands, or after two minutes with *No reply — the brain may be asleep*: dots that
+  never stop are a worse lie than no dots.
+
+### "Thanks" was answered with his location — and it is not the phone
+
+Every question carries `where` when sharing is on, and the gateway is putting it
+in the prompt on every turn, so a model with a location in front of it finds a way
+to use it. The phone is right to send it; the gateway is wrong to spend it on
+"thanks". Fixing it means the prompt treating location as ambient — available if
+asked for, never the subject — which is the same tool-use discipline as below.
+
+Worth noting it is **not** demo mode: `demoReply` answers anything it does not
+recognise with `Acknowledged: …`, so this reply came from the real brain.
+
+### The chat log was read off the phone — `docs/chat-audit-2026-08-14.md`
+
+The 08-13 APK is not debuggable, so `run-as` cannot reach `jarvis_chat_log`.
+Walking the inverted list with `uiautomator dump` and reading each bubble's
+accessibility label works, is exact, and costs a fraction of screenshots. The
+script is worth rebuilding if this is ever needed again.
+
+The findings are in that doc. The short version: location and weather are stated
+in six out of six greetings, `air temperature` and `feels like` were served back
+as two contradictory readings of the same payload, one desk was named four
+different ways in four turns, a hospital catering result was reported as his
+wife's meal plan, and a question about his dog was answered with WHO infant growth
+charts **while the dog sat in the context**, recallable on request one turn later.
+
+Three of those are fixed here (§2, §3, §6). The rest is the gateway's prompt.
+
+### The prompt, fixed — in a clone at `../jarvis-brain`
+
+`kaustav991a/J.A.R.V.I.S`, branch `feat/cloud-gateway`, cloned beside this repo.
+**Edited, not pushed, not deployed, and not run** — there is no Python on this
+machine, so `python -m py_compile jarvis-backend/cloud_gateway.py` is owed before
+anything else. The `.env` on the desk is still the source of truth for secrets.
+
+The cause was three lines of plumbing, not the model:
+
+1. **`_where_context` returned its fact block glued to the front of his message**
+   (`"[" + facts + "]\n\n" + text`). A user turn that opens with a wall of facts
+   reads as the operator having asked about them. It now returns the block alone
+   and `think()` takes it as a `context=` system turn.
+2. **That block was written into rolling memory**, because `think()` stores what it
+   is given and it was given the glued string. By the tenth turn the conversation
+   was mostly stale copies of his coordinates — which is where "still overcast" and
+   "still in Presidency Division" came from. History now stores what he said.
+3. **The web lookup ran on the glued string too.** `_LOOKUP_HINTS` matches
+   "weather", "where", "today" — all of which the fact block contains — so *every
+   located turn fired a Tavily/DDG search* on a query made mostly of coordinates.
+   That is almost certainly the unprompted pharmacy, complete with a Durgapur
+   address for a Kolkata question. It now searches what he actually asked.
+
+Plus, in `_PERSONA`: rule 3 (`PREEMPT: volunteer the next useful fact without being
+asked`) is what licensed the recital, and is now bounded — a greeting or a
+thank-you gets a human reply and nothing else. Three failure modes that had no rule
+at all now do: don't stretch a near-miss web result into an answer, ask once when a
+word is ambiguous instead of guessing confidently, and don't treat air temperature
+and feels-like as competing readings. `_decode_where` reads the phone's new
+`label`, and `_where_context` prefers it over the geocode.
+
+**None of this is verified.** It is a prompt change; it needs the phone, the
+questions from the audit doc, and a look at what comes back.
+
+### Camera and photos — built, needs a native rebuild
+
+The gateway half was nearly free: `see()` already existed for Telegram photos and
+already shares `think()`'s memory. All that was missing was the frame, which
+`docs/cloud-app-link.md` now specifies.
+
+- `src/lib/vision.ts` — `takeShot('camera' | 'library')`. `expo-image-picker`
+  rather than `expo-camera`: the system camera is better than one drawn here, it
+  brings review-and-retake for free, and the same module opens the gallery.
+- **The shrink is the load-bearing part.** 1280px long edge, quality 0.65, under
+  200 KB. A 12MP capture is ~5.5 MB as base64 in a single WebSocket text frame,
+  which does not arrive. Uses the contextual `ImageManipulator.manipulate()` —
+  `manipulateAsync` is deprecated in SDK 57, and the docs were read rather than
+  recalled.
+- Camera button replaces the leading glyph in `CommandBar` rather than adding a
+  fourth control to the row. `holdGate` wraps the capture for the same reason the
+  microphone needed it: a full-screen system activity reads to the app-lock as the
+  phone leaving your hand.
+- `sendPhoto` writes a local turn, unlike `sendVoice` — a clip echoes back as a
+  transcript frame, a photo has no such echo, so without one the chat looks like
+  the send failed.
+- Fixed in passing: `sendVoice` and `sendPhoto` were missing from the context
+  memo's dependency list, so a screen could hold a sender pointing at a replaced
+  socket.
+
+**New native deps mean `expo prebuild --clean` and a new dev build — and that
+means restoring `local.properties` and the 6144m jvmargs.** `app.json` gained the
+`expo-image-picker` plugin with the camera and photos permission strings.
+
+### Later on 2026-08-14 — the gateway caught up, and is deployed
+
+The gateway repo is cloned at `../jarvis-brain` (branch `feat/cloud-gateway`).
+Four commits, all pushed and **live on Render** — which is the real syntax check:
+the module imported and booted in production.
+
+**The recital is fixed and verified on the device.** `hi` at 13:24 got "Hello,
+Sir." The same message at 13:01, minutes before the deploy, got "You're still at
+the Office in Bidhannagar, Sir, where it's overcast and 31.3°C." The two sit next
+to each other in the log.
+
+**The dangling promise had a cause nobody would guess.** "I'll look up the breed
+standards for you" happened because `_LOOKUP_HINTS` holds `"what is"` and he typed
+`"what's"` — a substring test does not know they are the same word, so no search
+ran and the model had nothing to answer from. Contractions are expanded before the
+match now, but a substring list will never cover English let alone Benglish, so the
+model can ask for itself: it ends a reply with `[[LOOKUP: query]]`, the search runs,
+and it is asked again with the results. One extra round trip, one grounded reply,
+no promise. Once only, and the marker is stripped whether or not it was acted on.
+
+**It can speak first.** `_deliver_unprompted()` is the single path for anything
+unprompted: it writes into the same rolling history (a line the model cannot
+remember saying makes the next turn incoherent), frames it to attached phones, and
+pushes only when none are attached — mirroring `_announce_desk` so one event is
+never felt twice. `POST /app-say` exposes it behind `APP_TOKEN`, because it writes
+into his conversation as though the assistant had spoken. **No phone changes were
+needed**: `hudReducer` already logs a `speaking` frame as a J.A.R.V.I.S. turn.
+
+**Memory survives a restart** — when `DATABASE_URL` is set, which it is not yet.
+Turns go to Postgres and are read back on first mention of a chat. Unset, nothing
+runs and the behaviour is exactly what it was. A connection per call, because
+free-tier Postgres reaps idle ones. Recall happens once per process and only into an
+empty cache, or it would replay turns the process just had. `CLOUD_MAX_TURNS` is
+tunable — 12 was chosen when memory died with the process, and the in-process cap is
+a token budget rather than a storage one.
+
+**A second brain, per capability.** `LLM_PROVIDER_TEXT` / `_VISION` / `_AUDIO`,
+Groq the default everywhere, every Gemini failure falling back to Groq loudly.
+Currently `audio: gemini` on `gemini-3.5-flash` — the key is set and
+`gemini_ready: true`. Whisper cannot be *told* that a clip is code-switched Bengali
+and English; guessing wrong is the reported transcription bug, and Gemini can be
+told. `/health` reports `brains.usage` per capability, with
+`last_error_was_quota` separating "the free tier is spent" from "the call was
+wrong" — the two look identical from outside and want opposite responses.
+
+### The photo bug, and a diagnostics failure of mine
+
+"Sending photo won't work, says no link." Both of my photo failure toasts said
+"No link", so the report could not say which fired — that cost a diagnosis, and
+they are named distinctly now.
+
+The likely cause is architectural rather than a typo: the camera is a full-screen
+system activity, so the app is backgrounded while it is up and Android may take the
+WebSocket with it. A send issued the instant the user returns lands in the gap
+between `close` and the re-probe finishing. `sendWhenOpen` now waits up to 20s for
+the socket, read through a ref so a re-dial does not leave a closure sending into
+the old machine. The pre-flight `if (!connected)` check is also gone: it refused
+before the camera had even opened, which is the wrong call twice over — the link is
+usually about to come back, and the camera itself is what takes it away.
+
+**Unverified.** The phone dropped off adb before this could be tested.
+
+### Also fixed: the day rule was on the wrong side
+
+`Today` rendered *below* the day it introduced. An inverted `FlatList` flips each
+cell as well as their order, so a cell's children are laid out top-to-bottom and
+then turned over — the heading had to become the **last** child to appear on top.
+Caught from a screenshot, not a test.
+
+### Evening of 2026-08-14 — the Memory screen, and why the briefing looked broken
+
+**Home is the middle tab now.** Scripts, Chat, **Home**, Reports, Settings —
+`initialRouteName="Home"` is required now that it is not the first child, or the app
+opens on Scripts, which is a fixture file. A test pins the order, because a
+deliberate arrangement is exactly what a refactor silently undoes.
+
+**`MemoryScreen`** (Settings → Memory) reads, adds to and removes what the cloud
+brain holds as true. It exists because seeding those facts took a `curl` and a
+token: **a memory you cannot inspect is a memory you cannot trust**, and that store
+now holds an address, a family and a marriage plan. The gateway already served
+add/forget/list; this is a screen over an API.
+
+`api` is on the context now rather than rebuilt per screen, and `ApiConfig` gained
+`cloudUrl`. That fixed a live bug on the way past: `registerPush` was posted to
+`baseUrl`, which becomes the *desk* the moment a desk attaches — and the desk serves
+no `/app-push/register`, so the phone quietly stopped renewing its push address
+whenever the desk was on.
+
+**Facts are written naming him, not "he".** With Mousumi, Kinshuk, Tapas and two
+dogs in the store, "he" stops being unambiguous the moment two of them sit together.
+First or second person is worse still: "I live in…" inside a system prompt reads as
+being about the assistant.
+
+### The briefing was never broken — three separate things looked like one bug
+
+Diagnosed by pulling `RKStorage` off the phone, which the debug build allows.
+Settings were correct all along: Home 8:00 AM on, Office 7:00 PM on, Mon–Fri.
+
+1. **The `general` channel was silent.** Proved on device — a posted briefing read
+   `channel=general flags=AUTO_CANCEL|SILENT vibrate=null sound=null`. A bare
+   `importance: DEFAULT` does not make a channel audible; the pattern and sound have
+   to be named, which is the treatment the watch channel already had and is why that
+   one buzzed. Now `general-v2`, because **Android freezes importance, vibration and
+   light at creation** — the same lesson `desk-watch-v2` taught, relearned.
+2. **The Office preview was right to say nothing.** It toasts "Nothing worth warning
+   about in that window" and posts no notification when no threshold is crossed.
+   Silence is the designed answer; it is indistinguishable from failure.
+3. **`postNow` is immediate, and was never the problem.** The one notification on
+   the device was posted at 18:39:40, seconds after the tap. The "7–8 minutes" was
+   noticing a silent notification, not waiting for it.
+
+**`jarvis_commute_sent` has never existed on this phone.** That key is written on
+every completed run including silent ones, so its absence proves the background task
+has never once finished. Two reasons, both real: `home` is not a named place, so the
+morning briefing falls back to a live fix a headless task cannot get; and this is a
+HyperOS phone, whose battery manager is the likeliest reason WorkManager has never
+fired at all. **The real fix is the gateway holding the schedule and pushing at
+19:00** — proven infrastructure now, and no longer at Android's discretion.
+
+### Not done, and next
+
+- **Send the chat history.** The log is local-only (`chatStore.ts`) and the
+  envelope carries one turn. The gateway keeps rolling memory under `chat_id 0`,
+  in process RAM — Render restarts wipe it, and every device shares that slot.
+- **Tool-use over prose on the gateway.** Force a function call for weather,
+  distance, time and telemetry; no tool answer means "I don't know". This is the
+  actual cure. Items 1 and 2 above are the enabling conditions for it.
+- **Provenance in the chat UI** — measured / from the desk / from memory. Makes
+  guessing visible instead of anecdotal.
+- **Tavily is suspected of not working and cannot be checked from here.** It lives
+  in `jarvis-backend`, not in this repo. If search is silently failing, every
+  question needing a lookup falls back to the model's weights, which would look
+  exactly like the hallucination being reported. Check it before building anything
+  else on the gateway: a failed search must surface as "I could not look that up",
+  never as a fluent answer.
+- **Render's free tier spins down after 15 minutes.** The first message after a
+  quiet spell pays ~50s of cold start. A keep-warm ping, or a paid instance, is
+  the only fix; nothing on the phone can help.
+- `AGENTS.md` still says 287 tests. It was stale before this session too.
+
+---
+
 ## Resume point — end of 2026-08-13, 19:00
 
 **Everything is pushed.** Mobile `feat/mobile-hud` at `666a4b1`; gateway
