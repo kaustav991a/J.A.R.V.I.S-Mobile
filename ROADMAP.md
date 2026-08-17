@@ -1,212 +1,234 @@
 # jarvis-mobile — upgrades and roadmap
 
-Written 2026-08-11. Companion to `RESUME.md`, which records what has been built
+Rewritten 2026-08-17. Companion to `RESUME.md`, which records what has been built
 and why. This file records what has **not**, in the order it is worth doing.
 
-Every item names the files it touches. Anything marked **blocked** needs a
-surface the desk backend does not expose yet — those are listed together in
-§4 so the backend work can be scoped in one pass rather than discovered
-item by item.
+**This supersedes the 2026-08-11 roadmap, which is not kept.** That version's
+inventory had gone actively wrong — it claimed pairing was "never wired", Scripts
+and Reports were fixture-only, and phases one through three unstarted. All of that
+shipped between 08-11 and 08-14. A doc that records a stale claim as settled has
+already cost this project two sessions once (the mute-channel phantom, `RESUME.md`
+08-17), so the old text is gone rather than archived.
 
----
-
-## Building an installable APK
-
-The UI is complete enough to hand to a phone. `eas.json` carries a `preview`
-profile that produces a plain APK over internal distribution.
-
-```bash
-eas login                                  # interactive — your Expo account
-eas build -p android --profile preview     # ~10-20 min on the free queue
-```
-
-The build finishes with a download URL and a QR code. On the phone: open the
-link, allow installs from that browser, install. No Play Store, no signing set
-up by hand — EAS generates and keeps the keystore.
-
-A local `npx expo run:android --variant release` is the alternative, but this
-machine has neither a JDK nor an Android SDK, so that path starts with an
-Android Studio install and several GB of downloads. Cloud is faster here.
-
-**Demo mode carries the build.** With no desk on the network the app would open
-on an empty HUD reporting failure, which tests nothing. `src/state/demoFeed.ts`
-is a stand-in desk: telemetry that moves, a status word that changes, agent
-trace lines, one approval request, and a reply to every command. It emits real
-frames through the real reducer, so no screen has a second code path. A real
-desk always wins; the switch is in the Home menu. Turn it off before judging
-whether the transport works.
+Every item names the files it touches. Anything needing a surface the desk or the
+gateway does not expose is collected in §5, so that work can be scoped in one pass
+rather than discovered item by item.
 
 ---
 
 ## 0. Where the app actually stands
 
-Honest inventory, because the roadmap only makes sense against it.
+17 screens, 426 tests, `tsc --noEmit` clean. A standalone release APK is installed
+on the device as of 2026-08-17 14:46 and runs — JS bundled, no Metro.
 
-**Real, end to end**
-- Transport: LAN probe → cloud fallback → WebSocket, with reconnect
-  (`src/link/`). Frames drive one reducer (`src/state/hudReducer.ts`) shared by
-  every tab through `JarvisProvider`.
-- REST client for `/api/health-summary`, `/telemetry`, `/backdoor`, `/pending`,
-  `/confirm`, `/tasks`, `/presence` (`src/api/client.ts`).
-- Sending a command, and approving or denying a parked agent action.
-- A Node mock of the desk backend (`mock/server.js`) with its own tests.
+**Real, end to end, and proved on hardware**
+- Transport: LAN probe → cloud fallback → WebSocket with reconnect (`src/link/`),
+  one reducer (`src/state/hudReducer.ts`) shared by every tab.
+- Pairing with a token, stored in SecureStore. Rotation verified: the new token is
+  accepted, the old refused 403.
+- Push to a sleeping phone, which buzzed. Desk-watch alert reaching a closed app,
+  and tapping it opening the alert screen.
+- Chat surviving a force-stop. One socket per launch.
+- Persisted appearance, biometric lock (`LockScreen`, `src/security/`), haptics,
+  location and named places, the Memory screen, camera and photos.
 
-**Real UI over fixture data**
-- Scripts, Script Details, the Reports "script outcomes" list and the sample
-  command output all read `src/data/fixtures.ts`. Nothing about them is live.
+**Built but never once exercised by a human** — the whole of §1.
+- The microphone. `brains.usage.audio` is `0`.
+- The morning briefing. `jarvis_commute_sent` has never been written.
+- The desk-key handshake. `has_desk_key: false`.
 
-**Present but inert**
-- The mic on `CommandBar` calls `onVoice`, which every screen leaves empty.
-- Settings rows marked SOON: General, Notifications, Security.
-- Editing a script.
+**Known-lossy right now**
+- Every sealed cloud turn is discarded for want of the desk's public key — 39 at
+  last count, and the counter only goes up.
+- Gateway rolling memory lives in process RAM under a shared `chat_id 0`. Every
+  Render restart wipes it and every device shares the slot.
 
-**Not persisted at all**
-- Appearance (accent, glow, animations) — `src/theme/appearance.tsx` is memory
-  only, so every cold start resets the user's choices.
-- The desk address. `EXPO_PUBLIC_JARVIS_DESK` is read once at bundle time
-  (`src/link/config.ts`); a user cannot enter their own.
-- Command history — `recent` lives in `JarvisProvider` state.
-
-**Never wired**
-- The pairing token. `saveToken`/`loadToken` exist and `useLink` reads one, but
-  nothing in the UI ever writes one, and `createApi` is called with
-  `token: null`, so REST calls go out unauthenticated.
+**Cost of a one-line JS fix today:** an 11-minute Gradle release build plus an
+install, because there is no OTA channel. That number is why §3 exists.
 
 ---
 
-## 1. Phase one — finish what is already half-built
+## 1. Phase zero — prove what is already built
 
-No backend work. Highest ratio of value to risk.
+**No new features until this section is empty.** Three features have sat "built,
+untested" for four days or more, and one of them is dropping data while it waits.
+Ordered by cost of delay, not by effort.
 
-1. **Persist appearance and endpoint.** One storage module owning
-   `expo-secure-store` for secrets and `AsyncStorage` for preferences, consumed
-   by `AppearanceProvider` and a new endpoint setting. Fixes the two most
-   visible "the app forgot" moments.
-   *Touches:* `src/theme/appearance.tsx`, new `src/state/storage.ts`.
-2. **A real Connection settings screen.** Enter the desk's LAN address, see it
-   validated by an actual probe, save it. Today the address is a build-time
-   constant and the Connection screen can only report failure.
-   *Touches:* `src/screens/ConnectionScreen.tsx`, `src/link/config.ts`.
-3. **Pair with a token.** Enter or scan the desk's pairing token, store it in
-   SecureStore, pass it to `createApi` as well as the socket. Until this lands,
-   any REST call the desk protects will 401.
-   *Touches:* `src/state/JarvisProvider.tsx`, `src/link/useLink.ts`, Settings.
-4. **Screen tests.** Nothing under `src/screens/` is covered except Home,
-   Launch, Settings and Commands. Same pattern as
-   `src/screens/__tests__/settingsAndCommands.test.tsx`.
-5. **Plan task 15**: `__tests__/integration.test.ts` and a `README.md`. Use
-   `mock/nodeFetch.js`'s `nodeFetch` as `fetchImpl` — jest-expo's global fetch
-   returns `status: undefined`.
+1. **The desk-key handshake.** `has_desk_key: false`, and sealed turns are being
+   dropped, not queued. The machinery is complete on both sides; it needs the desk
+   brought up once so the keys can meet. Do this first because it is the only item
+   here whose cost grows while it is deferred.
+   *Touches:* nothing in this repo — `jarvis-brain` and the desk.
+2. **Rotate `BRIDGE_SECRET`.** The old value passed through Render's access log
+   before redaction landed, and it still opens `/desk-link` — a fake desk was
+   connected with it repeatedly during testing. Both ends change together (Render
+   env and `jarvis-backend/.env`), so it needs the desk on: **do it in the same
+   sitting as item 1** rather than waiting for the desk twice.
+3. **Speak into the microphone.** The oldest unverified thing in the project.
+   Chat → hold the mic → speak → release, then read `brains.usage.audio`. The
+   gesture, timer, meter and cancel/lock slides are all covered by tests; whether a
+   clip transcribes is unknown. If the result is `fell_back` with
+   `last_error_was_quota: false`, the mime type is wrong — the phone records m4a and
+   Google documents `audio/aac`, not `audio/mp4`. That is a one-line fix, and it is
+   the original complaint that started this feature.
+4. **Fire a real briefing.** Settings → Places → set Home while standing in it, set
+   a leaving time, then PREVIEW — do not wait for tomorrow to find out.
+   **Read the 08-17 finding before trusting the result:** PREVIEW is the only path
+   that can run `installHandler`, because it can only be pressed with the app open.
+   It makes noise now solely because `preview: true` opts in. A real 20:00 briefing
+   never touches that handler, so PREVIEW proves the content and the schedule,
+   never the alerting. Home still reads `Not set`, and the briefing falls back to a
+   live fix that a headless task cannot get — the gateway holding the schedule is
+   the real fix, and it is in §5.
+   *Touches:* `src/lib/notify.ts`, `syncCommuteTask`, `src/screens/PlacesScreen.tsx`.
+5. **Re-test the located answers.** Both have been unverified since the fix landed
+   on 08-13. Ask "is it raining here?" with sharing on — it should quote measured
+   figures, and "could not fetch" means the phone's own lookup failed, so check
+   sharing is on first, since without it no `where` is sent at all. Then "how far to
+   the office" with Office named; it resolves against the label with no geocoder
+   call, while unnamed destinations still go through Nominatim.
 
-## 2. Phase two — make the live data live
+**The lock-screen trap that blocked the last attempt at 3–5:** `adb` can wake the
+display but cannot unlock it, so the app launches behind the keyguard and never
+reaches the foreground. `apps_linked: 0` in that state means nothing. Unlock the
+phone by hand before testing any of this.
 
-Each of these swaps a fixture for a real call that already exists.
+---
 
-1. **Scripts from `/api/tasks`.** The endpoint is in the REST client and unused.
-   Keep the fixtures as the offline fallback so the list is never empty in a
-   demo, but label the difference honestly.
-   *Touches:* `src/screens/ScriptsScreen.tsx`, `src/data/fixtures.ts`.
-2. **Reports from telemetry.** `VitalsPanel` already renders live telemetry when
-   frames arrive; the script-outcome list underneath it is still fixture data.
-3. **Command result from the reply frame.** `CommandsScreen.latestReply()` falls
-   back to `SAMPLE_RESULT` when disconnected — make the fallback visibly a
-   sample rather than something that reads as a real machine's output.
-4. **Command history that survives a restart**, written by the same storage
-   module from phase one.
+## 2. Phase one — stop losing what it learns
 
-## 3. Phase three — the things that make it feel like a product
+Both items are named in `RESUME.md` as the enabling conditions for forced tool-use,
+so §4 is gated on this section.
 
-1. **Voice.** `expo-speech-recognition` or a desk-side STT round trip: hold the
-   mic, stream or post the clip, drop the transcript into the command bar for
-   confirmation before sending. The user asked for the icon first, deliberately;
-   this is the follow-through. Needs a microphone permission string in
-   `app.json` and a clear recording indicator.
-2. **Push notifications** for finished jobs and for parked actions awaiting
-   approval — the one case where the phone genuinely needs to interrupt.
-   Needs `expo-notifications`, a token registered with the desk, and a real
-   quiet-hours setting rather than the inert Notifications row.
-3. ~~**Haptics**~~ — done. `src/lib/haptics.ts` holds the whole vocabulary:
-   a tap for a control firing, success and warning for outcomes. Wired to
-   `Button`, `RunButton`, the toast (so an outcome can never feel one way here
-   and another there) and each detent of the tab dial. Still to do: a setting
-   to turn it off, alongside the animations toggle.
-4. **Widget / quick actions** — a home-screen shortcut straight to the command
-   bar. iOS App Intents and Android app shortcuts; both need a dev build.
-5. **Script editing.** Blocked on §4.
+1. **Gateway memory out of process RAM.** Rolling memory under `chat_id 0` in RAM
+   means a Render restart wipes it and every device shares one slot. Supabase is
+   already carrying the 12 stored facts and survives restarts; this belongs there.
+   *Touches:* `jarvis-brain`, not this repo.
+2. **Send the chat history.** The log is local-only (`src/state/chatStore.ts`) and
+   the envelope carries exactly one turn, so the brain is reasoning from a memory
+   the phone could have given it.
+   *Touches:* `src/state/chatStore.ts`, `JarvisProvider.sendCommand`.
 
-## 4. Blocked on the desk backend
+---
 
-Collected so the backend work can be scoped once:
+## 3. Phase two — stop debugging blind
 
-- **Script CRUD.** `/api/tasks` lists; there is no create, update, delete, or
+1. **Crash and error reporting.** Owed before any external tester sees this, and
+   more urgently than that: a native crash here is silent — no red box, nothing an
+   `ErrorBoundary` sees — so today the only diagnosis is `adb logcat` on the one
+   machine that built the APK.
+2. **OTA updates (`expo-updates`).** A JS-only fix currently costs an 11-minute
+   release build plus an install. Most fixes in this project are JS-only.
+   *Touches:* `app.json`, `eas.json`.
+3. **A real release keystore.** Release is signed with Expo's generated debug
+   keystore, which is why the local APK and an EAS-signed one cannot be installed
+   over each other. Fine while it is one phone; not fine at the first second
+   device. See `android/app/build.gradle:112`.
+4. **Render keep-warm, or accept the wait.** The free tier spins down after 15
+   minutes and the first message pays ~50s of cold start. Nothing on the phone can
+   fix this; a ping or a paid instance is the whole of the choice. The cloud probe
+   timeout was already raised 4s → 8s, so the first probe after idle will miss and
+   the next tick catches it — that is by design, not a bug to chase.
+
+---
+
+## 4. Phase three — make the answers trustworthy
+
+Gated on §2. Ordered so that nothing is built on a silent failure.
+
+1. **Verify Tavily first.** It is suspected of not working and cannot be checked
+   from this repo — it lives in `jarvis-backend`. If search is silently failing,
+   every question needing a lookup falls back to the model's weights, which looks
+   exactly like the hallucination being reported. A failed search must surface as
+   "I could not look that up", never as a fluent answer. Check this before building
+   anything else on the gateway.
+2. **Force tool-use over prose.** Weather, distance, time and telemetry become
+   function calls; no tool answer means "I don't know". `RESUME.md` calls this the
+   actual cure for hallucination.
+3. **Provenance in the chat UI** — measured / from the desk / from memory. Makes
+   guessing visible instead of anecdotal.
+   *Touches:* `src/screens/ChatScreen.tsx`, `src/ws/frames.ts`.
+
+---
+
+## 5. Blocked on the desk or the gateway
+
+Collected so the backend work can be scoped once.
+
+- **The briefing schedule.** The gateway holding it is the real fix for §1.4; a
+  headless task on the phone cannot get the live fix it currently falls back to.
+- **Script CRUD.** `/api/tasks` lists; there is no create, update, delete or
   run-by-id. Script Details' EDIT button is disabled for exactly this reason.
 - **Run history.** Outcomes and durations per run, so Reports stops inventing
   "Last run: 2h ago" from a fixture.
-- **A push token registry** and a server-side sender.
-- **App auth**: issue and revoke pairing tokens, and reject unauthenticated
-  calls. Design §6 owes this and it is unverified from here.
-- **Cloud gateway `/app-link`.** The app side of automatic failover is done and
-  wired: `chooseMode` probes the desk, then the cloud, then goes dark, and
-  re-probes on a 5s tick, on foreground, and on any network change.
-  `EXPO_PUBLIC_JARVIS_CLOUD` now points at
-  `https://jarvis-cloud-gateway.onrender.com`, whose `/health` answers 200.
+- **Presence**, so the app can say the desk is awake but idle rather than inferring
+  it from socket state.
+- **A paid routing key.** Routing is OSRM's public server, which knows the road
+  graph and not the road, so durations are free-flowing and the context says so.
+  `_route_blocking` / `_route_to_blocking` are the only functions that change when
+  a Mapbox or TomTom key exists.
+- **Desk-watch, desk side.** The phone half is done; `docs/desk-watch.md` holds what
+  is owed. The desk owns the countdown and silence locks — the phone's countdown is
+  a readout, never a decision timer.
 
-  What the gateway still owes, checked 2026-08-11 against its own
-  `/openapi.json` — it serves exactly `/health`, `/`, and one webhook path:
+---
 
-  1. **`WS /app-link`**, accepting `?token=…`, speaking the frames in
-     `src/ws/frames.ts` and taking a bare command string (no JSON envelope —
-     `LinkMachine.send` writes the text straight to the socket).
-  2. **`{"app_link": true}` in the `/health` body.** The app refuses to choose
-     a gateway that does not declare this, because a 200 alone would flip it to
-     CLOUD and leave it on a dead socket — worse than staying dark. Add the
-     flag only once the socket actually exists.
-  3. Optionally `/api/backdoor` and `/api/confirm`, which would let commands
-     work over REST while the socket is down.
+## 6. Phase four — platform debt
 
-  The free tier also sleeps; the cloud probe timeout was raised 4s → 8s, but a
-  cold start still takes tens of seconds, so the first probe after idle will
-  miss and the next tick will catch it.
-- **Presence**, so the app can say the desk is awake but idle, rather than
-  inferring it from socket state.
+None of this blocks daily use. All of it is cheap and gets more expensive to
+discover later.
 
-## 5. Quality and platform
-
-- **Accessibility pass.** Touch targets are floored at 44–64px and roles are
-  set, but nothing has been checked with a screen reader, and the dim palette
-  (`COLOR.dim` on `COLOR.panel`) needs a contrast audit.
-- **Reduced motion.** The Appearance toggle already gates every animation; wire
-  it to the OS setting (`AccessibilityInfo.isReduceMotionEnabled`) as the
-  default rather than requiring the user to find it.
-- **Light theme.** "System" on the Appearance screen behaves identically to
-  Dark. Either build the light palette or remove the option — a setting that
-  does nothing is worse than an absent one.
+- **Light theme: decide or remove.** "System" on the Appearance screen behaves
+  identically to Dark. A setting that does nothing is worse than an absent one.
+- **Accessibility pass.** Touch targets are floored at 44–64px and roles are set,
+  but nothing has been checked with a screen reader, and `COLOR.dim` on
+  `COLOR.panel` needs a contrast audit.
+- **Reduced motion from the OS.** The Appearance toggle already gates every
+  animation; default it to `AccessibilityInfo.isReduceMotionEnabled` rather than
+  making the user find it.
+- **Default the local build to arm64.** The universal APK is 100.7 MB across four
+  ABIs with `minifyEnabled false`; arm64-only is ~35 MB and the phone is arm64.
+  `-PreactNativeArchitectures=arm64-v8a`. Consider moving this and the 6144m
+  jvmargs into `expo-build-properties` so both survive `prebuild --clean` — that
+  reset has cost time twice.
 - **Tablet and landscape.** `orientation` is locked to portrait and the layout
-  assumes a phone; the reactor and the 2×2 quick-action grid both need a
-  breakpoint before iPad is claimed.
-- **Error surfaces.** `lastError` is shown only on the Connection screen. A
-  failed command currently reports success-shaped toast copy.
-- ~~**EAS build**~~ — done. `eas.json` `preview` profile builds a signed APK;
-  first one shipped 2026-08-11 from `da7bf8a`. Still to do: **OTA updates**
-  (`expo-updates`, so a UI change reaches the phone without a rebuild) and a
-  `development` client build, which voice, notifications and widgets all need.
-- **Crash and error reporting** before any external tester sees it.
+  assumes a phone; the reactor and the 2×2 quick-action grid both need a breakpoint
+  before iPad is claimed.
+- **Error surfaces.** `lastError` shows only on the Connection screen, and a failed
+  command still reports success-shaped toast copy.
+- **`AGENTS.md` says 287 tests.** It is 426, and it was stale before 08-14 too.
+- **Widgets / quick actions.** A home-screen shortcut straight to the command bar —
+  iOS App Intents and Android app shortcuts.
 
-## 6. Deliberately not doing
+---
 
-- **A light theme for the HUD's own sake.** The instrument look is the product;
-  a light variant is only worth building if a real user asks.
+## 7. Deliberately not doing
+
+- **A light theme for the HUD's own sake.** The instrument look is the product; a
+  light variant is only worth building if a real user asks. §6 is about removing the
+  dead option, not building the theme.
 - **Offline command queue.** The toast says "queued" today, which is a lie of
-  convenience — either build a real queue with retry and expiry, or change the
-  copy to say the command was dropped. Prefer changing the copy first.
+  convenience — either build a real queue with retry and expiry, or change the copy
+  to say the command was dropped. Change the copy first.
 - **Animation for its own sake.** The bounce was removed on purpose. New motion
   needs a reason beyond decoration.
+- **Rebuilding a notification channel to explain a silence.** Two sessions went to
+  this and the channel was never the problem. Read the dump
+  (`adb shell dumpsys notification`) and check which code path the test actually
+  ran through before touching a channel id. Related: force-stop the app before
+  renaming a channel, or Fast Refresh can spend the id on the old settings.
 
 ---
 
 ## Suggested order
 
-Phase one is four to six sessions and needs nobody else. Phase two is a session
-once the desk answers. Phase three is gated on a dev build, so start the EAS
-setup in §5 while phase one is in flight — it is the long pole for voice,
-notifications and widgets alike.
+§1 is one sitting with the desk on for items 1–2, then one sitting with the phone
+in hand and unlocked for 3–5. Nothing else should start until it is empty — three
+of these have been "nearly verified" for four days, and the project's two most
+expensive bugs were both a stale assumption treated as proved.
+
+§2 and §3 are independent of each other and neither needs the desk, so either can
+fill a session where the desk is unavailable. §3.2 (OTA) pays for itself fastest,
+since it removes an 11-minute cycle from every JS fix after it.
+
+§4 waits on §2 by design. §6 is filler for short sessions.

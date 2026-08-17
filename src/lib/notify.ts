@@ -28,11 +28,38 @@ import { Platform } from 'react-native';
 export const WATCH_CHANNEL = 'desk-watch-v2';
 const LEGACY_WATCH_CHANNEL = 'desk-watch';
 /**
- * `-v2` because the original was silent and a channel cannot be un-silenced.
- * See the comment where it is created.
+ * Android freezes a channel's importance, vibration and sound at creation, so a
+ * channel is not a setting — it is an id, and changing how this one feels costs a
+ * new one every time. `general` shipped silent, `general-v2` shipped malformed,
+ * and the versions after them were spent tuning the buzz by ear on the device.
+ * See the comment where it is created. The shipped ids are deleted below.
+ *
+ * **Stop the app before renaming a channel.** `-v4` was lost to Fast Refresh: the
+ * id here was changed one save before the vibration below it, the running app
+ * reloaded in between, and `prepare()` created `general-v4` carrying the *old*
+ * pattern. Android froze it there, so the finished edit could never reach a phone
+ * that had already reloaded once. A channel id and the settings under it have to
+ * arrive in the same launch, which on a machine with a device attached means
+ * force-stopping first — a hot reload is enough to spend an id.
  */
-export const GENERAL_CHANNEL = 'general-v2';
-const LEGACY_GENERAL_CHANNEL = 'general';
+export const GENERAL_CHANNEL = 'general-v8';
+/**
+ * Superseded ids, deleted at start-up so they stop appearing in the user's
+ * notification settings as rows nothing posts to.
+ *
+ * `general` and `general-v2` shipped in pushed builds, so any install can be
+ * carrying them. `general-v7` never shipped — but it was created on the test phone
+ * during the session that tuned the buzz, and an id has to stay on this list until
+ * a launch has actually cleared it. It was briefly dropped on the reasoning that
+ * unshipped ids do not matter, which was wrong within the same session: the next
+ * change stranded it, visible, on the only phone that runs this.
+ *
+ * The ids between `-v2` and `-v7` are absent because a launch already deleted them
+ * there. Deleting is not what keeps a channel gone — Android tombstones the id and
+ * keeps its frozen settings either way — so removing a cleared id from this list
+ * cannot bring it back.
+ */
+const LEGACY_GENERAL_CHANNELS = ['general', 'general-v2', 'general-v7'];
 
 /** the actionable category, so an alert can be answered from the shade */
 export const WATCH_CATEGORY = 'desk-watch-alert';
@@ -55,15 +82,44 @@ export type NotifyCapability = {
  */
 export function installHandler(): void {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
+    handleNotification: async (notification) => ({
       shouldShowBanner: true,
       shouldShowList: true,
-      // the app already plays its own haptics and toasts for anything it is
-      // showing on screen; a second sound on top reads as a double alert
-      shouldPlaySound: false,
+      shouldPlaySound: shouldAlertWhileOpen(notification?.request?.content?.data),
       shouldSetBadge: false,
     }),
   });
+}
+
+/**
+ * Whether a notification arriving while the app is open should make noise.
+ *
+ * **`shouldPlaySound` is also the vibration switch.** There is no separate
+ * vibrate field in the behaviour record, and the native builder reads this one
+ * for both — `ExpoNotificationBuilder.kt`:
+ *
+ *     val behaviorAllowsVibration = notificationBehavior?.shouldPlaySound ?: true
+ *     if (!shouldPlaySound && !shouldVibrate) builder.setSilent(true)
+ *
+ * `setSilent(true)` suppresses the buzz as well as the sound, and it is the
+ * `SILENT` in a posted record's `flags=AUTO_CANCEL|SILENT`.
+ *
+ * That flag cost three sessions of misdiagnosis. A blanket `false` here — right
+ * for an ordinary notification, since the app is already answering on screen with
+ * its own toast and haptic — also silenced **the preview**, which is the one
+ * notification pressed specifically to hear what the real thing sounds like, and
+ * which can only ever be pressed with the app open. Silence was read as a broken
+ * channel, and `general` was rebuilt twice chasing it. The channel was never at
+ * fault: it has carried the default sound URI throughout.
+ *
+ * So the default stays quiet and anything that is *about* being noticed opts in.
+ */
+function shouldAlertWhileOpen(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  // a preview is a test of the delivery path; answering it silently tests the
+  // wrong half
+  return d.preview === true || d.alertWhenOpen === true;
 }
 
 /**
@@ -121,27 +177,64 @@ export async function prepare(): Promise<boolean> {
        * which is the same treatment the watch channel already had — and the reason
        * that one buzzed while this one never did.
        *
-       * **`general-v2`, not `general`.** Android freezes importance, vibration and
+       * **`general-v8`, not `general`.** Android freezes importance, vibration and
        * light when a channel is created, so editing the old one changes nothing on
        * an install that already has it. Every phone that ever ran this app has a
        * silent `general`, and only a new id can escape it.
+       *
+       * **No `sound` key.** `sound: 'default'` was the v2 attempt and it is not the
+       * system-default alias any more: expo-notifications 57 reads any string as a
+       * *custom* filename and looks it up in the config plugin's `sounds` array.
+       * It is not there, so the call logged
+       *
+       *     expo-notifications: Custom sound 'default' not found in native app.
+       *
+       * and Expo stopped before applying the audio attributes. Proved on device —
+       * `general-v2` came out with `mAudioAttributes=null` while every other channel
+       * on the phone, including `desk-watch-v2`, had them set. So the fix that was
+       * supposed to un-mute the briefing shipped a second malformed channel.
+       *
+       * Omitting the key is what the watch channel does, and that one is the only
+       * channel here ever proved audible on hardware. Android then fills in the
+       * user's default notification sound itself.
        */
       await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL, {
         name: 'J.A.R.V.I.S.',
         importance: Notifications.AndroidImportance.DEFAULT,
-        // shorter and softer than the watch pattern: this is "look at me when you
-        // get a moment", not "a machine is about to lock"
-        vibrationPattern: [0, 220],
+        /**
+         * A long pulse then a shorter one, close together — falling, not repeating.
+         *
+         * Tuned by ear across several attempts, and the route matters because the
+         * first instinct was wrong twice over. It began at `[0, 220]` — "shorter
+         * and softer than the watch pattern" — which reads as a twitch you are not
+         * sure you felt: reported as "just small time buzzed". **A channel cannot
+         * ask for a higher amplitude, so duration is the whole of how strong a buzz
+         * feels**, and 220ms is under half the contact every other app sends. Then
+         * Android's default `[0, 250, 250, 250]` — the pattern WhatsApp gets — a
+         * beat slow. Then `[0, 200, 100, 200]`, too light again. Then
+         * `[0, 500, 200, 500]`, which was heavy enough but is the watch alert's own
+         * shape with a pulse removed, and two even beats against three are not much
+         * to tell apart through a pocket.
+         *
+         * The uneven pair is what fixed that. Equal pulses read as a repeat and
+         * invite counting; 400 falling to 250 reads as a single gesture and is told
+         * apart from the watch's three even 500s by shape rather than by length.
+         * The watch stays the heaviest thing the phone does, and must remain so —
+         * if these two are ever confused in use, shorten this one rather than
+         * lengthening that one.
+         */
+        vibrationPattern: [0, 400, 100, 250],
         enableVibrate: true,
-        sound: 'default',
         lightColor: '#3ea6ff',
       });
-      // the silent original, removed so it stops appearing in the user's
-      // notification settings for a channel nothing posts to any more
-      try {
-        await Notifications.deleteNotificationChannelAsync(LEGACY_GENERAL_CHANNEL);
-      } catch {
-        // absent on a fresh install, which is the state we wanted anyway
+      // the silent original and the malformed v2, removed so they stop appearing
+      // in the user's notification settings as channels nothing posts to any more
+      for (const dead of LEGACY_GENERAL_CHANNELS) {
+        try {
+          await Notifications.deleteNotificationChannelAsync(dead);
+        } catch {
+          // absent on a fresh install, which is the state we wanted anyway
+        }
       }
     }
 

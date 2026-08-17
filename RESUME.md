@@ -71,6 +71,148 @@ is documented here because it has cost time twice.
 
 ---
 
+## Resume point — 2026-08-17: the briefing was never mute, the preview was
+
+**Pushed.** 426 tests, `tsc --noEmit` clean. Nothing native changed, so the
+notification work ships in a JS reload — no rebuild, no `prebuild`. The diff is
+`src/lib/notify.ts` and its test, plus `ROADMAP.md` (rewritten, see below).
+
+Everything below was proved on the phone over wireless adb
+(`adb connect <phone>:<port>`, then `adb reverse tcp:8081 tcp:8081` so the debug
+build reaches Metro), reading `adb shell dumpsys notification` rather than
+trusting the shade.
+
+### The mute channel was a phantom, and this file was wrong about it twice
+
+Two sessions were spent rebuilding the `general` channel to explain a silent
+briefing, and 08-14 below records that theory as settled. It is not correct.
+Keep it for the trail, but the diagnosis is this one.
+
+A posted preview reads `flags=AUTO_CANCEL|SILENT vibrate=null sound=null`, which
+08-14 read as proof the channel was mute. The channel was fine: `general-v2` was
+carrying `mSound=content://settings/system/notification_sound` the whole time.
+The `SILENT` comes from `installHandler`, and specifically from this, which had
+looked obviously right since the day it was written:
+
+```ts
+shouldPlaySound: false,   // "a second sound on top reads as a double alert"
+```
+
+**`shouldPlaySound` is also the vibration switch.** There is no separate vibrate
+field in the behaviour record — `ExpoNotificationBuilder.kt` reads this one for
+both, then calls `builder.setSilent(true)` when neither is wanted, which is the
+`SILENT` in the dump:
+
+```kotlin
+val behaviorAllowsVibration = notificationBehavior?.shouldPlaySound ?: true
+if (!shouldPlaySound && !shouldVibrate) builder.setSilent(true)
+```
+
+That handler only runs when a notification lands while the app is **open** — and
+**PREVIEW can only ever be pressed with the app open**. So every test of this
+feature has been run through the one code path built to silence it, and the
+silence was read as a broken channel. A real briefing arriving with the app shut
+never touches the handler, which is consistent with the thing already proved on
+08-13: a push to a sleeping phone buzzed.
+
+So the default stays quiet — the app is already answering on screen with its own
+toast and haptic — and anything *about* being noticed opts in. `postNow` data
+carrying `preview: true` or `alertWhenOpen: true` is now heard. Three tests pin it.
+
+### Two Android traps this cost, both worth more than the fix
+
+**A hot reload can spend a channel id.** Android freezes importance, vibration
+and sound at creation, so retuning the buzz means a new id each time. `general-v4`
+was lost to Fast Refresh: the id was changed one save before the vibration under
+it, the running app reloaded in between, and `prepare()` created the channel
+carrying the *old* pattern — frozen there, unreachable by the finished edit.
+**Force-stop the app before renaming a channel**, so the id and its settings
+arrive in the same launch.
+
+**An unshipped id still has to be cleaned once.** `LEGACY_GENERAL_CHANNELS` was
+trimmed to only the ids that reached a pushed build, on the reasoning that a
+tuning id nobody else has does not matter. Within the same session the next change
+stranded `general-v7` on this phone, `mDeleted=false`, visible in Settings as a
+dead row. It is back on the list. Deleting is not what keeps a channel gone —
+Android tombstones the id either way — so a *cleared* id can safely leave the list,
+but a live one cannot.
+
+### Where the buzz landed
+
+`general-v8`, `vibrationPattern: [0, 400, 100, 250]` — a long pulse falling to a
+shorter one. Tuned by ear on the device, and every earlier guess was wrong:
+
+| Pattern | Verdict |
+| --- | --- |
+| `[0, 220]` | "just small time buzzed" — a twitch you are not sure you felt |
+| `[0, 250, 250, 250]` | Android's default, the one WhatsApp gets. A beat slow |
+| `[0, 200, 100, 200]` | quick double-tap, still too light |
+| `[0, 500, 200, 500]` | heavy enough, but it is the watch alert minus one pulse |
+| `[0, 400, 100, 250]` | **kept.** Uneven, so it reads as one gesture, not a repeat |
+
+**A channel cannot ask for a higher amplitude.** Duration is the whole of how
+strong a buzz feels, which is why 220ms was imperceptible next to every other app.
+The watch keeps its three even 500s and must stay the heaviest thing the phone
+does — if the two are ever confused in use, shorten this one rather than
+lengthening that one.
+
+### Confirmed on the device while here
+
+**Home is still `Not set`** on the Places screen, which is exactly what 08-14
+suspected: the morning briefing falls back to a live fix a headless task cannot
+get, and `jarvis_commute_sent` has still never been written. The gateway holding
+the schedule remains the real fix.
+
+The app itself is healthy — CLOUD linked, ONLINE, location resolving to
+Bidhannagar, 1803 modules bundling clean.
+
+### Left where it was found
+
+- **The desk-watch alert is still silent in the foreground.** Same handler, and it
+  does not opt in. Defensible, since the app renders the alert screen itself — but
+  it is now a decision rather than an accident. `alertWhenOpen: true` flips it.
+- **Nobody has still spoken into the microphone.** `brains.usage.audio` is `0`.
+  Unchanged from 08-13 and 08-14; it is now the oldest unverified thing here.
+- `AGENTS.md` says 287 tests. It is 426.
+
+### A standalone APK now exists, and it is 100.7 MB
+
+`cd android && ./gradlew.bat app:assembleRelease` — 11 minutes, exit 0, installed
+over the 08-14 sideload with `adb install -r` and no uninstall, because the debug
+keystore signs both. `assets/index.android.bundle` is embedded at 3.5 MB, so this
+one runs with Metro off and away from this machine. PID confirmed alive, no
+tombstone. Wireless adb found the phone through `adb mdns services` rather than a
+remembered address — the pairing survived, and the port randomises on every
+toggle of Wireless debugging, so discovery is the reliable route.
+
+**It is 100.7 MB, not the 38.6 MB recorded on 08-12.** Nothing regressed: this was
+a universal APK over all four ABIs in `reactNativeArchitectures` with
+`minifyEnabled false`, and the phone is arm64, so three of the four native lib
+sets are dead weight. `-PreactNativeArchitectures=arm64-v8a` brings it back to
+~35 MB. The 08-12 figure was almost certainly an arm64-only build and did not say
+so, which is why this note does.
+
+**The desk stayed cloud-only.** `EXPO_PUBLIC_JARVIS_DESK` is still commented out
+in `.env.local`, and it bakes at bundle time, so this APK resolves the desk to
+`127.0.0.1` and can only reach the gateway. Deliberate — a baked LAN IP works on
+one network and lies on every other.
+
+### `ROADMAP.md` was rewritten, and the old one deleted
+
+The 08-11 roadmap had gone actively wrong: it listed pairing as "never wired" and
+Scripts and Reports as fixture-only, all of which shipped by 08-14. It is replaced
+rather than archived, on the same reasoning this file learned the hard way with the
+mute channel — a stale claim recorded as settled costs more than a lost trail.
+
+The new ordering puts **the desk-key handshake first**, ahead of the microphone,
+because it is the only open item whose cost grows while it waits: sealed turns are
+dropped, not queued. `BRIDGE_SECRET` rotation is bundled into the same sitting,
+since both need the desk on and waiting for the desk twice is how that rotation
+keeps slipping. Nothing new gets built until the three untested features are
+proved.
+
+---
+
 ## Resume point — 2026-08-14: the question now says when and where
 
 **Not pushed. Not yet on a phone.** 410 tests, `tsc --noEmit` clean. Nothing
@@ -392,6 +534,11 @@ Settings were correct all along: Home 8:00 AM on, Office 7:00 PM on, Mon–Fri.
    to be named, which is the treatment the watch channel already had and is why that
    one buzzed. Now `general-v2`, because **Android freezes importance, vibration and
    light at creation** — the same lesson `desk-watch-v2` taught, relearned.
+
+   > **Wrong — see 2026-08-17 above.** The `SILENT` in that dump is the foreground
+   > handler's `shouldPlaySound: false`, which is the vibration switch too. The
+   > channel was carrying the default sound throughout, and rebuilding it changed
+   > nothing. The freezing-at-creation half is right and still matters.
 2. **The Office preview was right to say nothing.** It toasts "Nothing worth warning
    about in that window" and posts no notification when no threshold is crossed.
    Silence is the designed answer; it is indistinguishable from failure.
