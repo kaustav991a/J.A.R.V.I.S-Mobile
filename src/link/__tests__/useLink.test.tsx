@@ -16,6 +16,9 @@ class FakeMachine {
   static last: FakeMachine | null = null;
   started = 0;
   stopped = 0;
+  suspends = 0;
+  resumes = 0;
+  suspended = false;
   reprobes = 0;
   ticks = 0;
   sent: string[] = [];
@@ -30,6 +33,17 @@ class FakeMachine {
   }
   stop() {
     this.stopped++;
+  }
+  resume() {
+    this.resumes++;
+    this.suspended = false;
+  }
+  suspend() {
+    this.suspends++;
+    this.suspended = true;
+    // mirrors the real one: the socket is gone, so the snapshot says closed —
+    // which is what `reprobeIfDown` reads on the way back
+    this.push({ ...this.snapshot, status: 'closed' });
   }
   async reprobe() {
     this.reprobes++;
@@ -128,11 +142,32 @@ describe('useLink', () => {
     expect(FakeMachine.last?.reprobes).toBe(1);
   });
 
-  it('leaves a live socket alone when the app comes back to the foreground', async () => {
-    // Re-probing unconditionally threw away a working connection and opened a
-    // new one — and the gateway greets every connection, so switching away and
-    // back printed "Cloud brain only…" into the chat each time. A socket that is
-    // open but secretly dead is the watchdog's job, not this trigger's.
+  /**
+   * Backgrounding now closes the socket on purpose, so this used to assert the
+   * opposite.
+   *
+   * The old test held that an open socket must survive a background — the concern
+   * being that re-dialling replayed the gateway's greeting into the chat every time
+   * the app was looked at. That greeting is filtered now (`linkNotice` in
+   * `hudReducer` drops `online`/`offline` status messages), and leaving the socket
+   * open turned out to cost the thing the app is for: the gateway went on writing
+   * replies into a socket Android had already suspended, saw the write succeed, and
+   * so never pushed. An answer asked for and then pocketed was lost.
+   *
+   * What still must not happen is churn, which is what the next test pins.
+   */
+  it('closes the socket on the way out, so the far end knows to push', async () => {
+    await renderHook(() => useLink({ onFrame: jest.fn(), machineFactory: factory, token: 'sekrit' }));
+    await act(async () => {
+      FakeMachine.last!.push({ mode: 'cloud', status: 'open', lastError: null });
+      appStateListener()('background');
+    });
+    expect(FakeMachine.last?.suspends).toBe(1);
+    // and not as a user-initiated disconnect, which would refuse to come back
+    expect(FakeMachine.last?.stopped).toBe(0);
+  });
+
+  it('re-dials on the way back in, since it closed on the way out', async () => {
     await renderHook(() => useLink({ onFrame: jest.fn(), machineFactory: factory, token: 'sekrit' }));
     await act(async () => {
       FakeMachine.last!.push({ mode: 'cloud', status: 'open', lastError: null });
@@ -140,6 +175,43 @@ describe('useLink', () => {
       onChange('background');
       onChange('active');
     });
+    expect(FakeMachine.last?.reprobes).toBe(1);
+  });
+
+  /**
+   * A missed transition must not strand the link.
+   *
+   * `suspend()` latches a flag that blocks the watchdog, and the watchdog is the
+   * only thing that recovers a connection nothing else noticed. So a latch left set
+   * is a dead link until the app is restarted. Clearing it on every `active` event —
+   * rather than only on a `background -> active` pair we managed to observe — is
+   * what makes a coalesced or dropped transition survivable.
+   */
+  it('lifts the suspension on any active event, not just a detected return', async () => {
+    await renderHook(() => useLink({ onFrame: jest.fn(), machineFactory: factory, token: 'sekrit' }));
+    await act(async () => {
+      const onChange = appStateListener();
+      onChange('background');
+      // the pair the handler would recognise never arrives; this is the coalesced
+      // case, where the only thing seen is that we are active again
+      onChange('inactive');
+      onChange('active');
+    });
+    expect(FakeMachine.last?.suspended).toBe(false);
+    expect(FakeMachine.last?.resumes).toBeGreaterThan(0);
+  });
+
+  it('holds the link through an inactive blip, which is not going away', async () => {
+    // a notification shade, a permission sheet, a call overlay — the user is still
+    // in the app, and dropping the link for these is the churn the old test feared
+    await renderHook(() => useLink({ onFrame: jest.fn(), machineFactory: factory, token: 'sekrit' }));
+    await act(async () => {
+      FakeMachine.last!.push({ mode: 'cloud', status: 'open', lastError: null });
+      const onChange = appStateListener();
+      onChange('inactive');
+      onChange('active');
+    });
+    expect(FakeMachine.last?.suspends).toBe(0);
     expect(FakeMachine.last?.reprobes).toBe(0);
   });
 

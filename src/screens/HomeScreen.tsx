@@ -70,8 +70,28 @@ export function HomeScreen() {
   // the third generic is the id `getParent` may be called with
   const nav = useNavigation<NativeStackNavigationProp<HomeStackParams, 'HomeMain', typeof TABS_ID>>();
   const { accent, animations, glow } = useAppearance();
-  const { hud, mode, connected, connecting, connect, decide, unread, shareLocation, place, refreshPlace } =
-    useJarvis();
+  const {
+    hud,
+    mode,
+    connected,
+    connecting,
+    connect,
+    decide,
+    unread,
+    alertsUnread,
+    shareLocation,
+    place,
+    refreshPlace,
+  } = useJarvis();
+
+  /**
+   * What the bell shows: things you have not seen, plus things still waiting on you.
+   *
+   * Two different kinds of attention deliberately summed into one number, because
+   * one 23px glyph cannot carry two marks. Reading the sheet clears the first half
+   * only — see `markAlertsRead`.
+   */
+  const bellCount = alertsUnread + hud.parked.length;
 
   // the clock, not the session, decides the greeting — so it has to be re-read
   // while the screen is open, on the minute
@@ -189,7 +209,16 @@ export function HomeScreen() {
           onPress={() => nav.navigate('Activity')}
         >
           <Ionicons name="notifications-outline" size={23} color={COLOR.white} />
-          {hud.parked.length > 0 ? <View testID="home-alert-dot" style={styles.alertDot} /> : null}
+          {/* A count, not a dot. The dot was driven by `parked.length` alone, so a
+              timeline full of things you had not seen looked exactly like an empty
+              one. Parked approvals are added on top of the unread count rather than
+              replaced by it: marking the sheet read cannot clear something that is
+              still waiting on a decision. */}
+          {bellCount > 0 ? (
+            <View testID="home-alert-count" style={styles.alertCount}>
+              <Text style={styles.alertCountText}>{bellCount > 9 ? '9+' : String(bellCount)}</Text>
+            </View>
+          ) : null}
         </Touchable>
       </View>
 
@@ -361,14 +390,25 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  alertDot: {
+  alertCount: {
     position: 'absolute',
-    top: -1,
-    right: -1,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: -4,
+    right: -6,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLOR.blue,
+  },
+  alertCountText: {
+    ...TYPE.dataLabel,
+    fontSize: 9,
+    lineHeight: 14,
+    // dark on the blue, so the digit is the hole rather than a second bright thing
+    color: COLOR.bg,
+    includeFontPadding: false,
   },
   greetRow: { flexDirection: 'row', alignItems: 'center', marginTop: SPACE.xl, marginBottom: SPACE.xl },
   greetText: { flex: 1 },

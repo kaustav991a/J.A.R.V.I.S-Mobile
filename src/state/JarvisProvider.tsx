@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { hudReducer, initialHudState, HudState } from './hudReducer';
 import { clearChat, loadChat, saveChat } from './chatStore';
 import { demoFrames, demoReply } from './demoFeed';
@@ -35,6 +35,7 @@ import {
   onAlertTapped,
   postNow,
   registerForPush,
+  shouldNotifyReply,
 } from '../lib/notify';
 import { haptic } from '../lib/haptics';
 import {
@@ -94,9 +95,23 @@ export type JarvisContextValue = {
   clearRecent: () => void;
   /** replies since the chat was last opened */
   unread: number;
+  /**
+   * Activity events not yet seen, for the count on the bell. Parked approvals are
+   * NOT included — the bell adds those itself, because marking things read must not
+   * clear something that still needs a decision.
+   */
+  alertsUnread: number;
+  /** the activity sheet was read: everything up to now has been seen */
+  markAlertsRead: () => void;
   /** the Chat screen came into focus: everything up to now has been seen */
   markChatRead: () => void;
-  /** the Chat screen is (or is no longer) on screen — suppresses reply notifications */
+  /**
+   * The Chat screen is (or is no longer) on screen, which keeps `unread` honest.
+   *
+   * It used to suppress reply notifications too, and could not: navigation blur
+   * does not fire when the app is backgrounded, so this stayed true for a phone in
+   * a pocket. `shouldNotifyReply` asks about the app being on screen instead.
+   */
   setChatFocused: (focused: boolean) => void;
   /** forget the whole conversation, on disk as well as in memory */
   forgetChat: () => void;
@@ -679,16 +694,79 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     chatFocused.current = focused;
   }, []);
 
+  /**
+   * Unread activity, for the count on the bell.
+   *
+   * The bell carried a dot driven by `parked.length`, which answered "is anything
+   * blocked" and nothing else — so a timeline full of things you had not seen
+   * looked identical to an empty one.
+   *
+   * Baselined at mount for the same reason the chat is: `hydrate` brings back a log
+   * that was already read, and launching the app to "37 new" would train you to
+   * ignore the number. Parked items are counted separately by the bell and
+   * deliberately **not** cleared by marking things read — an approval is not
+   * something you can read away, it needs a decision.
+   */
+  const [alertsReadAt, setAlertsReadAt] = useState(() => Date.now());
+  const markAlertsRead = useCallback(() => setAlertsReadAt(Date.now()), []);
+  /**
+   * Only things that happened *to* him.
+   *
+   * The timeline shows "You sent" entries and they belong there — it is a record of
+   * what happened, both directions. A count on a bell is a different claim: it says
+   * "there is something here you have not seen", and you have seen the message you
+   * just typed. Counting it meant sending one thing put 1 on the bell instantly.
+   */
+  const alertsUnread = useMemo(
+    () =>
+      hud.chat.filter((c) => c.from === 'jarvis' && c.at > alertsReadAt).length +
+      hud.trace.filter((t) => t.at > alertsReadAt).length,
+    [hud.chat, hud.trace, alertsReadAt]
+  );
+
+  /**
+   * Whether the app is on screen, which is what decides if a reply is announced.
+   *
+   * Read from a ref rather than from state because the effect below must see the
+   * value at the moment the reply lands, and a re-render is not guaranteed between
+   * the two.
+   */
+  const appActive = useRef(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      appActive.current = next === 'active';
+    });
+    return () => sub.remove();
+  }, []);
+
   const notifiedFor = useRef<number>(0);
+  /**
+   * The baseline, and why it is not simply `notifiedFor === 0`.
+   *
+   * The old code took its "everything before this is old news" mark from the first
+   * *J.A.R.V.I.S.* turn it saw. If the restored log ended on a **user** turn — the
+   * app killed right after asking, which is exactly when it gets killed — the
+   * effect returned early without setting the mark, so the next real reply was read
+   * as the first pass and swallowed. One notification lost per launch, always the
+   * one that mattered.
+   *
+   * Marked from any entry instead, so a trailing user turn cannot leave the
+   * baseline unset. `hydrate` prepends the restored log, so the tail is the newest
+   * turn either way.
+   */
+  const baselined = useRef(false);
   useEffect(() => {
     const newest = hud.chat[hud.chat.length - 1];
-    if (!newest || newest.from !== 'jarvis') return;
+    if (!newest) return;
+    if (!baselined.current) {
+      baselined.current = true;
+      notifiedFor.current = newest.at;
+      return;
+    }
+    if (newest.from !== 'jarvis') return;
     if (newest.at <= notifiedFor.current) return;
-    const first = notifiedFor.current === 0;
     notifiedFor.current = newest.at;
-    // the first pass is whatever was already on screen or restored from disk, not
-    // news; and a reply being watched arrive needs no notification
-    if (first || chatFocused.current || simulated) return;
+    if (!shouldNotifyReply({ appActive: appActive.current, simulated })) return;
     void postNow({
       title: 'J.A.R.V.I.S. replied',
       body: newest.text.length > 140 ? `${newest.text.slice(0, 139)}…` : newest.text,
@@ -792,6 +870,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       recent,
       clearRecent: () => setRecent([]),
       unread,
+      alertsUnread,
+      markAlertsRead,
       markChatRead,
       setChatFocused,
       forgetChat: () => {
@@ -835,6 +915,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       place,
       refreshPlace,
       unread,
+      alertsUnread,
+      markAlertsRead,
       markChatRead,
       setChatFocused,
       demo,

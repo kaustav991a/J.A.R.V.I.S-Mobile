@@ -67,17 +67,34 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
     const at = await coordsFor(departure);
     if (!at) return BackgroundTask.BackgroundTaskResult.Failed;
 
-    const briefing = await commuteBriefing(at.lat, at.lon, departure, now);
+    const outcome = await commuteBriefing(at.lat, at.lon, departure, now);
+
+    /**
+     * Not knowing must not consume the day.
+     *
+     * This is where the briefing was actually being lost. The lookup returned null
+     * for a failed `fetch` and for a fine morning alike, both fell into the branch
+     * below, and `markBriefed` then silenced the departure until tomorrow — when it
+     * would fail the same way. On the test phone that failure is the normal case:
+     * `dumpsys jobscheduler` reports this uid as
+     * `Network: 106 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)`, so a
+     * headless run has no network at all.
+     *
+     * Returning `Failed` without marking leaves the day open for the next run, and
+     * tells Android this attempt did not do its work.
+     */
+    if (outcome.state === 'unavailable') return BackgroundTask.BackgroundTaskResult.Failed;
+
     // silence is an answer: a notification every morning saying "it's fine" is one
     // you stop reading, and then you miss the morning it is not
-    if (!briefing) {
+    if (outcome.state === 'clear') {
       await markBriefed(departure.placeId, today);
       return BackgroundTask.BackgroundTaskResult.Success;
     }
 
     await postNow({
-      title: briefing.title,
-      body: briefing.body,
+      title: outcome.briefing.title,
+      body: outcome.briefing.body,
       channel: GENERAL_CHANNEL,
       data: { kind: 'commute', placeId: departure.placeId },
     });
@@ -150,7 +167,21 @@ export async function previewBriefing(placeId: string): Promise<string | null> {
   const at = await coordsFor(departure);
   if (!at) return `Set ${departure.label} on this screen first, or turn on location sharing`;
 
-  const briefing = await commuteBriefing(at.lat, at.lon, departure);
+  const outcome = await commuteBriefing(at.lat, at.lon, departure);
+
+  /**
+   * The third outcome preview could never show, and the one worth pressing for.
+   *
+   * "I pressed preview and got nothing" used to mean two different things, and the
+   * comment below was written believing there were only two. There are three, and
+   * the missing one — the forecast could not be read at all — was being reported as
+   * a quiet morning. Said plainly here rather than posted, because a notification
+   * claiming nothing to report is the lie this feature kept telling.
+   */
+  if (outcome.state === 'unavailable') {
+    return `Could not reach the forecast (${outcome.reason}). Nothing was posted.`;
+  }
+
   /**
    * A preview always posts, even when there is nothing to warn about.
    *
@@ -163,11 +194,15 @@ export async function previewBriefing(placeId: string): Promise<string | null> {
    * and the delivery all the way through.
    */
   await postNow({
-    title: briefing ? briefing.title : `Nothing to report for ${departure.label}`,
+    title:
+      outcome.state === 'briefing'
+        ? outcome.briefing.title
+        : `Nothing to report for ${departure.label}`,
     body:
-      briefing?.body ??
-      `No rain, heat or wind worth mentioning between ${hourLabel(departure.hour)} and ` +
-        `${hourLabel((departure.hour + 3) % 24)}. A real briefing would have stayed quiet.`,
+      outcome.state === 'briefing'
+        ? outcome.briefing.body
+        : `No rain, heat or wind worth mentioning between ${hourLabel(departure.hour)} and ` +
+          `${hourLabel((departure.hour + 3) % 24)}. A real briefing would have stayed quiet.`,
     channel: GENERAL_CHANNEL,
     data: { kind: 'commute', placeId: departure.placeId, preview: true },
   });

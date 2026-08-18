@@ -9,6 +9,15 @@ jest.mock('../../security/AuthProvider', () => ({
   useAuth: () => ({ holdGate: jest.fn() }),
 }));
 
+/**
+ * What the mocked provider reports, per test.
+ *
+ * The mock used to return a frozen object, which was enough while the tab bar was
+ * pure chrome. It now reads `unread` and `hud.status` to mark the Chat tab, so a
+ * test has to be able to move those.
+ */
+let mockJarvis: Record<string, unknown> = {};
+
 jest.mock('../../state/JarvisProvider', () => ({
   useJarvis: () => ({
     hud: jest.requireActual('../../state/hudReducer').initialHudState,
@@ -34,8 +43,15 @@ jest.mock('../../state/JarvisProvider', () => ({
     // Connection reads these to fill its address and token fields
     pairing: { deskBase: 'http://127.0.0.1:8787', cloudBase: null, usingDefault: true, hasToken: false },
     pair: jest.fn().mockResolvedValue(true),
+    alertsUnread: 0,
+    markAlertsRead: jest.fn(),
+    ...mockJarvis,
   }),
 }));
+
+beforeEach(() => {
+  mockJarvis = {};
+});
 
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -141,3 +157,56 @@ describe('RootNavigator', () => {
     expect(order[2]).toBe('tab-Home');
   });
 });
+
+/**
+ * What the Chat tab says about itself.
+ *
+ * Asking a question and walking to another tab used to leave one signal: a system
+ * notification, raised for an app that was open and on screen. Reported as "going
+ * to the pages except chat page a notification arrives — that isn't normal", and it
+ * was right. The tab is the surface that should answer it, so the notification can
+ * be reserved for a phone that is away.
+ *
+ * `Commands` is the route; `Chat` is the label, and the testIDs are keyed on the
+ * label because that is what `TabDetent` already builds its own testID from.
+ */
+describe('the Chat tab as a status light', () => {
+  const state = jest.requireActual('../../state/hudReducer').initialHudState;
+
+  it('shows nothing when there is nothing to say', async () => {
+    const { queryByTestId } = await mount();
+    expect(queryByTestId('tab-unread-Chat')).toBeNull();
+    expect(queryByTestId('tab-thinking-Chat')).toBeNull();
+  });
+
+  it('counts replies that arrived while another tab was open', async () => {
+    mockJarvis = { unread: 2 };
+    const { findByTestId, getByText } = await mount();
+    expect(await findByTestId('tab-unread-Chat')).toBeTruthy();
+    expect(getByText('2')).toBeTruthy();
+  });
+
+  it('caps the count rather than widening the capsule', async () => {
+    // the capsule width is computed from the label, so a three-digit count would
+    // push the glyph off its own centre
+    mockJarvis = { unread: 14 };
+    const { getByText } = await mount();
+    expect(getByText('9+')).toBeTruthy();
+  });
+
+  it('pulses instead of counting while an answer is still coming', async () => {
+    mockJarvis = { unread: 3, hud: { ...state, status: 'thinking' } };
+    const { findByTestId, queryByTestId } = await mount();
+    expect(await findByTestId('tab-thinking-Chat')).toBeTruthy();
+    // both marks on one 20px glyph is two things competing for the same corner
+    expect(queryByTestId('tab-unread-Chat')).toBeNull();
+  });
+
+  it('marks only Chat, never whichever tab happens to be open', async () => {
+    mockJarvis = { unread: 5, hud: { ...state, status: 'thinking' } };
+    const { queryByTestId } = await mount();
+    expect(queryByTestId('tab-unread-Home')).toBeNull();
+    expect(queryByTestId('tab-thinking-Home')).toBeNull();
+    expect(queryByTestId('tab-thinking-Settings')).toBeNull();
+  });
+})

@@ -123,6 +123,33 @@ function shouldAlertWhileOpen(data: unknown): boolean {
 }
 
 /**
+ * Whether a reply that has just landed earns a system notification.
+ *
+ * The condition this replaces was `first || chatFocused.current || simulated`, and
+ * it got both directions wrong at once.
+ *
+ * **It buzzed for a reply you were looking at.** Leaving the Chat tab mid-answer
+ * made `chatFocused` false, so an answer arriving while the app was open on Home
+ * raised a notification — for something the app was already showing, with its own
+ * toast and haptic. That is noise, and the unread badge on the Chat tab is the
+ * signal that belongs there.
+ *
+ * **And it stayed silent for a reply you could not see.** React Navigation's blur
+ * does not fire when the app is backgrounded — the screen is still focused inside
+ * the navigator — so `chatFocused` stays `true` for the Chat tab. Ask a question
+ * from Chat, put the phone away, and the guard written to suppress noise suppressed
+ * the only notification that mattered. Which is how every question gets asked.
+ *
+ * So focus was never the question; being on screen at all is. `chatFocused` is no
+ * longer part of this decision — it still drives `unread`, where "which tab" is
+ * genuinely what is being asked.
+ */
+export function shouldNotifyReply(o: { appActive: boolean; simulated: boolean }): boolean {
+  if (o.simulated) return false;
+  return !o.appActive;
+}
+
+/**
  * Create the channels and ask for permission.
  *
  * Order matters on Android 13+: the channel must exist *before* the permission

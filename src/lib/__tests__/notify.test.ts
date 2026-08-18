@@ -7,6 +7,7 @@ import {
   installHandler,
   postNow,
   prepare,
+  shouldNotifyReply,
 } from '../notify';
 
 // the factory may not close over anything out of scope, so the handles are
@@ -252,5 +253,47 @@ describe('postNow', () => {
     // posted must not take down whatever was trying to post it
     schedule.mockRejectedValueOnce(new Error('no native module'));
     await expect(postNow({ title: 'x', body: 'y' })).resolves.toBeNull();
+  });
+});
+
+/**
+ * Whether a reply earns a system notification.
+ *
+ * Two bugs met in the one condition this replaces. It read
+ * `if (first || chatFocused.current || simulated) return;`:
+ *
+ * 1. **A reply arriving while the app is open on another tab buzzed.** Reported as
+ *    "going to the pages except chat page a notification arrives — that isn't
+ *    normal". It was working as written: `chatFocused` was the only guard, so
+ *    leaving the Chat tab mid-answer made the reply "unwatched". But the app is on
+ *    screen and answering; the unread badge is the right signal, not a buzz.
+ *
+ * 2. **A reply arriving while the app was closed did NOT buzz** — the actual
+ *    complaint. React Navigation's blur does not fire when the app is
+ *    backgrounded, so `chatFocused` stays `true` for the Chat tab. Ask a question
+ *    from Chat, background the app, and the one guard meant to suppress noise
+ *    suppressed the notification instead. Which is exactly how anyone asks a
+ *    question.
+ *
+ * So focus is not the question — whether the app is on screen at all is. And with
+ * that, `chatFocused` stops being part of this decision entirely.
+ */
+describe('shouldNotifyReply', () => {
+  it('notifies when the app is not on screen, which is the whole point of one', () => {
+    expect(shouldNotifyReply({ appActive: false, simulated: false })).toBe(true);
+  });
+
+  it('stays quiet while the app is open, because the tab badge already says so', () => {
+    expect(shouldNotifyReply({ appActive: true, simulated: false })).toBe(false);
+  });
+
+  it('notifies a backgrounded app even though Chat was the tab left open', () => {
+    // the regression this exists to prevent: blur never fired, so the old guard
+    // read "you are watching this" about a phone in a pocket
+    expect(shouldNotifyReply({ appActive: false, simulated: false })).toBe(true);
+  });
+
+  it('never notifies for the stand-in desk, whose replies are scripted', () => {
+    expect(shouldNotifyReply({ appActive: false, simulated: true })).toBe(false);
   });
 });

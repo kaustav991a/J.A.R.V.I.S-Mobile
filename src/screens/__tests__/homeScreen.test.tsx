@@ -12,6 +12,14 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: jest.fn(), getParent: () => ({ navigate: jest.fn() }) }),
 }));
 
+/**
+ * What the mocked provider reports, per test.
+ *
+ * Jest only permits a factory to reach an out-of-scope name when it is prefixed
+ * `mock` — see the same note in `notify.test.ts`.
+ */
+let mockJarvis: Record<string, unknown> = {};
+
 jest.mock('../../state/JarvisProvider', () => ({
   useJarvis: () => ({
     hud: jest.requireActual('../../state/hudReducer').initialHudState,
@@ -29,8 +37,15 @@ jest.mock('../../state/JarvisProvider', () => ({
     place: null,
     refreshPlace: jest.fn().mockResolvedValue(undefined),
     setShareLocation: jest.fn().mockResolvedValue(true),
+    alertsUnread: 0,
+    markAlertsRead: jest.fn(),
+    ...mockJarvis,
   }),
 }));
+
+beforeEach(() => {
+  mockJarvis = {};
+});
 
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -69,5 +84,59 @@ describe('HomeScreen', () => {
   it('reads Disconnected while the link is down', async () => {
     const { getByTestId } = await mount();
     expect(getByTestId('home-link').props.children).toBe('Disconnected');
+  });
+});
+
+/**
+ * The bell's count.
+ *
+ * It carried a dot, and the dot was driven by `parked.length` alone — so a timeline
+ * full of things nobody had looked at was indistinguishable from an empty one. The
+ * count answers "how much" rather than only "is anything blocked".
+ *
+ * Parked approvals are summed in rather than replaced, because one 23px glyph
+ * cannot carry two marks and an approval must never be hidden behind a read count.
+ */
+describe('the bell count', () => {
+  const state = jest.requireActual('../../state/hudReducer').initialHudState;
+  const parked = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `p${i}`,
+      goal: 'delete a file',
+      action: 'rm',
+      detail: 'temp.txt',
+      at: 1,
+    }));
+
+  it('shows nothing at all when there is nothing to show', async () => {
+    const { queryByTestId } = await mount();
+    await waitFor(() => expect(queryByTestId('home-alert-count')).toBeNull());
+  });
+
+  it('counts unread activity', async () => {
+    mockJarvis = { alertsUnread: 3 };
+    const { findByTestId, getByText } = await mount();
+    expect(await findByTestId('home-alert-count')).toBeTruthy();
+    expect(getByText('3')).toBeTruthy();
+  });
+
+  it('adds a parked approval to the count rather than hiding behind it', async () => {
+    // the old dot's whole job, kept: something needing a decision always marks the
+    // bell, even with everything read
+    mockJarvis = { alertsUnread: 0, hud: { ...state, parked: parked(1) } };
+    const { getByText } = await mount();
+    await waitFor(() => expect(getByText('1')).toBeTruthy());
+  });
+
+  it('sums the two kinds of attention', async () => {
+    mockJarvis = { alertsUnread: 2, hud: { ...state, parked: parked(1) } };
+    const { getByText } = await mount();
+    await waitFor(() => expect(getByText('3')).toBeTruthy());
+  });
+
+  it('caps the digit rather than stretching the bell', async () => {
+    mockJarvis = { alertsUnread: 40 };
+    const { getByText } = await mount();
+    await waitFor(() => expect(getByText('9+')).toBeTruthy());
   });
 });

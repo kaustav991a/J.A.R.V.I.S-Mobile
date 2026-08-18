@@ -42,6 +42,8 @@ export class LinkMachine {
   private socket: MinimalSocket | null = null;
   private lastFrameAt: number | null = null;
   private stopped = false;
+  /** away, rather than switched off: blocks the watchdog, not a deliberate dial */
+  private suspended = false;
 
   constructor(private deps: MachineDeps) {}
 
@@ -72,6 +74,57 @@ export class LinkMachine {
     this.set({ status: 'closed' });
   }
 
+  /**
+   * Close the socket because nobody is listening, without latching `stopped`.
+   *
+   * Backgrounding the app used to do nothing here — the socket was simply left to
+   * rot. That reads as harmless from this side and is expensive on the far one: a
+   * suspended Android app's socket still accepts a write into an OS buffer, so the
+   * gateway's `send_json` succeeds, `emit()` reports the frame as delivered, and
+   * `deliver()` therefore never falls back to push. An answer asked for and then
+   * pocketed was written into a corpse. Closing deliberately is what tells the
+   * gateway to push instead.
+   *
+   * It also stops the far end accumulating phantoms — `apps_linked: 4` for one
+   * phone, each a dead socket from a previous visit, and the gateway gates desk
+   * push on that list being empty.
+   *
+   * Deliberately NOT `stop()`: that means "the user asked for no link" and blocks
+   * every reconnect after it. This means "back shortly".
+   */
+  suspend(): void {
+    /**
+     * The flag is the whole fix, not the teardown.
+     *
+     * Closing alone did not work, and made things worse. `tick()` only ever bailed
+     * on `stopped`, so the watchdog saw `status: 'closed'`, called `reprobe()`, and
+     * opened a fresh socket in the moment before Android froze the JS thread — so
+     * backgrounding took the gateway from `apps_linked: 2` to `3`. The link came
+     * back only to rot, and the far end still believed a phone was listening.
+     *
+     * Cleared by `reprobe()`, which is what a deliberate return to the foreground
+     * goes through. So this suppresses automatic revival while away, and nothing
+     * else.
+     */
+    this.suspended = true;
+    this.teardown();
+    this.set({ status: 'closed' });
+  }
+
+  /**
+   * Back on screen: let the watchdog work again, whatever the socket is doing.
+   *
+   * Separate from `reprobe()` because the latch must be cleared even when no dial
+   * is wanted. `suspend()` blocks `tick()`, and `tick()` is the only thing that
+   * recovers a link nothing else noticed — so a `suspended` flag left set is a
+   * permanently dead link until the app is restarted. Clearing it on every `active`
+   * event, rather than only on a detected return, means a missed or coalesced
+   * transition cannot strand the connection.
+   */
+  resume(): void {
+    this.suspended = false;
+  }
+
   private teardown(): void {
     const s = this.socket;
     this.socket = null;
@@ -89,6 +142,8 @@ export class LinkMachine {
 
   async reprobe(): Promise<void> {
     if (this.stopped) return;
+    // a deliberate dial ends the suspension — coming back is exactly what this is
+    this.suspended = false;
     this.teardown();
     this.set({ status: 'probing' });
 
@@ -176,7 +231,11 @@ export class LinkMachine {
   /** Called on an interval by useLink, and directly by tests. Re-probes when
    *  the link is dead or has gone quiet for longer than the watchdog window. */
   async tick(): Promise<void> {
-    if (this.stopped) return;
+    // `suspended` as well as `stopped`: without it this watchdog immediately undid
+    // every suspend, because a suspended link reads as `closed` and `closed` reads
+    // as dead. That reconnect is what kept the gateway believing a pocketed phone
+    // was still listening.
+    if (this.stopped || this.suspended) return;
     const watchdogMs = this.deps.watchdogMs ?? 30000;
     const quietFor = this.lastFrameAt === null ? Infinity : this.deps.now() - this.lastFrameAt;
     const dead = this.snap.status === 'closed';

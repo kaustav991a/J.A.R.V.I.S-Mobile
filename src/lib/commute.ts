@@ -66,6 +66,26 @@ export const WINDY_KMH = 40;
 
 export type Briefing = { title: string; body: string };
 
+/**
+ * The three answers a forecast lookup can give, which used to be two.
+ *
+ * `Briefing | null` collapsed "nothing worth saying" and "could not find out" into
+ * the same value, and the task read both as the former — then wrote the once-a-day
+ * marker. On the test phone the headless task has no network at all
+ * (`dumpsys jobscheduler` reports `blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY`
+ * for this uid), so every run failed, marked the departure briefed, and went quiet
+ * until tomorrow, where it did the same again.
+ *
+ * A silence that means "the morning is fine" is correct and must stay. A silence
+ * that means "the phone could not reach Open-Meteo" must not consume the day.
+ */
+export type BriefingOutcome =
+  | { state: 'briefing'; briefing: Briefing }
+  /** the forecast was read, and there is nothing worth carrying anything for */
+  | { state: 'clear' }
+  /** the forecast could not be read, so nothing is known either way */
+  | { state: 'unavailable'; reason: 'network' | 'http' | 'no-hours' | 'no-window' };
+
 const hour12 = (h: number): number => (h % 12 === 0 ? 12 : h % 12);
 const meridiem = (h: number): string => (h % 24 < 12 ? 'AM' : 'PM');
 
@@ -244,17 +264,22 @@ const THUNDER = new Set([95, 96, 99]);
  * Silence is a real answer here: a notification every morning that says "it's
  * fine" is one you stop reading, and then you miss the morning it does not.
  */
-export async function commuteBriefing(lat: number, lon: number, d: Departure, now = new Date()): Promise<Briefing | null> {
+export async function commuteBriefing(
+  lat: number,
+  lon: number,
+  d: Departure,
+  now = new Date()
+): Promise<BriefingOutcome> {
   try {
     const url =
       `${OPEN_METEO}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
       '&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m' +
       '&forecast_days=2&timezone=auto';
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) return { state: 'unavailable', reason: 'http' };
     const data = (await res.json()) as { hourly?: Hourly };
     const hourly = data.hourly;
-    if (!hourly?.time?.length) return null;
+    if (!hourly?.time?.length) return { state: 'unavailable', reason: 'no-hours' };
 
     // the departure hour and the two after it, matched by local hour rather than
     // by index — the array starts at midnight, but only in the API's timezone
@@ -266,7 +291,9 @@ export async function commuteBriefing(lat: number, lon: number, d: Departure, no
       if (date !== todayStamp) return;
       if (wanted.includes(Number((clock ?? '').slice(0, 2)))) rows.push(i);
     });
-    if (!rows.length) return null;
+    // a forecast that answered, but not about the hours being asked about. Still an
+    // absence of knowledge rather than a quiet morning, so the day is not consumed
+    if (!rows.length) return { state: 'unavailable', reason: 'no-window' };
 
     const pick = (arr?: number[]) => rows.map((i) => arr?.[i]).filter((v): v is number => typeof v === 'number');
     const temps = pick(hourly.temperature_2m);
@@ -299,19 +326,26 @@ export async function commuteBriefing(lat: number, lon: number, d: Departure, no
     }
     if (maxWind >= WINDY_KMH) notes.push(`Windy, gusting ${Math.round(maxWind)} km/h.`);
 
-    if (!notes.length) return null;
+    // the one silence that is an answer: read, and there is nothing to say
+    if (!notes.length) return { state: 'clear' };
 
     // both ends carry the meridiem even when they share one: this label read
     // "08:00–11:00" on a briefing its owner believed was set for the evening, and
     // the redundancy is what would have shown him otherwise
     const window = `${hourLabel(d.hour)}–${hourLabel((d.hour + 3) % 24)}`;
     return {
-      // named, because two of these arrive in a day and a shade holding both has
-      // to say which door each one is about
-      title: `Before you leave ${d.label}`,
-      body: `${notes.join(' ')} (${window})`,
+      state: 'briefing',
+      briefing: {
+        // named, because two of these arrive in a day and a shade holding both has
+        // to say which door each one is about
+        title: `Before you leave ${d.label}`,
+        body: `${notes.join(' ')} (${window})`,
+      },
     };
   } catch {
-    return null;
+    // the common one, and the reason this function stopped returning null: a
+    // headless task in Android's RARE standby bucket has its network blocked, so
+    // `fetch` rejects here on every scheduled run
+    return { state: 'unavailable', reason: 'network' };
   }
 }

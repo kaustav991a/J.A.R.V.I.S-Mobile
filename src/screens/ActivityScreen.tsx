@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { EmptyState, Screen, SectionLabel } from '../components/ui/Atoms';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { GovernancePanel } from '../components/GovernancePanel';
+import { Touchable } from '../components/ui/Touchable';
 import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { useJarvis } from '../state/JarvisProvider';
 
@@ -29,7 +30,7 @@ const clock = (at: number): string => {
  * because they are the only entries that need the user to do something.
  */
 export function ActivityScreen() {
-  const { hud, decide } = useJarvis();
+  const { hud, decide, alertsUnread, markAlertsRead } = useJarvis();
 
   const items: Item[] = [
     ...hud.chat.map((c, i) => ({
@@ -52,7 +53,31 @@ export function ActivityScreen() {
 
   return (
     <Screen testID="activity-screen">
-      <ScreenTitle title="ACTIVITY" caption={items.length ? `${items.length} events` : undefined} />
+      <ScreenTitle
+        title="ACTIVITY"
+        caption={items.length ? `${items.length} events` : undefined}
+        /**
+         * Offered only when there is something unread, rather than always.
+         *
+         * A permanently visible "mark all as read" is a button that does nothing
+         * most of the time you look at it, and a control that usually no-ops stops
+         * being read as a control. It does not clear parked approvals — those are
+         * answered in "Needs you" below, not read away.
+         */
+        trailing={
+          alertsUnread > 0 ? (
+            <Touchable
+              testID="activity-mark-read"
+              accessibilityRole="button"
+              accessibilityLabel={`Mark all ${alertsUnread} as read`}
+              hitSlop={10}
+              onPress={markAlertsRead}
+            >
+              <Text style={styles.markRead}>MARK ALL READ</Text>
+            </Touchable>
+          ) : undefined
+        }
+      />
 
       {hud.parked.length > 0 ? (
         <>
@@ -91,6 +116,7 @@ export function ActivityScreen() {
 }
 
 const styles = StyleSheet.create({
+  markRead: { ...TYPE.dataLabel, fontSize: 10, letterSpacing: 1.2, color: COLOR.blue },
   list: { gap: SPACE.sm },
   row: {
     flexDirection: 'row',

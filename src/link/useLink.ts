@@ -150,8 +150,25 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
     let lastAppState: string = AppState.currentState;
     const appSub = AppState.addEventListener('change', (s) => {
       const returned = s === 'active' && lastAppState !== 'active';
+      /**
+       * `background` only, never `inactive`.
+       *
+       * `inactive` is a notification shade, a permission sheet, a call overlay —
+       * moments the user is still in the app. Dropping the link for those would
+       * reconnect several times a minute, which is the churn the guard above exists
+       * to prevent.
+       */
+      const leaving = s === 'background' && lastAppState === 'active';
       lastAppState = s;
+      // Unconditional, not only on a detected return: the suspend latch blocks the
+      // watchdog, and the watchdog is the only thing that recovers a link nothing
+      // else noticed. A missed or coalesced `active` would otherwise strand it.
+      if (s === 'active') machine.resume();
       if (returned) reprobeIfDown();
+      // Closed on the way out so the gateway learns immediately that nobody is
+      // holding this socket, and pushes the answer instead of writing it into a
+      // corpse. See `LinkMachine.suspend`.
+      if (leaving) machine.suspend();
     });
 
     let lastNet: string | null = null;

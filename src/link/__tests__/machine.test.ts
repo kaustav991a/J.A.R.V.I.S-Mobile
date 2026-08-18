@@ -174,6 +174,83 @@ describe('LinkMachine', () => {
     expect(h.machine.snapshot.status).toBe('closed');
   });
 
+  /**
+   * Going away must close the socket, and must not look like quitting.
+   *
+   * Backgrounding used to do nothing at all: the socket was left to rot. That is
+   * invisible from here and expensive on the far side — a suspended app's socket
+   * still swallows a write into an OS buffer, so the gateway records a reply as
+   * delivered and never falls back to push. Which is exactly how an answer asked
+   * for and then pocketed never arrived.
+   *
+   * `stop()` cannot be reused for it: that means "the user wants no link" and
+   * latches `stopped`, so nothing would reconnect on the way back.
+   */
+  it('suspend() closes the socket so the far end learns nobody is listening', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+    h.machine.suspend();
+    expect(FakeSocket.opened[0].closed).toBe(true);
+    expect(h.machine.snapshot.status).toBe('closed');
+  });
+
+  /**
+   * The regression this exists to prevent, caught on the device rather than here.
+   *
+   * The first version of `suspend()` only tore the socket down. `tick()` bailed on
+   * `stopped` alone, so the watchdog saw `status: 'closed'`, read it as dead, and
+   * re-dialled — inside the moment before Android froze the JS thread. Measured on
+   * the phone: backgrounding took the gateway from `apps_linked: 2` to `3`. The fix
+   * made things worse than doing nothing, because now there was a fresh socket to
+   * rot instead of an old one.
+   */
+  it('suspend() survives the watchdog, which used to undo it immediately', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+    h.machine.suspend();
+
+    // far past the watchdog window, and the link reads as closed — both of the
+    // things that would otherwise trigger a re-dial
+    h.clock.t = 90000;
+    await h.machine.tick();
+    expect(FakeSocket.opened).toHaveLength(1);
+  });
+
+  it('ticks again normally once it has been dialled back', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+    h.machine.suspend();
+    await h.machine.reprobe();
+    FakeSocket.opened[1].open();
+    expect(FakeSocket.opened).toHaveLength(2);
+
+    // the suspension is over, so the watchdog is allowed to do its job again
+    h.clock.t = 200000;
+    await h.machine.tick();
+    expect(FakeSocket.opened).toHaveLength(3);
+  });
+
+  it('suspend() leaves the link free to come back, unlike stop()', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+    h.machine.suspend();
+    await h.machine.reprobe();
+    expect(FakeSocket.opened).toHaveLength(2);
+  });
+
+  it('stop() still refuses to come back, which is the whole difference', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+    h.machine.stop();
+    await h.machine.reprobe();
+    expect(FakeSocket.opened).toHaveLength(1);
+  });
+
   it('unsubscribe stops delivering snapshots', async () => {
     const h = build(lanUp());
     const seen: LinkSnapshot[] = [];

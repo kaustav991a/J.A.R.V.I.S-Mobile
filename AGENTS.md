@@ -25,7 +25,7 @@ guessing here has cost real time.
 ## Before you claim anything works
 
 ```bash
-npm test          # 287 tests
+npm test          # 461 tests
 npm run typecheck # tsc --noEmit
 ```
 

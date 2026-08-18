@@ -3,13 +3,14 @@ import {
   DEFAULT_COMMUTE,
   alreadyBriefed,
   clockLabel,
+  commuteBriefing,
   dueDeparture,
   hourLabel,
   loadCommute,
   markBriefed,
   saveCommute,
 } from '../commute';
-import type { CommuteSettings } from '../commute';
+import type { CommuteSettings, Departure } from '../commute';
 
 /**
  * The clock labels, the day mask, and which door is due.
@@ -181,5 +182,95 @@ describe('loadCommute', () => {
   it('falls back to the defaults on unreadable storage', async () => {
     await AsyncStorage.setItem('jarvis_commute', 'not json');
     expect(await loadCommute()).toEqual(DEFAULT_COMMUTE);
+  });
+});
+
+/**
+ * Why a briefing that "worked" was silent for four days.
+ *
+ * `commuteBriefing` returned `Briefing | null`, and the task read null as "the
+ * weather is unremarkable, say nothing" — then wrote the once-a-day marker. But
+ * null was also what a failed `fetch` returned, and on the test phone the
+ * headless task has no network at all: `dumpsys jobscheduler` reports
+ * `Network: 106 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)` for this uid.
+ *
+ * So a blocked lookup marked the departure briefed and guaranteed silence until
+ * tomorrow, when it would do the same again. Every failure mode reported success,
+ * which is why the feature looked unfixable rather than broken.
+ *
+ * The three outcomes have to be distinguishable: something to say, nothing to say,
+ * and could not find out.
+ */
+describe('commuteBriefing outcomes', () => {
+  const home: Departure = { placeId: 'home', label: 'Home', on: true, hour: 8, minute: 0 };
+  /** the Friday the rest of this file uses, so `dayKey` matches the rows below */
+  const when = friday(8, 0);
+
+  type Row = { h: number; temp: number; chance: number; mm: number; wind: number; code: number };
+  const mild = (h: number): Row => ({ h, temp: 28, chance: 5, mm: 0, wind: 6, code: 1 });
+  const wet = (h: number): Row => ({ h, temp: 28, chance: 80, mm: 3.2, wind: 6, code: 61 });
+
+  const payload = (rows: Row[]) => ({
+    hourly: {
+      time: rows.map((r) => `2026-08-14T${String(r.h).padStart(2, '0')}:00`),
+      temperature_2m: rows.map((r) => r.temp),
+      precipitation_probability: rows.map((r) => r.chance),
+      precipitation: rows.map((r) => r.mm),
+      weather_code: rows.map((r) => r.code),
+      wind_speed_10m: rows.map((r) => r.wind),
+    },
+  });
+
+  const serve = (body: unknown, ok = true) => {
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = jest
+      .fn()
+      .mockResolvedValue({ ok, json: async () => body });
+  };
+
+  afterEach(() => {
+    delete (globalThis as unknown as { fetch?: unknown }).fetch;
+  });
+
+  it('says it could not find out when the lookup throws, rather than reporting fine weather', async () => {
+    // the headless task on a phone in the RARE standby bucket, which is the real
+    // device state — not a hypothetical
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = jest
+      .fn()
+      .mockRejectedValue(new Error('Network request failed'));
+    const out = await commuteBriefing(22.57, 88.36, home, when);
+    expect(out.state).toBe('unavailable');
+  });
+
+  it('says it could not find out on a non-200, which is not the same as nothing to report', async () => {
+    serve({}, false);
+    expect((await commuteBriefing(22.57, 88.36, home, when)).state).toBe('unavailable');
+  });
+
+  it('says it could not find out when the forecast body carries no hours', async () => {
+    serve({ hourly: { time: [] } });
+    expect((await commuteBriefing(22.57, 88.36, home, when)).state).toBe('unavailable');
+  });
+
+  it('says it could not find out when today has no row for the departure hour', async () => {
+    // a forecast that answered, but not about the window being asked about — still
+    // an absence of knowledge, not a quiet morning
+    serve(payload([mild(3), mild(4)]));
+    expect((await commuteBriefing(22.57, 88.36, home, when)).state).toBe('unavailable');
+  });
+
+  it('reports a clear morning as clear, so the day can be marked done', async () => {
+    serve(payload([mild(8), mild(9), mild(10)]));
+    expect((await commuteBriefing(22.57, 88.36, home, when)).state).toBe('clear');
+  });
+
+  it('returns the briefing when there is something worth carrying an umbrella for', async () => {
+    serve(payload([wet(8), mild(9), mild(10)]));
+    const out = await commuteBriefing(22.57, 88.36, home, when);
+    expect(out.state).toBe('briefing');
+    if (out.state !== 'briefing') throw new Error('narrowing');
+    expect(out.briefing.title).toBe('Before you leave Home');
+    expect(out.briefing.body).toContain('umbrella');
+    // the window still names both ends with a meridiem, which is the 08-14 fix
+    expect(out.briefing.body).toContain('8 AM–11 AM');
   });
 });

@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withRepeat,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -20,6 +21,15 @@ import { CHROME, COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
 import { haptic } from '../lib/haptics';
 import { Glass } from '../components/ui/Glass';
+import { useJarvis } from '../state/JarvisProvider';
+
+/**
+ * The tab that carries the conversation, and therefore the only one with news.
+ *
+ * Named `Commands` in the navigator and labelled `Chat`; the route name is what is
+ * matched here, because the label is a display string and has already changed once.
+ */
+const CHAT_ROUTE = 'Commands';
 
 export type GlassTabBarProps = BottomTabBarProps & {
   icons: Record<string, keyof typeof Ionicons.glyphMap>;
@@ -183,6 +193,17 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { accent, animations } = useAppearance();
+  /**
+   * What the Chat tab has to say about itself.
+   *
+   * Read here rather than passed down from `RootNavigator` so the chrome owns its
+   * own indicators — and because this is the surface that answers the question
+   * "did anything come back?" for someone standing on another tab. Before this, a
+   * reply arriving off-Chat could only be announced by a system notification,
+   * which is the wrong instrument for an app that is already open.
+   */
+  const { unread, hud } = useJarvis();
+  const thinking = hud.status === 'thinking';
 
   const last = state.routes.length - 1;
   const barWidth = width - CHROME.tabBarSide * 2;
@@ -329,6 +350,11 @@ export function GlassTabBar({ state, descriptors, navigation, icons }: GlassTabB
                   icon={icons[route.name]}
                   accent={accent}
                   selected={state.index === index}
+                  // thinking wins: while an answer is still coming, the count of
+                  // what already arrived is the less useful of the two, and showing
+                  // both puts two marks on one 20px glyph
+                  busy={route.name === CHAT_ROUTE && thinking}
+                  badge={route.name === CHAT_ROUTE && !thinking ? unread : 0}
                   onPress={() => {
                     haptic.tap();
                     jump(index);
@@ -353,11 +379,28 @@ type DetentProps = {
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
   selected: boolean;
+  /** an answer is still on its way, so the glyph pulses instead of counting */
+  busy: boolean;
+  /** replies seen by nobody yet; 0 draws nothing */
+  badge: number;
   onPress: () => void;
   onLongPress: () => void;
 };
 
-function TabDetent({ index, pos, armed, opens, label, icon, accent, selected, onPress, onLongPress }: DetentProps) {
+function TabDetent({
+  index,
+  pos,
+  armed,
+  opens,
+  label,
+  icon,
+  accent,
+  selected,
+  busy,
+  badge,
+  onPress,
+  onLongPress,
+}: DetentProps) {
   /** 0 under the lens, 1 a whole tab away — everything here reads off it */
   const away = useDerivedValue(() => Math.min(Math.abs(pos.value - index), 1));
   const nameWidth = labelWidth(label);
@@ -376,6 +419,30 @@ function TabDetent({ index, pos, armed, opens, label, icon, accent, selected, on
     // exactly the name's own width, so there is no slack between it and the
     // icon and the pair sits centred in the capsule
     width: interpolate(away.value, [0, 1], [nameWidth, 0], Extrapolation.CLAMP),
+  }));
+
+  /**
+   * The thinking pulse.
+   *
+   * Driven off a shared value rather than a JS interval: this runs on the UI thread
+   * and keeps breathing while the bridge is busy carrying the answer, which is
+   * precisely when it is on screen.
+   *
+   * No default parameter anywhere in the worklet — a default is not captured by the
+   * closure and throws once per frame on the UI thread. See `AGENTS.md`.
+   */
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (!busy) {
+      pulse.value = withTiming(0, { duration: 160 });
+      return;
+    }
+    pulse.value = withRepeat(withTiming(1, { duration: 620 }), -1, true);
+  }, [busy, pulse]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.3 + pulse.value * 0.7,
+    transform: [{ scale: 0.8 + pulse.value * 0.35 }],
   }));
 
   const tap = Gesture.Tap()
@@ -397,9 +464,29 @@ function TabDetent({ index, pos, armed, opens, label, icon, accent, selected, on
         accessibilityState={{ selected }}
         style={[styles.detent, slotStyle]}
       >
-        <Animated.View style={iconStyle}>
-          <Ionicons name={icon} size={20} color={selected ? accent : COLOR.dim} />
-        </Animated.View>
+        {/* the glyph is the positioning context for both marks. They sit OUTSIDE
+            `iconStyle` on purpose: that style dims a resting tab to 0.55, and an
+            unread count you have to squint at is not a notification. The detent
+            clips at 44px, so both offsets stay inside the 12px of headroom the
+            20px glyph leaves. */}
+        <View style={styles.glyph}>
+          <Animated.View style={iconStyle}>
+            <Ionicons name={icon} size={20} color={selected ? accent : COLOR.dim} />
+          </Animated.View>
+          {badge > 0 ? (
+            <View testID={`tab-unread-${label}`} style={[styles.badge, { backgroundColor: accent }]}>
+              {/* 9+ rather than a widening pill: the capsule width is computed from
+                  the label, so a three-digit count would push the glyph off centre */}
+              <Text style={styles.badgeText}>{badge > 9 ? '9+' : String(badge)}</Text>
+            </View>
+          ) : null}
+          {busy ? (
+            <Animated.View
+              testID={`tab-thinking-${label}`}
+              style={[styles.pulse, { backgroundColor: accent }, pulseStyle]}
+            />
+          ) : null}
+        </View>
         <Animated.Text numberOfLines={1} style={[styles.label, { color: accent }, labelStyle]}>
           {label}
         </Animated.Text>
@@ -450,6 +537,28 @@ const styles = StyleSheet.create({
     gap: SPACE.sm,
     overflow: 'hidden',
   },
+  // sized to the glyph so the two marks below have something to hang off
+  glyph: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  badge: {
+    position: 'absolute',
+    top: -7,
+    right: -11,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    ...TYPE.dataLabel,
+    fontSize: 9,
+    lineHeight: 14,
+    // dark on accent: the accent is the bright colour here, so the text is the hole
+    color: COLOR.bg,
+    includeFontPadding: false,
+  },
+  pulse: { position: 'absolute', top: -5, right: -7, width: 7, height: 7, borderRadius: 3.5 },
   label: {
     ...TYPE.dataLabel,
     fontSize: 11,

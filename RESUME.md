@@ -28,7 +28,7 @@ want to change the app.
 | Facts about him | 12 stored, `facts_known: 12`, survive restarts |
 | Text brain | Groq `llama-3.3-70b-versatile` |
 | Vision + voice | Gemini `gemini-3.5-flash` |
-| Phone build on device | **debug** APK — needs Metro on the machine that built it |
+| Phone build on device | **debug** APK again as of 2026-08-18 — needs Metro and `adb reverse tcp:8081 tcp:8081`. The 08-17 standalone release build was replaced to get Fast Refresh back |
 
 Check state with one call, which is the fastest way to know where you are:
 
@@ -70,6 +70,131 @@ jvmargs in `android/gradle.properties`.** Prebuild resets jvmargs to 2048m and t
 is documented here because it has cost time twice.
 
 ---
+
+## Resume point — 2026-08-18: four reported bugs, and one of them was not a bug
+
+**461 tests, `tsc --noEmit` clean.** Nothing native changed — all of this ships in a
+JS reload. A debug APK replaced the 08-17 standalone release so Fast Refresh works
+again; that build needs Metro plus `adb reverse tcp:8081 tcp:8081`.
+
+### The app storage is readable now, and it settles arguments
+
+The build is `DEBUGGABLE`, so AsyncStorage can be read directly instead of guessed
+at:
+
+```bash
+adb exec-out run-as com.mypersonalintelligence.jarvis cat databases/RKStorage > rk.db
+grep -a -oE 'jarvis_commute\{.{0,400}' rk.db
+```
+
+`adb exec-out`, not `adb shell` — the shell translates line endings and corrupts the
+SQLite file. `sqlite3` is not executable as the app user, so grep the raw pages.
+
+What it said on 08-18: Office named at 22.5770/88.4344, Home **not** named, both
+departures on (8 AM / 7 PM), weekdays, sharing on, and **no `jarvis_commute_sent`
+key at all** — the briefing has still never fired once. That key is written even on
+a quiet day, so its absence is now a usable signal for whether Android ran the task.
+
+### The 7 PM briefing was silent because there was nothing to say
+
+Checked against Open-Meteo for the Office coordinates, 19:00–21:00: 27.7°C, 13%
+rain chance, 0.00 mm, codes 2–3, wind 8.8 km/h. Not one threshold crossed
+(`RAIN_CHANCE 50`, `RAIN_MM 0.4`, `HOT_C 35`, `COLD_C 12`, `WINDY_KMH 40`). So
+`clear`, and silence is correct.
+
+**This is the ambiguity that made the feature look broken for four days**, and it is
+why the outcome type changed below. PREVIEW is still the only way to prove the chain,
+because it posts either way.
+
+### `commuteBriefing` returns three answers, not two
+
+`Briefing | null` collapsed "nothing worth saying" and "could not find out", and the
+task read both as the former — then wrote the once-a-day marker. On this phone the
+failure is the normal case: `dumpsys jobscheduler` reports this uid as
+`Network: 106 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)`, and
+`am get-standby-bucket` returns **40 (RARE)** with the app absent from
+`dumpsys deviceidle whitelist`. So a headless run has no network, failed, marked the
+day briefed, and went quiet until tomorrow — where it did the same again. Every
+failure mode reported success.
+
+Now `{state:'briefing'|'clear'|'unavailable'}`. Only `clear` consumes the day;
+`unavailable` returns `BackgroundTaskResult.Failed` and leaves it open. PREVIEW
+reports the third outcome in words rather than posting "nothing to report".
+
+Places gained a **Battery restrictions → SETTINGS** row for the part code cannot fix:
+RARE plus no battery exemption is the real reason this never arrives on the dot.
+
+### Reply notifications: two bugs in one condition
+
+It read `if (first || chatFocused.current || simulated) return;` and was wrong both
+ways.
+
+- **It buzzed for a reply you were looking at.** Leaving the Chat tab mid-answer made
+  `chatFocused` false, so an answer landing while the app was open on Home raised a
+  notification. Reported as "going to the pages except chat page a notification
+  arrives — that isn't normal".
+- **It stayed silent for a reply you could not see.** Navigation blur does **not**
+  fire when the app is backgrounded, so `chatFocused` stays `true` for the Chat tab.
+  Ask from Chat, pocket the phone, and the guard written to suppress noise suppressed
+  the only notification that mattered.
+
+Focus was never the question. `shouldNotifyReply({appActive, simulated})` asks whether
+the app is on screen at all; `chatFocused` now only drives `unread`.
+
+Also fixed: the baseline took its mark from the first *J.A.R.V.I.S.* turn, so a
+restored log ending on a **user** turn left it unset and the next real reply was
+swallowed as "first pass" — one lost notification per launch, always the one that
+mattered.
+
+### The socket is closed on the way out, and that took two attempts
+
+Backgrounding used to do nothing, leaving the socket to rot. That is invisible here
+and expensive on the gateway: a suspended app's socket still swallows a write, so
+`emit()` reported the reply delivered and the push never fired.
+
+**The first fix made it worse.** `suspend()` tore the socket down but `tick()` only
+bailed on `stopped`, so the watchdog read `closed` as dead and re-dialled in the
+moment before Android froze the JS thread — backgrounding took the gateway from
+`apps_linked: 2` to **3**. There is now a `suspended` flag that `tick()` respects,
+cleared by `reprobe()` and by **any** `active` event — not only an observed
+`background → active` pair, because a latch left set means a dead link until restart.
+
+Measured after: `apps_linked` goes 1 → 0 when the phone leaves.
+
+**This is half a fix.** The other half is `deliver()` in `jarvis-brain`
+(`cloud_gateway.py`), which now consults `_app_clients` instead of trusting the
+write — committed there the same day, and **it needs a Render deploy**. The two
+repos have to move together; reverting either alone puts the bug back.
+
+### Badges, where there were none
+
+`GlassTabBar` had no access to app state at all. The Chat tab now carries an unread
+count (capped `9+`) and a pulsing dot while `status === 'thinking'`; thinking wins,
+since two marks on one 20px glyph is two things fighting for a corner. Both sit
+inside the 44px detent because it clips.
+
+The bell carried a dot driven by `parked.length` alone, so an unseen timeline looked
+like an empty one. It now shows `alertsUnread + parked.length`, and the Activity
+sheet gained **MARK ALL READ** — offered only when something is unread, and it
+clears the unread half only, because an approval is answered rather than read.
+`alertsUnread` counts replies and agent steps, **not** your own sent messages: you
+have seen what you typed.
+
+### Traps this cost
+
+- **Fast Refresh cannot reach a backgrounded app.** Its HMR socket dies with the
+  background, so an edit silently never arrives and you test stale JS. Two "still
+  broken" readings were pre-fix code. Force-stop is the only reliable reload for any
+  background test.
+- **`adb shell input` is blocked on HyperOS** — `SecurityException: INJECT_EVENTS`,
+  even with "USB debugging (Security settings)" on, at least over wireless. Background
+  the app with `adb shell am start -a android.intent.action.MAIN -c android.intent.category.HOME`
+  instead; that needs no injection.
+- **Wireless adb's port rotates on every toggle and mDNS caches the old one.**
+  `adb connect` then fails with "actively refused". `adb kill-server` sometimes
+  refreshes it; otherwise read the port off the phone's screen.
+- **A jest `jest.mock` factory may only reach an out-of-scope name prefixed `mock`.**
+  `jarvisOverrides` threw; `mockJarvis` works.
 
 ## Resume point — 2026-08-17: the briefing was never mute, the preview was
 

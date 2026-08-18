@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Hint, Screen, SectionLabel } from '../components/ui/Atoms';
@@ -304,6 +304,45 @@ export function PlacesScreen() {
           ? 'Android decides when background checks run, so a briefing arrives within about half an hour of your time — not on the dot. Preview sends one now.'
           : 'Background work is disabled for this app in Android settings, so the briefing cannot run. Preview still works while the app is open.'}
       </Hint>
+
+      {/**
+       * The lever that actually decides whether any of this runs.
+       *
+       * `commuteTaskAvailable()` reports Available on a phone the briefing will
+       * still never reach, which is most of why this feature looked broken rather
+       * than throttled. Measured on the device it is meant for:
+       *
+       *     adb shell am get-standby-bucket  ->  40 (RARE)
+       *     dumpsys deviceidle whitelist     ->  not listed
+       *     jobscheduler, this uid           ->  Network: blocked=REASON_APP_STANDBY
+       *
+       * RARE allows roughly one job window a day, against a departure window of an
+       * hour — and the network is cut for the run even when it does land. Exempting
+       * the app from battery optimisation is the only fix, and it cannot be done
+       * from code: it is a permission the user grants. So the screen says so and
+       * offers the door rather than reporting a healthy background task.
+       */}
+      <View style={styles.row}>
+        <Ionicons name="battery-charging-outline" size={19} color={COLOR.dim} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Battery restrictions</Text>
+          <Text style={styles.rowSub}>
+            Android throttles rarely-used apps and cuts their background network, which stops a
+            briefing even when the time and the place are right. Set this app to Unrestricted.
+          </Text>
+        </View>
+        <Touchable
+          testID="commute-battery-settings"
+          accessibilityRole="button"
+          accessibilityLabel="Open app settings to lift battery restrictions"
+          hitSlop={8}
+          onPress={() => {
+            void Linking.openSettings().catch(() => {});
+          }}
+        >
+          <Text style={[styles.action, { color: accent }]}>SETTINGS</Text>
+        </Touchable>
+      </View>
     </Screen>
   );
 }
