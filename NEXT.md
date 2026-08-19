@@ -77,6 +77,32 @@ machinery as the learned version.
 
 ---
 
+## Tomorrow, first thing: did the briefing fire on its own?
+
+**2026-08-19, 18:40** — the evening briefing arrived, but probably only after the
+app was opened. That is the expected symptom of a throttled job: Android defers
+it, and opening the app promotes the standby bucket enough for the pending work
+to run. So the feature works; the timing was Android's decision.
+
+The fix for the cause shipped the same evening — the briefing now runs BEFORE the
+journal in that task, so it stops blowing the time budget — but the quota was
+already spent for that window.
+
+**The test is a weekday evening, phone untouched, app not opened.** If the
+notification arrives near 19:00 by itself, this is closed. If it does not:
+
+
+
+`timeout-reg` and `timeout-total` are the numbers that matter — they were at 13
+against limits of 3 and 10. If they are climbing again, something in the task is
+still overrunning.
+
+The **preview button on the Places screen** runs the real briefing and posts the
+real notification immediately, bypassing the scheduler. It is the way to separate
+"the feature is broken" from "Android did not run it".
+
+---
+
 ## Owed, small, and not features
 
 - **`run_harnesses.py` with the venv on the desk.** Expect **81**. Several
