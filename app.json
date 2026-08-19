@@ -68,7 +68,8 @@
           "cameraPermission": "Allow JARVIS to take a photo to look at.",
           "photosPermission": "Allow JARVIS to open a photo for you to send."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "extra": {
       "eas": {

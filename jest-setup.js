@@ -34,3 +34,41 @@ jest.mock('expo-audio', () => ({
     HIGH_QUALITY: { extension: '.m4a' },
   },
 }));
+
+/**
+ * A real SQLite for the journal tests, rather than a mock that agrees with them.
+ *
+ * jest-expo automocks expo-sqlite's native side, so `NativeDatabase` is not a
+ * constructor and every query throws before it runs. Mocking the *store* instead
+ * would be the wrong repair: the whole value of those tests is that the schema,
+ * the composite primary key, the `ON CONFLICT` upserts and the retention delete
+ * are exercised by an actual SQL engine.
+ *
+ * Node 24 ships one — `node:sqlite` — so this adapter maps expo-sqlite's async
+ * surface onto it. Same SQL, same semantics, no native build and no new
+ * dependency.
+ */
+jest.mock('expo-sqlite', () => {
+  const { DatabaseSync } = require('node:sqlite');
+  // expo takes bind parameters either as varargs or as one array; node:sqlite
+  // takes varargs only, so a lone array argument is spread back out
+  const bind = (params) => (params.length === 1 && Array.isArray(params[0]) ? params[0] : params);
+  // node:sqlite hands back null-prototype rows, and `changes` can be a bigint
+  const plain = (row) => (row == null ? null : { ...row });
+
+  return {
+    openDatabaseAsync: async (name) => {
+      const db = new DatabaseSync(name === ':memory:' ? ':memory:' : `:memory:${name}`);
+      return {
+        execAsync: async (sql) => db.exec(sql),
+        runAsync: async (sql, ...params) => {
+          const r = db.prepare(sql).run(...bind(params));
+          return { changes: Number(r.changes), lastInsertRowId: Number(r.lastInsertRowid) };
+        },
+        getAllAsync: async (sql, ...params) => db.prepare(sql).all(...bind(params)).map(plain),
+        getFirstAsync: async (sql, ...params) => plain(db.prepare(sql).get(...bind(params))),
+        closeAsync: async () => db.close(),
+      };
+    },
+  };
+});
