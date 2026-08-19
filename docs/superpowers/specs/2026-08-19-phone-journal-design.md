@@ -67,8 +67,16 @@ says so rather than pretending a green suite covered it.
 **Two tables, because Android gives two fidelities and they must not be
 confused with each other.**
 
-Android's retention, verified 2026-08-19: **daily 7 days, weekly 4 weeks,
-monthly 6 months, yearly 2 years.**
+Android's retention, verified 2026-08-19 and **corrected on the device the same
+day**: **daily 7 days, weekly 4 weeks, monthly 6 months, yearly 2 years** — and
+those are four *separate* aggregates. `INTERVAL_DAILY` therefore serves about a
+week; the two-year figure belongs to the yearly bucket, which is not per-day and
+cannot answer a habit question.
+
+**So a first launch is a week of history, not months** — an earlier draft of this
+spec claimed otherwise and was wrong. It also sharpens what this piece is for:
+the journal's job is not fetching history, it is **keeping** what the system
+discards after seven days. Depth is earned by running, not by installing.
 
 ```sql
 -- precise sessions. Android keeps ~7 days; we keep them forever once collected.
@@ -80,7 +88,8 @@ CREATE TABLE events (
 );
 CREATE INDEX events_at ON events (at);
 
--- coarse per-day totals. Android keeps up to 2 years, so day one is not day zero.
+-- coarse per-day totals. Android keeps DAILY buckets ~7 days, so this is what
+-- the journal exists to KEEP rather than what it can go and fetch.
 CREATE TABLE daily (
   day TEXT    NOT NULL,         -- YYYY-MM-DD, local
   app TEXT    NOT NULL,
@@ -124,9 +133,13 @@ triggers, all free:
 
 This is safe because of a property worth stating plainly: **the collector can
 afford to be lazy, because Android is the buffer.** Every query is retroactive
-within its retention window, so a missed run costs nothing. Only an app left
-unopened for more than seven days loses per-day event detail — and the daily
-aggregate for those days still survives for months.
+within its retention window, so a missed run costs nothing.
+
+**The window is about seven days for both halves**, events and daily buckets
+alike — so an app left unopened longer than that loses those days permanently:
+Android has dropped its own copy and no later sync can go back for them. That
+makes the background leg of the sync load-bearing rather than an optimisation.
+It is what stops a week away from being a week erased.
 
 ## Error handling
 

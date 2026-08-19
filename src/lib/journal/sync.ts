@@ -8,9 +8,14 @@ import type { UsageSource } from './source';
  * commute briefing, and from a button on the Journal screen. No service, no
  * scheduler of its own, no foreground notification — because the collector can
  * afford to be lazy: **Android is the buffer.** Every query here is retroactive
- * inside its retention window, so a missed run costs nothing at all. Only an app
- * left unopened for more than seven days loses per-day event detail, and the
- * daily aggregate for those days survives for months regardless.
+ * inside its retention window, so a missed run costs nothing at all.
+ *
+ * The window is the limit of that generosity, and it is about **seven days for
+ * both halves** — events and daily buckets alike. An app left unopened longer
+ * than that loses the days beyond it permanently, because Android has discarded
+ * its own copy and no later sync can go back for them. Which is the argument for
+ * the background leg of this: it is not an optimisation, it is what stops a week
+ * away from being a week erased.
  *
  * That property is why this feature costs the phone no battery: nothing is
  * collected here. The system records this whether an app asks or not, and these
@@ -28,7 +33,16 @@ export const OVERLAP_MS = 5 * 60_000;
 /** Android keeps roughly seven days of events; ask for all of it the first time */
 export const FIRST_RUN_EVENT_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** and up to two years of daily buckets, which is why day one is not day zero */
+/**
+ * Two years asked for, about one week expected.
+ *
+ * Android retains daily buckets for roughly seven days; the longer windows it
+ * keeps (4 weeks, 6 months, 2 years) are weekly, monthly and yearly aggregates,
+ * none of them per-day. The generous request costs nothing and takes whatever a
+ * given phone happens to hold — but a first launch is a WEEK of history, not
+ * months, and the depth after that comes from the journal keeping what Android
+ * drops.
+ */
 export const FIRST_RUN_DAILY_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
 const since = async (j: Journal, source: string, now: number, firstRun: number): Promise<number> => {

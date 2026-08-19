@@ -18,7 +18,14 @@ export type EventKind = 'foreground' | 'background' | 'screen_on' | 'screen_off'
 /** a precise moment. Android keeps roughly seven days of these */
 export type UsageEvent = { at: number; kind: EventKind; app: string | null };
 
-/** a coarse per-day total. Android keeps these for up to two years */
+/**
+ * A coarse per-day total.
+ *
+ * Android keeps DAILY buckets for about a week — the two-year figure belongs to
+ * its yearly aggregate, which is not per-day and is no use for a habit. So the
+ * journal's real job is not to fetch history, it is to KEEP it: what is written
+ * here survives long after the system has discarded its own copy.
+ */
 export type DailyRow = { day: string; app: string; ms: number };
 
 /**
@@ -118,8 +125,8 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
     async putDaily(rows) {
       if (rows.length === 0) return 0;
       let written = 0;
-      // batched for the same reason as `putEvents`: two years of daily buckets
-      // is thousands of rows, and a commit per row is what made the first sync
+      // batched for the same reason as `putEvents`: a row per app per day is
+      // still hundreds on a first run, and a commit each is what made that run
       // look like a hang
       await db.withTransactionAsync(async () => {
         const upsert = await db.prepareAsync(

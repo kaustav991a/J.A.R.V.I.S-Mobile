@@ -70,8 +70,11 @@ class UsageStatsModule : Module() {
     /**
      * Per-day totals, which is the half of this API with a long memory.
      *
-     * Android keeps daily buckets for up to two years, so a first launch is not
-     * a blank slate — it is months of history arriving at once.
+     * Android keeps DAILY buckets for about seven days. Its longer retentions —
+     * 4 weeks, 6 months, 2 years — are weekly, monthly and yearly aggregates and
+     * are not per-day, so they cannot answer a habit question. A first launch is
+     * therefore a week of history, and everything deeper is the journal keeping
+     * what the system throws away.
      *
      * No launch count: `UsageStats.mLaunchCount` is hidden API with no public
      * getter, and reaching it by reflection works on one phone and returns zero
