@@ -549,6 +549,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     }
     let alive = true;
     void postNow({
+      // the one notification in the app with no wit in it, and deliberately so:
+      // there is a lock deadline running behind this line, and a dry remark on a
+      // security prompt costs the seconds it takes to work out whether it is one
       title: 'Someone is at your desk, sir',
       body: `Was that you? The desk locks itself in ${Math.max(1, Math.round((alert.deadline - Date.now()) / 1000))}s.`,
       channel: WATCH_CHANNEL,
@@ -796,8 +799,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     if (!arrived || simulated) return;
     haptic.good();
     void postNow({
-      title: 'At your full disposal, sir',
-      body: 'The desk is online — PC control, files and the terminal are available again.',
+      title: 'At your disposal, sir',
+      body: 'Desk online. PC control, files and the terminal, all yours again.',
       data: { kind: 'desk_link' },
     });
   }, [deskLinked, simulated]);

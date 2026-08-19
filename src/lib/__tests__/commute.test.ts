@@ -209,6 +209,12 @@ describe('commuteBriefing outcomes', () => {
   type Row = { h: number; temp: number; chance: number; mm: number; wind: number; code: number };
   const mild = (h: number): Row => ({ h, temp: 28, chance: 5, mm: 0, wind: 6, code: 1 });
   const wet = (h: number): Row => ({ h, temp: 28, chance: 80, mm: 3.2, wind: 6, code: 61 });
+  // one row per branch of the advice, each a clear step past its threshold so a
+  // later tweak to HOT_C or WINDY_KMH moves the line without silencing a test
+  const hot = (h: number): Row => ({ h, temp: 41, chance: 5, mm: 0, wind: 6, code: 1 });
+  const cold = (h: number): Row => ({ h, temp: 8, chance: 5, mm: 0, wind: 6, code: 1 });
+  const windy = (h: number): Row => ({ h, temp: 28, chance: 5, mm: 0, wind: 47, code: 1 });
+  const stormy = (h: number): Row => ({ h, temp: 28, chance: 80, mm: 3.2, wind: 6, code: 95 });
 
   const payload = (rows: Row[]) => ({
     hourly: {
@@ -287,7 +293,7 @@ describe('commuteBriefing outcomes', () => {
     serve(payload([mild(8), mild(9), mild(10)]));
     const out = await commuteBriefing(22.57, 88.36, home, when);
     if (out.state !== 'clear') throw new Error('narrowing');
-    expect(out.briefing.title).toBe('Your route from Home is clear, sir');
+    expect(out.briefing.title).toBe('Nothing in your way from Home, sir');
     expect(out.briefing.body).toContain('Nothing to carry');
   });
 
@@ -303,13 +309,64 @@ describe('commuteBriefing outcomes', () => {
     expect(out.briefing.body).toContain('8 AM–11 AM');
   });
 
-  it('addresses him, because the voice is the butler’s', async () => {
-    serve(payload([wet(8), mild(9), mild(10)]));
+  /**
+   * The voice, pinned. Its rules are in the doc comment above `notes` in
+   * `commute.ts`; these are the ones a rewrite can break silently.
+   */
+  it('spends its one “sir” in the title, because it is punctuation and not deference', async () => {
+    serve(payload([stormy(8), mild(9), mild(10)]));
     const out = await commuteBriefing(22.57, 88.36, home, when);
     if (out.state !== 'briefing') throw new Error('narrowing');
-    expect(out.briefing.body).toContain('sir');
-    // measurement before recommendation: a suggestion with no figure behind it is
-    // the tone this app exists to avoid
-    expect(out.briefing.body).toContain('80% chance');
+    expect(out.briefing.title).toContain('sir');
+    // repeated in every clause it stops reading as dry and starts reading as
+    // servile, which is a different character than the one that was asked for
+    expect(out.briefing.body).not.toContain('sir');
+  });
+
+  /**
+   * The figure comes first and the remark follows it, in every branch.
+   *
+   * Android truncates a notification body in the shade, so whatever survives the
+   * cut has to be the half you can act on. These assertions are on the ORDER, not
+   * just the presence: a rewrite that opens with the joke passes a `toContain`
+   * check and fails the person reading it at 6 AM.
+   */
+  const branches: Array<{ name: string; row: (h: number) => Row; figure: string; remark: string }> = [
+    { name: 'rain', row: wet, figure: '80% chance', remark: 'umbrella' },
+    { name: 'heat', row: hot, figure: '41°C', remark: 'hospital' },
+    { name: 'cold', row: cold, figure: '8°C', remark: 'jacket' },
+    { name: 'wind', row: windy, figure: '47 km/h', remark: 'hair' },
+  ];
+
+  for (const b of branches) {
+    it(`states the ${b.name} measurement before it says anything about it`, async () => {
+      serve(payload([b.row(8), mild(9), mild(10)]));
+      const out = await commuteBriefing(22.57, 88.36, home, when);
+      if (out.state !== 'briefing') throw new Error('narrowing');
+      const { body } = out.briefing;
+      expect(body).toContain(b.figure);
+      expect(body).toContain(b.remark);
+      expect(body.indexOf(b.figure)).toBeLessThan(body.indexOf(b.remark));
+    });
+  }
+
+  it('names the thunderstorm and still gives the hour', async () => {
+    serve(payload([stormy(8), mild(9), mild(10)]));
+    const out = await commuteBriefing(22.57, 88.36, home, when);
+    if (out.state !== 'briefing') throw new Error('narrowing');
+    expect(out.briefing.body).toContain('Thunderstorms forecast');
+    expect(out.briefing.body).toContain('8 AM–11 AM');
+  });
+
+  it('never exclaims, in any branch, including the quiet one', async () => {
+    // understatement is the whole instrument; an exclamation mark is the one
+    // punctuation mark that cannot be read dryly
+    for (const rows of [[wet(8)], [hot(8)], [cold(8)], [windy(8)], [stormy(8)], [mild(8)]]) {
+      serve(payload([...rows, mild(9), mild(10)]));
+      const out = await commuteBriefing(22.57, 88.36, home, when);
+      if (out.state === 'unavailable') throw new Error('narrowing');
+      expect(out.briefing.title).not.toContain('!');
+      expect(out.briefing.body).not.toContain('!');
+    }
   });
 });

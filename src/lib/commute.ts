@@ -316,33 +316,50 @@ export async function commuteBriefing(
     const storm = codes.some((c) => THUNDER.has(c));
 
     /**
-     * The voice is the butler's, and it is load-bearing.
+     * The voice is JARVIS's, and it is load-bearing. Four rules, in order:
      *
-     * These lines are read half-awake, on a lock screen, by someone deciding whether
-     * to pick something up on the way out. So: address him, state the measurement,
-     * then recommend — never the reverse. A recommendation with no figure behind it
-     * cannot be disagreed with, and "Take an umbrella" from a machine that will not
-     * say why is the tone this app exists to avoid.
+     * 1. **The figure comes first, the remark second.** These lines are read
+     *    half-awake on a lock screen by someone deciding whether to pick something
+     *    up on the way out. A recommendation with no measurement behind it cannot
+     *    be disagreed with, and "Take an umbrella" from a machine that will not say
+     *    why is the tone this app exists to avoid.
+     * 2. **The remark never replaces the instruction, it follows it.** Android
+     *    truncates a notification body in the shade; whatever survives the cut has
+     *    to be the actionable half. This is why the needle is always last.
+     * 3. **`sir` at most once per message, and the title already spends it.** It is
+     *    punctuation, not deference — repeated in every clause it stops reading as
+     *    dry and starts reading as servile, which is a different character.
+     * 4. **No exclamation marks, ever.** Understatement is the whole instrument.
+     *
+     * The dry-with-a-needle register was chosen deliberately (2026-08-19) over a
+     * flatter one. It is banned in exactly two places, both of them here in spirit
+     * and enforced in `commuteTask.ts` and `JarvisProvider.tsx`: the desk-watch
+     * alert, which is a security prompt on a lock deadline, and the `unavailable`
+     * path, whose entire job is admitting he does not know — a joke there sounds
+     * like an answer.
      */
     const notes: string[] = [];
     if (storm) {
-      notes.push('Thunderstorms are forecast, sir — leaving early or waiting it out would both be sensible.');
+      notes.push('Thunderstorms forecast. Leave early or wait it out — either beats the alternative.');
     }
     if (maxChance >= RAIN_CHANCE || totalMm >= RAIN_MM) {
       notes.push(
-        `Rain is likely on your way out, sir — a ${Math.round(maxChance)}% chance` +
+        `A ${Math.round(maxChance)}% chance of rain on your way out` +
           (totalMm >= RAIN_MM ? `, around ${totalMm.toFixed(1)} mm` : '') +
-          '. I would take an umbrella.'
+          `. An umbrella, unless you've grown fond of arriving wet.`
       );
     }
     if (maxTemp !== null && maxTemp >= HOT_C) {
-      notes.push(`It reaches ${Math.round(maxTemp)}°C, sir. Water, and something for your head.`);
+      notes.push(
+        `It reaches ${Math.round(maxTemp)}°C today. Water, and something for your head — ` +
+          `I would rather not arrange the hospital visit.`
+      );
     }
     if (minTemp !== null && minTemp <= COLD_C) {
-      notes.push(`Down to ${Math.round(minTemp)}°C, sir. A jacket, I would suggest.`);
+      notes.push(`Down to ${Math.round(minTemp)}°C. The jacket you keep ignoring would be appropriate.`);
     }
     if (maxWind >= WINDY_KMH) {
-      notes.push(`Wind gusting to ${Math.round(maxWind)} km/h, sir.`);
+      notes.push(`Gusts to ${Math.round(maxWind)} km/h. Mind the hair.`);
     }
 
     // both ends carry the meridiem even when they share one: this label read
@@ -369,10 +386,11 @@ export async function commuteBriefing(
       return {
         state: 'clear',
         briefing: {
-          title: `Your route from ${d.label} is clear, sir`,
+          title: `Nothing in your way from ${d.label}, sir`,
           body:
             `Nothing to carry. ${maxTemp === null ? '' : `${Math.round(maxTemp)}°C, `}` +
-            `a ${Math.round(maxChance)}% chance of rain, wind ${Math.round(maxWind)} km/h (${window}).`,
+            `a ${Math.round(maxChance)}% chance of rain, wind ${Math.round(maxWind)} km/h (${window}). ` +
+            `Do try to enjoy it.`,
         },
       };
     }

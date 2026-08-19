@@ -184,7 +184,10 @@ export async function previewBriefing(placeId: string): Promise<string | null> {
    * claiming nothing to report is the lie this feature kept telling.
    */
   if (outcome.state === 'unavailable') {
-    return `I could not reach the forecast, sir (${outcome.reason}). Nothing was posted.`;
+    // flat on purpose, and the second of the two places the voice keeps its wit to
+    // itself: this line's whole job is admitting he does not know, and a remark
+    // attached to it reads as though something was worked out after all
+    return `I could not reach the forecast, sir (${outcome.reason}). Nothing was posted, rather than something invented.`;
   }
 
   /**
