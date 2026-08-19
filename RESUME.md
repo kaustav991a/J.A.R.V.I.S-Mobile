@@ -71,6 +71,83 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ 2026-08-19, third session: the chat is VERIFIED, and the link took three fixes
+
+**591 tests, `tsc --noEmit` clean.** Running on the phone: release build
+`8cf9e12`, **arm64-only, 48 MB**, installed over the top with data intact.
+
+### The chat works, proved end to end
+
+```
+You    · 16:38   reply with the single word ACORN
+Jarvis · 16:39   ACORN, Sir.
+```
+
+Link establishes in **6 seconds** and holds. `apps_linked: 1` steady.
+
+### The link needed three fixes, and the first two were mine
+
+Each was correct and incomplete, and the device found every one:
+
+1. Racing probes leaked sockets → **generation counter**.
+2. The counter let the 5s watchdog **cancel the probe it was waiting for**, so on
+   a cold host `connect()` was never reached → **the watchdog leaves probes
+   alone**.
+3. That guard read `status === 'probing'`, a label a superseded probe leaves
+   behind. The machine could sit labelled 'probing' with nothing in flight and
+   the watchdog would decline to rescue it **forever** → **it guards on a real
+   in-flight flag**.
+
+Also: a refused handshake (**gateway 403s a bad token** — confirmed from the
+laptop) fires `onerror` and often no `onclose` on Android, and `onerror` only
+recorded `lastError`. So a refusal displayed as "Connecting…". It reports
+`closed` now, which is also what the watchdog looks for.
+
+### The one open question: replies are slow
+
+The ACORN round trip took about a minute. **Ruled out by measurement:**
+
+| Suspect | Verdict |
+| --- | --- |
+| cold gateway | no — `/health` in 0.31s, UptimeRobot warm |
+| model fallback | no — `gemini_ok: 5, fell_back: 0` |
+| quota | no — `last_error_was_quota: false` |
+
+So it is delivery, not thinking. **Prime suspect: the REST fallback.**
+`sendCommand` uses `api.backdoor()` whenever `link.send()` returns false, and the
+answer then has to find a socket that may be re-dialling. Worth tracing next.
+
+### Build economics, fixed
+
+`reactNativeArchitectures=arm64-v8a` via `plugins/withArm64Only.js` — a plugin,
+because `prebuild` regenerates `gradle.properties` and the setting would silently
+revert. **Clean build 7 min / 107 MB → incremental 46 s / 48 MB.**
+
+### OTA is configured but not yet used
+
+`expo-updates` installed, `updates.url` for project `f047fd2e-…`, and
+**`runtimeVersion: fingerprint`** — chosen over `appVersion` because this app has
+a local native module and fingerprint is what stops a JS update landing on a
+build whose native side does not match.
+
+**Owed: `eas login` once**, then `eas update --branch production` ships JS with no
+USB. Native changes still need a build.
+
+`expo-updates` is mocked in `jest-setup.js`: installing it made the App smoke test
+take **92 seconds** to mount and fail its 5s timeout: Expo checks for an update at
+startup and, with no server reachable under jest, waits.
+
+### Traps
+
+- **`prebuild --clean` wipes `android/`**, taking any built APK with it. Finished
+  APKs get parked in `builds/` (gitignored) for that reason.
+- **UI automation cannot survive the app lock** — backgrounding re-locks, and the
+  biometric prompt needs a finger. Tab and SEND bounds also shift between dumps,
+  so taps land on the wrong control; `uiautomator` reporting
+  `could not get idle state` means the bounds just read are stale.
+
+---
+
 ## ▶ 2026-08-19, second session: connecting forever, and OTA
 
 **572 tests, `tsc --noEmit` clean.** Release APK is what runs on the phone now —
