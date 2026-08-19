@@ -95,6 +95,13 @@ export function SettingsScreen() {
           title="Memory"
           subtitle="What he knows about you — read it, add to it, take things back"
           onPress={() => nav.navigate('Memory')}
+        />
+        <SettingsRow
+          testID="settings-journal"
+          icon="pulse-outline"
+          title="Journal"
+          subtitle="How this phone is used, kept on the phone and nowhere else"
+          onPress={() => nav.navigate('Journal')}
           last
         />
       </View>

@@ -41,6 +41,14 @@ export type SettingsStackParams = {
   Places: undefined;
   /** what the cloud brain holds as true about him, and the way to correct it */
   Memory: undefined;
+  /**
+   * What this phone has observed about its own use.
+   *
+   * Deliberately a different screen from Memory: that one holds what he has
+   * *told* J.A.R.V.I.S. and lives on the gateway, this one holds what the phone
+   * has *watched* and never leaves the device.
+   */
+  Journal: undefined;
   About: undefined;
 };
 

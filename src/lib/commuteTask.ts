@@ -1,5 +1,8 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
+import { openJournal } from './journal/store';
+import { androidSource } from './journal/source';
+import { syncUsage } from './journal/sync';
 import { GENERAL_CHANNEL, postNow } from './notify';
 import {
   alreadyBriefed,
@@ -52,6 +55,23 @@ async function coordsFor(d: Departure): Promise<{ lat: number; lon: number } | n
 }
 
 TaskManager.defineTask(COMMUTE_TASK, async () => {
+  /**
+   * The journal rides this schedule rather than asking Android for one of its
+   * own.
+   *
+   * A second background registration competes with the first for the same
+   * budget, and between a life-log and a briefing with a deadline the briefing
+   * wins every time. Wrapped in its own try so it can never be the reason the
+   * briefing did not run — and it costs nothing to skip, because every usage
+   * query is retroactive and the next run collects what this one missed.
+   */
+  try {
+    const journal = await openJournal();
+    await syncUsage(journal, androidSource, Date.now());
+  } catch {
+    // the journal never bills the briefing for its failures
+  }
+
   try {
     const settings = await loadCommute();
     const now = new Date();
