@@ -599,6 +599,17 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         image: alert.image,
         user: alert.user,
         trigger: alert.trigger,
+        /**
+         * The one notification that must be heard with the app already open.
+         *
+         * `installHandler` answers `shouldPlaySound: false` for anything that has
+         * not opted in, and on Android that flag is the vibration switch as well —
+         * so this arrived in complete silence whenever the app happened to be
+         * foregrounded. The alert screen takes the display over, which serves a
+         * phone being looked at and does nothing whatever for one lying face down
+         * on the desk with thirty seconds on the clock.
+         */
+        alertWhenOpen: true,
       },
     }).then((id) => {
       if (alive) watchNote.current = id;

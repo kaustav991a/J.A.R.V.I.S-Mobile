@@ -287,3 +287,89 @@ describe('a voice transcript', () => {
     expect(s.chat).toEqual([{ from: 'user', text: 'lock the pc', at: 7 }]);
   });
 });
+
+describe('the bugs an audit found in the reducer', () => {
+  /**
+   * Park-then-ask is the ordinary agent flow, and it used to blank the card.
+   *
+   * `agent_confirm` carries only an action — the goal, the detail and the risk are
+   * not on that frame — and `upsertParked` spread the whole object over the
+   * existing entry. So a parked action that arrived with a full description had it
+   * overwritten with three empty strings at the exact moment the user was asked to
+   * approve it. You were shown a decision with nothing to decide on.
+   */
+  it('keeps the parked description when a confirm arrives for the same action', () => {
+    const s = feed([
+      {
+        kind: 'agent_parked',
+        id: 'a1',
+        goal: 'clear the download folder',
+        action: 'delete 41 files',
+        detail: 'nothing modified in the last 30 days',
+        risk: 'high',
+      },
+      { kind: 'agent_confirm', id: 'a1', action: 'delete 41 files', resolved: false, approved: false },
+    ]);
+    expect(s.parked).toHaveLength(1);
+    expect(s.parked[0].goal).toBe('clear the download folder');
+    expect(s.parked[0].detail).toBe('nothing modified in the last 30 days');
+    expect(s.parked[0].risk).toBe('high');
+  });
+
+  /**
+   * The live alert is guarded; the announcement was not.
+   *
+   * A resolution for an older id left the countdown on screen — correctly — and
+   * still wrote "Desk locked" into the chat and the timeline. The log then
+   * contradicted the screen, on the one subject where that matters.
+   */
+  it('says nothing when a resolution arrives for an alert that is not the live one', () => {
+    const s = feed([
+      { kind: 'intruder', id: 'now', expiresIn: 30, image: null, user: 'kaustav', trigger: 'wake' },
+      { kind: 'intruder_resolved', id: 'earlier', outcome: 'locked' },
+    ]);
+    expect(s.intruder?.id).toBe('now');
+    expect(s.chat).toEqual([]);
+    expect(s.trace.filter((t) => t.event === 'locked')).toEqual([]);
+  });
+
+  it('still announces the resolution of the alert that is live', () => {
+    const s = feed([
+      { kind: 'intruder', id: 'now', expiresIn: 30, image: null, user: 'kaustav', trigger: 'wake' },
+      { kind: 'intruder_resolved', id: 'now', outcome: 'approved' },
+    ]);
+    expect(s.intruder).toBeNull();
+    expect(s.chat).toHaveLength(1);
+  });
+
+  /**
+   * Two turns can share a millisecond, and one of them used to disappear.
+   *
+   * `hydrate` de-duplicated restored turns against what was already in state on
+   * `(from, at)` alone, so a restored line was dropped whenever an unrelated line
+   * from the same side happened to carry the same timestamp.
+   */
+  it('restores two different turns that share a timestamp', () => {
+    const live: HudState = {
+      ...initialHudState,
+      chat: [{ from: 'jarvis', text: 'the second thing', at: 500 }],
+    };
+    const s = hudReducer(live, {
+      type: 'hydrate',
+      chat: [{ from: 'jarvis', text: 'the first thing', at: 500 }],
+    });
+    expect(s.chat.map((c) => c.text)).toEqual(['the first thing', 'the second thing']);
+  });
+
+  it('still drops a restored turn that is the same turn', () => {
+    const live: HudState = {
+      ...initialHudState,
+      chat: [{ from: 'jarvis', text: 'greetings', at: 500 }],
+    };
+    const s = hudReducer(live, {
+      type: 'hydrate',
+      chat: [{ from: 'jarvis', text: 'greetings', at: 500 }],
+    });
+    expect(s.chat).toHaveLength(1);
+  });
+});

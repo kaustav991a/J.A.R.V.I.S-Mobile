@@ -15,17 +15,22 @@ import { JarvisProvider, useJarvis } from '../JarvisProvider';
 
 const mockSend = jest.fn();
 const mockBackdoor = jest.fn();
+/** the provider's own onFrame, captured so a test can land a frame on it */
+const mockFrames: { onFrame: ((f: unknown, at: number) => void) | null } = { onFrame: null };
 
 jest.mock('../../link/useLink', () => ({
-  useLink: () => ({
-    mode: 'offline',
-    status: 'closed',
-    lastError: null,
-    send: mockSend,
-    sendVoice: jest.fn(() => false),
-    reprobe: jest.fn(),
-    disconnect: jest.fn(),
-  }),
+  useLink: (opts: { onFrame: (f: unknown, at: number) => void }) => {
+    mockFrames.onFrame = opts.onFrame;
+    return {
+      mode: 'offline',
+      status: 'closed',
+      lastError: null,
+      send: mockSend,
+      sendVoice: jest.fn(() => false),
+      reprobe: jest.fn(),
+      disconnect: jest.fn(),
+    };
+  },
 }));
 
 jest.mock('../../api/client', () => ({
@@ -155,5 +160,39 @@ describe('sendCommand when nothing can carry the message', () => {
 
     expect(log()).toBe('user: lock the desk');
     expect(mockBackdoor).toHaveBeenCalledWith('lock the desk');
+  });
+});
+
+/**
+ * The desk watch, while the app is open.
+ *
+ * `installHandler` answers `shouldPlaySound: false` for any notification that has
+ * not opted in, and on Android that flag is the vibration switch as well. The one
+ * notification in this app carrying a 30-second lock deadline had not opted in, so
+ * with the app foregrounded it landed in total silence. The alert screen takes
+ * over the display, which serves a phone being looked at and does nothing for one
+ * lying face down.
+ */
+describe('the desk-watch notification', () => {
+  it('opts into being heard, even with the app open', async () => {
+    const { postNow } = jest.requireMock('../../lib/notify') as { postNow: jest.Mock };
+    postNow.mockClear();
+
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockFrames.onFrame?.(
+        { kind: 'intruder', id: 'i-9', expiresIn: 30, image: null, user: 'KAUSTAV', trigger: 'wake' },
+        Date.now()
+      );
+    });
+
+    const posted = postNow.mock.calls.map(([o]) => o).find((o) => o?.data?.kind === 'intruder');
+    expect(posted).toBeDefined();
+    expect(posted.data.alertWhenOpen).toBe(true);
+    view.unmount();
   });
 });

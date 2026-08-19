@@ -103,9 +103,22 @@ const WATCH_SAID = {
 
 const cap = <T,>(list: T[], max: number): T[] => (list.length > max ? list.slice(list.length - max) : list);
 
-const upsertParked = (parked: ParkedAction[], next: ParkedAction): ParkedAction[] => {
+/**
+ * Merge what a frame actually said into a parked action, and nothing else.
+ *
+ * The patch is partial on purpose. `agent_confirm` carries only an action — the
+ * goal, the detail and the risk are not on that frame — and this used to take a
+ * whole `ParkedAction` with those three filled in as empty strings, then spread
+ * it over the existing entry. Park-then-ask is the ordinary agent flow, so a
+ * parked action that had arrived with a full description was blanked at the exact
+ * moment the user was asked to approve it: a decision with nothing to decide on.
+ */
+const upsertParked = (
+  parked: ParkedAction[],
+  next: Partial<ParkedAction> & { id: string; at: number }
+): ParkedAction[] => {
   const i = parked.findIndex((p) => p.id === next.id);
-  if (i === -1) return [...parked, next];
+  if (i === -1) return [...parked, { goal: '', action: '', detail: '', risk: '', resolving: false, ...next }];
   const copy = parked.slice();
   copy[i] = { ...copy[i], ...next, resolving: copy[i].resolving };
   return copy;
@@ -198,18 +211,9 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
       if (frame.resolved) {
         return { ...state, parked: state.parked.filter((p) => p.id !== frame.id) };
       }
-      return {
-        ...state,
-        parked: upsertParked(state.parked, {
-          id: frame.id,
-          goal: '',
-          action: frame.action,
-          detail: '',
-          risk: '',
-          at,
-          resolving: false,
-        }),
-      };
+      // only what this frame carries: an id, an action, and when it arrived. A
+      // description already gathered from `agent_parked` survives
+      return { ...state, parked: upsertParked(state.parked, { id: frame.id, action: frame.action, at }) };
     case 'intruder':
       return {
         ...state,
@@ -229,11 +233,21 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
           TRACE_CAP
         ),
       };
-    case 'intruder_resolved':
+    case 'intruder_resolved': {
+      /**
+       * A resolution for some other alert must not clear the live one — and it
+       * must not speak for it either.
+       *
+       * The `intruder` field was guarded and the announcement was not, so a late
+       * resolution for an older id left the countdown correctly on screen and
+       * still wrote "Desk locked" into the chat and the timeline. The log then
+       * contradicted the screen, on the one subject where that cannot be allowed.
+       */
+      const stale = state.intruder !== null && state.intruder.id !== frame.id;
+      if (stale) return state;
       return {
         ...state,
-        // a resolution for some other alert must not clear the live one
-        intruder: state.intruder && state.intruder.id !== frame.id ? state.intruder : null,
+        intruder: null,
         // the outcome is said in Chat as well as logged: the timeline is a place
         // you have to go looking, and afterwards the one thing worth knowing is
         // whether the machine is open or shut
@@ -252,6 +266,7 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
           TRACE_CAP
         ),
       };
+    }
   }
 }
 
@@ -299,10 +314,13 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
       // Restored turns go BEFORE whatever is already here. The socket can open and
       // J.A.R.V.I.S. can answer before a disk read finishes, and replacing would
       // throw away a turn that had already happened in this session.
-      // De-duplicated on (from, at): a relaunch that restores a log and then
-      // receives the same greeting again should not show it twice.
-      const seen = new Set(state.chat.map((c) => `${c.from}@${c.at}`));
-      const restored = action.chat.filter((c) => !seen.has(`${c.from}@${c.at}`));
+      // De-duplicated on (from, at, text): a relaunch that restores a log and then
+      // receives the same greeting again should not show it twice. The text is part
+      // of the key because two different turns from the same side can land in one
+      // millisecond, and on (from, at) alone the restored one was thrown away.
+      const key = (c: ChatEntry) => `${c.from}@${c.at}@${c.text}`;
+      const seen = new Set(state.chat.map(key));
+      const restored = action.chat.filter((c) => !seen.has(key(c)));
       return { ...state, chat: cap([...restored, ...state.chat], CHAT_CAP) };
     }
     case 'reset':

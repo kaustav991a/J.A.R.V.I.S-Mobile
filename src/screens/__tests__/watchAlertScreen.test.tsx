@@ -20,6 +20,10 @@ jest.mock('../../security/AuthProvider', () => ({
   useAuth: () => ({ confirmCritical: mockConfirm }),
 }));
 
+jest.mock('../../lib/haptics', () => ({
+  haptic: { tap: jest.fn(), good: jest.fn(), bad: jest.fn() },
+}));
+
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
@@ -132,5 +136,24 @@ describe('WatchAlertScreen', () => {
     const first = mockExpire.mock.calls.length;
     await new Promise((r) => setTimeout(r, 600));
     expect(mockExpire.mock.calls.length).toBe(first);
+  });
+});
+
+/**
+ * The alert has to be felt, not only shown.
+ *
+ * While the app is open, the notification handler answers `shouldPlaySound: false`
+ * for anything that has not opted in — and on Android that flag is the vibration
+ * switch too. So the one notification in this app with a lock deadline behind it
+ * arrived with no sound and no buzz whenever the app happened to be foregrounded.
+ * The screen takes over completely, which covers a phone being looked at and does
+ * nothing at all for one lying face down on the desk.
+ */
+describe('when the alert appears', () => {
+  it('buzzes, because a screen nobody is looking at is not a warning', async () => {
+    const { haptic } = jest.requireMock('../../lib/haptics') as { haptic: { bad: jest.Mock } };
+    haptic.bad.mockClear();
+    await mount(alert());
+    expect(haptic.bad).toHaveBeenCalledTimes(1);
   });
 });

@@ -71,6 +71,64 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ 2026-08-19, third pass: the reducer, the frames and the notifications
+
+**485 tests, 40 suites, `tsc --noEmit` clean.** Second audit slice — `ws/frames.ts`,
+`state/hudReducer.ts`, `lib/notify.ts`, about 1,030 lines. Four found, four fixed.
+
+| # | Where | What it was |
+| --- | --- | --- |
+| 1 | `hudReducer.ts` `upsertParked` | an approval card lost the description of what it was approving |
+| 2 | `JarvisProvider.tsx` + `WatchAlertScreen.tsx` | the desk-watch alert was silent while the app was open |
+| 3 | `hudReducer.ts` `intruder_resolved` | a stale resolution announced itself over a live alert |
+| 4 | `hudReducer.ts` `hydrate` | two turns sharing a millisecond, one dropped on relaunch |
+
+### 1. Park-then-ask blanked the card
+
+`agent_confirm` carries only an action — no goal, no detail, no risk — and the
+branch built a whole `ParkedAction` with those three as empty strings, which
+`upsertParked` then spread over the existing entry. A parked action that arrived
+with a full description was wiped at the moment the user was asked to approve it.
+The patch is `Partial` now, and only what a frame actually said is merged.
+
+### 2. The one alert that must be heard was the one that opted out
+
+`installHandler` answers `shouldPlaySound: false` for anything not carrying
+`preview` or `alertWhenOpen`, and **on Android that flag is the vibration switch
+too**. The desk-watch notification set neither, so with the app foregrounded it
+landed in complete silence; `WatchAlertScreen` fired haptics only inside
+`answer()`, never on appearance. Screen fully covered, nothing to tell you to look.
+
+Both halves fixed: `alertWhenOpen: true` in the watch payload, and one
+`haptic.bad()` keyed on the alert id when the screen mounts.
+
+### 3. The log contradicted the screen
+
+`intruder` was guarded against a resolution for another id; the chat line and the
+trace entry were not. A late resolution wrote "Desk locked" while the live alert
+was still counting. A stale resolution is now a no-op in full.
+
+### 4. `hydrate` keyed on (from, at)
+
+Two different turns from the same side in one millisecond collided and the
+restored one was dropped. The key carries the text now.
+
+### `frames.ts` came out clean
+
+Every field is coerced, unknown types return null, and the three id spellings and
+the `cpu_percent` naming trap are already handled. One thing to know rather than
+fix: telemetry and weather parse **only** under `status: 'sync'` — a bare
+`type: 'telemetry'` is dropped without a word.
+
+### What has NOT been audited
+
+`security/AuthProvider.tsx` and `lib/biometrics.ts` (525 lines, the app lock),
+`api/client.ts`, `lib/place.ts`, `lib/vision.ts`, `lib/voice.ts`, and roughly 3,500
+lines of screens and components. **Two audit slices have found eight bugs; assume
+the rest holds more.**
+
+---
+
 ## ▶ START HERE — 2026-08-19, later: four bugs found by audit, all four fixed
 
 **478 tests, 40 suites, `tsc --noEmit` clean.** Two commits: `83914b9` (the JARVIS

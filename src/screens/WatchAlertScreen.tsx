@@ -52,6 +52,19 @@ export function WatchAlertScreen({ alert }: { alert: IntruderAlert }) {
     setLeft(secondsLeft(alert.deadline, Date.now()));
   }, [alert.id, alert.deadline]);
 
+  /**
+   * A screen nobody is looking at is not a warning.
+   *
+   * This takes the whole display the moment an alert lands, which is a complete
+   * answer for a phone in your hand and none at all for one face down on the desk.
+   * The notification's own buzz covers the backgrounded case; this covers the
+   * other one. Keyed on the alert id so a re-render, or a countdown tick, does not
+   * buzz again — one alert, one warning.
+   */
+  useEffect(() => {
+    haptic.bad();
+  }, [alert.id]);
+
   useEffect(() => {
     // wall-clock, not a decrementing counter: a timer starved while the phone
     // slept would otherwise show time this alert no longer has
