@@ -369,3 +369,42 @@ describe('the watchdog while a probe is in flight', () => {
     expect(h.machine.snapshot.status).toBe('connecting');
   });
 });
+
+/**
+ * A refused handshake looked exactly like a connection still being made.
+ *
+ * The gateway answers 403 to a wrong or missing pairing token. That fires
+ * `onerror` and, on Android, does not reliably fire `onclose` — so the machine
+ * stayed on `connecting` and the Connection screen read "Connecting… probing the
+ * local network, then the cloud gateway" indefinitely, while the far end had
+ * already refused. Reported from the device.
+ */
+describe('a socket that is refused rather than opened', () => {
+  it('reports closed, so the screen stops claiming it is still trying', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    expect(h.machine.snapshot.status).toBe('connecting');
+
+    FakeSocket.opened[0].onerror?.({ message: 'Unexpected server response: 403' });
+
+    expect(h.machine.snapshot.status).toBe('closed');
+    expect(h.machine.snapshot.lastError).toContain('403');
+  });
+
+  it('lets the watchdog retry it, because closed is what it looks for', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].onerror?.({ message: 'Unexpected server response: 403' });
+    await h.machine.tick();
+    expect(FakeSocket.opened).toHaveLength(2);
+  });
+
+  it('leaves an error on a live socket alone, which onclose already handles', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+    FakeSocket.opened[0].onerror?.({ message: 'ECONNRESET' });
+    expect(h.machine.snapshot.status).toBe('open');
+    expect(h.machine.snapshot.lastError).toContain('ECONNRESET');
+  });
+});

@@ -220,9 +220,25 @@ export class LinkMachine {
        */
       this.set({ status: 'closed' });
     };
+    /**
+     * An error before the socket ever opened is a refusal, and must say so.
+     *
+     * A rejected handshake — the gateway answers 403 to a wrong or missing
+     * pairing token — fires `onerror` and, on Android, does not reliably fire
+     * `onclose` afterwards. So the status sat on `connecting` and the screen
+     * read "Connecting… probing the local network, then the cloud gateway"
+     * indefinitely, while the truth was that the far end had already said no.
+     * Reported from the device on 2026-08-19, and it is the same failure class
+     * this project keeps paying for: an error that looks like progress.
+     *
+     * Only when it never opened. An error on a live socket is a fault mid-
+     * conversation, and `onclose` handles that one properly.
+     */
     socket.onerror = (e) => {
       if (!isCurrent()) return;
-      this.set({ lastError: errText(e) });
+      const refused = this.snap.status !== 'open';
+      this.set({ lastError: errText(e), ...(refused ? { status: 'closed' as const } : {}) });
+      if (refused) this.socket = null;
     };
     socket.onmessage = (e) => {
       if (!isCurrent()) return;
