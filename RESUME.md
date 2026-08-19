@@ -71,6 +71,76 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ RESUME POINT — 2026-08-19, end of day
+
+**614 tests, 49 suites, `tsc --noEmit` clean. Both repos clean and pushed.**
+Read `NEXT.md` for the queue; this is the state of the world.
+
+| | |
+| --- | --- |
+| On the phone | release APK, **arm64-only, 48 MB**, fingerprint `ff3e7ae8` |
+| Updates | **OTA is live** — JS ships without USB |
+| jarvis-mobile | `feat/mobile-hud`, pushed |
+| jarvis-brain | `feat/cloud-gateway`, pushed, deployed |
+
+### What is proved on the device, not just green in jest
+
+- **The chat round-trips.** `reply with the single word ACORN` → `ACORN, Sir.`
+- **The link establishes in ~6s** and holds. It took three fixes to get there.
+- **The journal holds 17,500 events and 360 day-totals**, with real app names.
+- **The evening briefing fired** — though probably only once the app was opened,
+  which is the throttled-job symptom. See `NEXT.md`, first item.
+- **Push notifications arrive.** They had been addressed to `general`, a channel
+  the app deleted eight renames ago, and Android was discarding every one.
+
+### Bug C, finally closed, and it took four separate fixes
+
+The pocketed reply survived three correct socket fixes because the last mile was
+elsewhere. In order: the phone was not closing its socket on background; the
+gateway was not noticing when it did; the app never consumed a pushed reply; and
+**the push itself was addressed to a channel that did not exist**. Each fix was
+necessary. Only the fourth made it work.
+
+The gateway now asks the phone for its channel names rather than assuming them.
+**Keep it that way** — the assumption is what rotted.
+
+### The link took three fixes, and two were self-inflicted
+
+Racing probes leaked sockets → a generation counter. The counter let the watchdog
+cancel the probe it was waiting for → the watchdog leaves probes alone. That
+guard read `status === 'probing'`, a label a superseded probe leaves behind, so
+the machine could sit labelled probing with nothing running and never recover →
+it guards on a real in-flight flag. All three found by the device, none by 614
+tests.
+
+### The shape that came up FIVE times today
+
+An outcome that looks like progress: the mute briefing, the empty Vitals panel,
+the silent Sync button, a refused handshake reporting "Connecting…", and a
+silently applied OTA. **Every state must name itself.** Where that rule is now
+enforced: `syncLine`, `describeUpdate`, `say()` in the journal digest, the
+`denied` reading, and the sendCommand failure line.
+
+### Built today, beyond the fixes
+
+- **The phone journal**, pieces 1 and 2: a local SQLite record of how the phone
+  is used, usage riding every question, and a facts pipe that **starts telling
+  the gateway about him after 7 completed days** — automatically, no work needed.
+- **The JARVIS voice** across every notification, with its rules written down.
+- **An Updates screen and banner**, a version line in About and Settings.
+- **OTA end to end**: fingerprint, EAS env vars, and a channel linked to a branch.
+
+### First three things tomorrow
+
+1. **Did the briefing fire unprompted?** Weekday evening, phone untouched.
+   `NEXT.md` has the check and the preview-button shortcut.
+2. **Set Home in Settings → Places** and switch the morning departure on. A
+   headless task cannot take a GPS fix; a named place already has coordinates.
+3. **`run_harnesses.py` with the venv on the desk.** Expect **81**. Several
+   gateway commits have never been run against it.
+
+---
+
 ## ▶ 2026-08-19, third session: the chat is VERIFIED, and the link took three fixes
 
 **591 tests, `tsc --noEmit` clean.** Running on the phone: release build
