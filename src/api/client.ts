@@ -49,7 +49,7 @@ export type Api = {
    * state the phone is in when the desk wakes up at 2am. Push is the only way
    * that news arrives. Gateway-only — the desk serves no such route.
    */
-  registerPush(pushToken: string, platform: string): Promise<void>;
+  registerPush(pushToken: string, platform: string, channels?: Record<string, string>): Promise<void>;
   /**
    * What the cloud brain believes about him, and the two ways to change it.
    *
@@ -153,8 +153,13 @@ export function createApi(cfg: ApiConfig): Api {
     // Gateway-only, and previously sent to `baseUrl` — so once the desk attached,
     // the phone was registering its push address with a machine that has no such
     // route, and push silently stopped being renewed.
-    registerPush: async (pushToken, platform) => {
-      await postCloud('/app-push/register', { push_token: pushToken, platform });
+    registerPush: async (pushToken, platform, channels) => {
+      // The channels travel with the token because ONLY the phone knows what it
+      // called them. Android discards a push addressed to a channel that does
+      // not exist, and this app has renamed its everyday channel eight times —
+      // every one of those renames silently broke replies until the gateway was
+      // told, which nobody remembered to do.
+      await postCloud('/app-push/register', { push_token: pushToken, platform, channels });
     },
     facts: async () => readFacts(await postCloud('/app-fact', {})),
     remember: async (fact) => {

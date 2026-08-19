@@ -28,6 +28,7 @@ import type { Endpoints, LinkMode, LinkStatus } from '../link/config';
 import { createApi } from '../api/client';
 import type { Api } from '../api/client';
 import {
+  GENERAL_CHANNEL,
   WATCH_CATEGORY,
   WATCH_CHANNEL,
   alertFromLaunch,
@@ -688,7 +689,13 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       // and a "register once per address" guard left the phone unreachable by push
       // until the app was restarted. It also went stale on a rotated token, since
       // the address had not changed but the credential had.
-      void api.registerPush(push, Platform.OS).catch(() => {});
+      // The channel names go with it. Only this phone knows what it called them,
+      // and a push addressed to a channel Android does not have is discarded
+      // without a word — which is what broke every reply push after this app
+      // renamed its everyday channel, eight times over.
+      void api
+        .registerPush(push, Platform.OS, { general: GENERAL_CHANNEL, watch: WATCH_CHANNEL })
+        .catch(() => {});
     });
     return () => {
       alive = false;

@@ -1,5 +1,5 @@
 import { AppState, Text } from 'react-native';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { JarvisProvider, useJarvis } from '../JarvisProvider';
 
 /**
@@ -15,6 +15,9 @@ import { JarvisProvider, useJarvis } from '../JarvisProvider';
 
 const mockSend = jest.fn();
 const mockBackdoor = jest.fn();
+const mockRegisterPush = jest.fn().mockResolvedValue(undefined);
+/** the link state the provider sees; cloud+open is what push registration needs */
+const mockLink = { mode: 'offline', status: 'closed' };
 /** the provider's own onFrame, captured so a test can land a frame on it */
 const mockFrames: { onFrame: ((f: unknown, at: number) => void) | null } = { onFrame: null };
 /** the provider's pushed-reply handler, captured so a test can deliver one */
@@ -24,8 +27,8 @@ jest.mock('../../link/useLink', () => ({
   useLink: (opts: { onFrame: (f: unknown, at: number) => void }) => {
     mockFrames.onFrame = opts.onFrame;
     return {
-      mode: 'offline',
-      status: 'closed',
+      mode: mockLink.mode,
+      status: mockLink.status,
       lastError: null,
       send: mockSend,
       sendVoice: jest.fn(() => false),
@@ -43,7 +46,7 @@ jest.mock('../../api/client', () => ({
     answerWatch: jest.fn().mockResolvedValue(undefined),
     tasks: jest.fn().mockResolvedValue({}),
     presence: jest.fn().mockResolvedValue({}),
-    registerPush: jest.fn().mockResolvedValue(undefined),
+    registerPush: mockRegisterPush,
   }),
 }));
 
@@ -61,7 +64,7 @@ jest.mock('../../lib/notify', () => ({
   },
   replyFromLaunch: jest.fn().mockResolvedValue(null),
   postNow: jest.fn().mockResolvedValue(undefined),
-  registerForPush: jest.fn().mockResolvedValue(null),
+  registerForPush: jest.fn().mockResolvedValue('ExponentPushToken[test]'),
   shouldNotifyReply: jest.fn(() => false),
 }));
 
@@ -123,6 +126,8 @@ const sendAndSettle = async (text: string) => {
 beforeEach(() => {
   mockSend.mockReset();
   mockBackdoor.mockReset();
+  mockLink.mode = 'offline';
+  mockLink.status = 'closed';
   // a real AppState emits on its own schedule, and the provider reads
   // `currentState` during render to know whether a reply should notify
   jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() } as never);
@@ -261,6 +266,33 @@ describe('a reply that arrives as a push', () => {
     });
     const log = view.getByTestId('log').props.children as string;
     expect(log.split('Twice, sir.').length - 1).toBe(1);
+    view.unmount();
+  });
+});
+
+/**
+ * Android discards a push addressed to a channel it does not have, and this app
+ * has renamed its everyday channel eight times chasing a mute-briefing bug —
+ * `general` through `general-v8` — deleting each old one as it went. The gateway
+ * went on addressing `general`, so every reply push in between was accepted by
+ * Expo and thrown away by Android. Bug C survived three correct fixes to the
+ * socket because of it.
+ */
+describe('registering for push', () => {
+  it('tells the gateway what this phone calls its channels', async () => {
+    mockRegisterPush.mockClear();
+    mockLink.mode = 'cloud';
+    mockLink.status = 'open';
+
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await waitFor(() => expect(mockRegisterPush).toHaveBeenCalled());
+
+    const [, , channels] = mockRegisterPush.mock.calls[0];
+    expect(channels).toEqual({ general: 'general', watch: 'watch' });
     view.unmount();
   });
 });
