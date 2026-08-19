@@ -71,6 +71,71 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ 2026-08-19, second session: connecting forever, and OTA
+
+**572 tests, `tsc --noEmit` clean.** Release APK is what runs on the phone now —
+installed over the debug build, same debug keystore, so SecureStore and the
+journal survived intact.
+
+### Two connection bugs, and I caused one of them
+
+1. **The watchdog was cancelling the probe it was waiting for.** `lastFrameAt` is
+   null until something connects, so `quietFor` is Infinity and `tick()` fires on
+   every pass. That was always true and always harmless — a redundant probe
+   simply raced the first to `connect()`. The generation counter added the same
+   morning made the redundant probe **cancel** the first instead, so with
+   `chooseMode` slower than one 5s tick on a cold host, `connect()` was never
+   reached at all. Both changes are individually right; `tick()` now leaves an
+   in-flight probe alone. **A probe owns the next connection, and interrupting
+   one is not a retry, it is a restart.**
+2. **A refused handshake reported "connecting".** The gateway answers **403** to
+   a wrong or missing pairing token — verified from the laptop, where an
+   unauthenticated dial to `/app-link` returns exactly that. On Android that
+   fires `onerror` and does **not** reliably fire `onclose`, and `onerror` only
+   recorded `lastError`. So the machine sat on `connecting` and the screen
+   promised it was still trying while the far end had already said no. An error
+   before the socket ever opened is a refusal now: status goes to `closed`,
+   which is also what the watchdog looks for.
+
+**That is the fourth outcome-that-looks-like-progress this project has paid for**
+— the mute briefing, the empty Vitals panel, the silent Sync button, and now a
+refusal dressed as a connection attempt.
+
+### The token is the open question
+
+`/health` is healthy and `app_link: true`. The gateway 403s an unauthenticated
+dial, which is correct. So the phone's stored token is the suspect: take
+`APP_TOKEN` from Render's Environment tab and paste it into **Connection →
+Pairing token → Save & reconnect**. If that is not it, the new build now SAYS
+refused rather than hiding it.
+
+**`http://127.0.0.1:8787` is the stored desk address** — localhost on the phone,
+so the LAN probe can never succeed. Harmless (it fails fast and falls through to
+cloud) but meaningless. Point it at the real desk IP or clear it.
+
+### OTA is configured, and needs one login
+
+`expo-updates` installed; `app.json` carries the `updates.url` for project
+`f047fd2e-…` and **`runtimeVersion: { policy: "fingerprint" }`**. Fingerprint
+rather than `appVersion` on purpose: this app carries a local native module, and
+fingerprint is what guarantees a JS update can never land on a build whose native
+side does not match it.
+
+After this build is installed: `eas login` once, then `eas update --branch
+production` ships JS without USB. **Native changes still need a real build** —
+the usage-stats module, permissions, any new native dependency.
+
+### Traps from this session
+
+- **`expo prebuild --clean` wipes `android/`**, build outputs included. The APK
+  you were about to install disappears with it.
+- **The app lock re-locks on every background**, so UI automation that
+  backgrounds the app cannot get back in — the biometric prompt needs a finger.
+  It also means `apps_linked` drops while the prompt is up, which is correct and
+  looks alarming.
+
+---
+
 ## ▶ 2026-08-19, late: the journal is VERIFIED ON THE DEVICE
 
 **536 tests, 45 suites, `tsc --noEmit` clean — and, unlike everything above this
