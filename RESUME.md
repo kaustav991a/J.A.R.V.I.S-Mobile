@@ -136,12 +136,17 @@ optimisation: miss more than a week and those days are gone for good.
 - **Git Bash rewrites `/sdcard/...`** into `/Files/Git/sdcard/...`. Use the
   PowerShell tool for `adb shell` paths.
 
-### Still unverified
+### Still unverified — ONE ROW, and it is the important one
 
-The **Journal screen itself** — the data path underneath it is proven, and its
-logic has five tests, but nobody has looked at it on the device. The denial path
-especially: revoke usage access, return, and it must say *"I cannot see your
-usage"* rather than *"Nothing recorded"*.
+**The denial path has never been run on the device.** Revoke usage access, return
+to the Journal screen, refresh: it must say *"I cannot see your usage"* and never
+*"Nothing recorded"*. Deferred 2026-08-19 because the grant was hard to find in
+MIUI's Settings — so the screen now carries a **Usage access** row even while
+access is granted, which is the only state in which finding it matters. Tap that,
+switch it off, come back.
+
+Everything else on this screen has been seen working on the phone: the digest,
+the counts, Sync now, and the line that says what the last sync did.
 
 ---
 

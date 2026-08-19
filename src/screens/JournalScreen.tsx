@@ -111,14 +111,28 @@ export function JournalScreen() {
           last
         />
       ) : (
-        <SettingsRow
-          testID="journal-sync"
-          icon="refresh-outline"
-          title="Sync now"
-          subtitle="Reads what Android has already recorded. Nothing is collected here."
-          onPress={() => void refresh()}
-          last
-        />
+        <>
+          <SettingsRow
+            testID="journal-sync"
+            icon="refresh-outline"
+            title="Sync now"
+            subtitle="Reads what Android has already recorded. Nothing is collected here."
+            onPress={() => void refresh()}
+          />
+          {/* Offered even while access is granted, which is the only time it is
+              hard to find: the grant lives several levels into Settings, under a
+              different name on every skin, and the one moment you want to reach
+              it — to switch it off and see what this screen says — is the one
+              moment the button above would not be here. */}
+          <SettingsRow
+            testID="journal-access"
+            icon="key-outline"
+            title="Usage access"
+            subtitle="Opens Android's list, where this can be switched off again"
+            onPress={() => void androidSource.openSettings()}
+            last
+          />
+        </>
       )}
       {/* always rendered, including when nothing changed: a sync that found
           nothing is an answer, and it has to look like one */}

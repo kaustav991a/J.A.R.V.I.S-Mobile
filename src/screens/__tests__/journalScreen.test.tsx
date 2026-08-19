@@ -101,3 +101,14 @@ describe('the Journal screen after a sync', () => {
     await waitFor(() => expect(getByTestId('journal-last').props.children).toContain('5 new moments'));
   });
 });
+
+describe('reaching Android usage access', () => {
+  it('offers the way there even when access is already granted', async () => {
+    // the grant is several levels into Settings and named differently on every
+    // skin, and the moment you want it — to switch it off and see what this
+    // screen says — is the moment the denied-state button is not there
+    mockSync.mockResolvedValue({ state: 'ok', events: 0, daily: 1 });
+    const { getByTestId } = await mount();
+    await waitFor(() => expect(getByTestId('journal-access')).toBeTruthy());
+  });
+});
