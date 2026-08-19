@@ -24,6 +24,21 @@ import {
  */
 export const SHEET_SETTLE_MS = 600;
 
+/**
+ * The longest a single hold is believed without being released.
+ *
+ * `holdGate(true)` with no matching `false` — a throw between the two, which is
+ * one missing `try/finally` away at every call site — used to leave the flag
+ * raised for the life of the process. Every departure after that returned early,
+ * `setLocked(true)` was never reached again, and the app lock was off with
+ * nothing on screen saying so.
+ *
+ * Generous, because what holds the gate is a camera or a permission dialog and a
+ * person can sit in either for minutes. The point is not to cut those short; it
+ * is that a hold nobody released expires on its own instead of never.
+ */
+export const HOLD_CEILING_MS = 5 * 60_000;
+
 const LOCK_KEY = 'jarvis_app_lock';
 const APPROVAL_KEY = 'jarvis_approval_lock';
 
@@ -101,25 +116,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [locked, setLocked] = useState(false);
   const [lastFailure, setLastFailure] = useState<AuthFailure | null>(null);
 
-  /** true while an OS sheet is up because *we* asked for it */
+  /** true while the app is away because *we* sent it there */
   const authing = useRef(false);
+  /**
+   * How many things are holding the gate open at once.
+   *
+   * A counter and not a boolean, because two of them overlap in ordinary use: the
+   * chat holds it around the camera and around the microphone permission dialog,
+   * and our own biometric sheet raises the same flag. With one boolean the first
+   * release spoke for every holder — the camera's settle timer cleared the flag
+   * while the microphone dialog was still up, the gate read that as the phone
+   * leaving your hand, and the answer to "may I record" was a fingerprint prompt
+   * over the top of the permission dialog. Which is the loop this flag exists to
+   * prevent, arriving from the other side.
+   */
+  const holds = useRef(0);
+  const ceiling = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** the effects below read these without wanting to re-subscribe on a change */
   const live = useRef({ appLock: false, usable: false });
+
+  const clearCeiling = () => {
+    if (ceiling.current) clearTimeout(ceiling.current);
+    ceiling.current = null;
+  };
+
+  const acquireGate = useCallback(() => {
+    holds.current += 1;
+    authing.current = true;
+    clearCeiling();
+    ceiling.current = setTimeout(() => {
+      // whatever was holding this is not coming back
+      holds.current = 0;
+      authing.current = false;
+      ceiling.current = null;
+    }, HOLD_CEILING_MS);
+  }, []);
+
+  const releaseGate = useCallback(() => {
+    holds.current = Math.max(0, holds.current - 1);
+    // someone else is still holding it; their own release will settle it
+    if (holds.current > 0) return;
+    setTimeout(() => {
+      // and a new hold may have started inside the settle window
+      if (holds.current > 0) return;
+      authing.current = false;
+      clearCeiling();
+    }, SHEET_SETTLE_MS);
+  }, []);
+
+  useEffect(() => clearCeiling, []);
 
   /**
    * Every authentication goes through here, so the gate can tell the difference
    * between the app being sent away and the app asking a question.
    */
-  const ask = useCallback(async (reason: string, opts?: { strong?: boolean; confirm?: boolean }) => {
-    authing.current = true;
-    try {
-      return await authenticate(reason, opts);
-    } finally {
-      setTimeout(() => {
-        authing.current = false;
-      }, SHEET_SETTLE_MS);
-    }
-  }, []);
+  const ask = useCallback(
+    async (reason: string, opts?: { strong?: boolean; confirm?: boolean }) => {
+      acquireGate();
+      try {
+        return await authenticate(reason, opts);
+      } finally {
+        releaseGate();
+      }
+    },
+    [acquireGate, releaseGate]
+  );
 
   /**
    * Hold the gate open across something else that sends the app away.
@@ -132,15 +193,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Same flag, same settle delay — the trailing `AppState` change arrives after the
    * dialog has already gone.
    */
-  const holdGate = useCallback((active: boolean) => {
-    if (active) {
-      authing.current = true;
-      return;
-    }
-    setTimeout(() => {
-      authing.current = false;
-    }, SHEET_SETTLE_MS);
-  }, []);
+  const holdGate = useCallback(
+    (active: boolean) => {
+      if (active) acquireGate();
+      else releaseGate();
+    },
+    [acquireGate, releaseGate]
+  );
 
   useEffect(() => {
     let alive = true;
@@ -231,6 +290,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // asks too: otherwise whoever is holding the unlocked phone just
       // switches the lock off and keeps it.
       if (on && !(capability?.enrolled ?? false)) return;
+      /**
+       * Nothing can answer a prompt, and the gate this switches is already inert.
+       *
+       * With no biometric and no device passcode, `usable` is false, so the lock is
+       * never raised — and asking here refused with `unavailable`, leaving a switch
+       * that could not be moved in either direction. Turning off something that is
+       * not running gives up nothing.
+       */
+      if (!on && !usable) {
+        setLastFailure(null);
+        setAppLockState(false);
+        await write(LOCK_KEY, false);
+        return;
+      }
       const outcome = await ask(on ? 'Turn on app lock' : 'Turn off app lock');
       if (!outcome.ok) {
         setLastFailure(outcome.reason);
@@ -240,7 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAppLockState(on);
       await write(LOCK_KEY, on);
     },
-    [capability, ask]
+    [capability, usable, ask]
   );
 
   const setRequireForApprovals = useCallback(

@@ -1,7 +1,7 @@
 import { AppState } from 'react-native';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
-import { AuthProvider, SHEET_SETTLE_MS, useAuth } from '../AuthProvider';
+import { AuthProvider, HOLD_CEILING_MS, SHEET_SETTLE_MS, useAuth } from '../AuthProvider';
 import { authenticate, probe } from '../../lib/biometrics';
 
 jest.mock('../../lib/biometrics', () => ({
@@ -323,3 +323,103 @@ describe('AuthProvider — leaving the foreground', () => {
   });
 });
 
+
+/**
+ * `authing` is one flag doing a job that needs a counter.
+ *
+ * It is raised by our own biometric sheet AND by `holdGate`, which the chat uses
+ * around the camera and the microphone permission dialog — both of which send the
+ * app away exactly like a user pocketing it. One boolean cannot tell two holders
+ * apart, so the first release used to speak for both.
+ */
+describe('the gate hold, when more than one thing holds it', () => {
+  const listen = () => {
+    const calls: ((s: string) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_e: string, cb: (s: string) => void) => {
+      calls.push(cb);
+      return { remove: jest.fn() };
+    }) as never);
+    return calls;
+  };
+
+  /** app lock on, and already unlocked once, with the sheet guard waited out */
+  const opened = async () => {
+    saved({ jarvis_app_lock: '1' });
+    const { result } = await mount();
+    await waitFor(() => expect(result.current.locked).toBe(true));
+    await act(async () => {
+      await result.current.unlock();
+    });
+    await waitFor(() => expect(result.current.locked).toBe(false));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, SHEET_SETTLE_MS + 100));
+    });
+    return result;
+  };
+
+  afterEach(() => jest.restoreAllMocks());
+
+  const leave = async (calls: ((s: string) => void)[]) => {
+    await act(async () => {
+      calls.forEach((cb) => cb('background'));
+    });
+  };
+  const settle = async () => {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, SHEET_SETTLE_MS + 100));
+    });
+  };
+
+  it('stays held when one of two holders lets go', async () => {
+    // the camera closes while the microphone dialog is still up: the camera's
+    // settle timer used to clear the flag under it, and the answer to "may I
+    // record" was a fingerprint prompt over the top of the permission dialog
+    const calls = listen();
+    const result = await opened();
+
+    await act(async () => {
+      result.current.holdGate(true);
+    });
+    await act(async () => {
+      result.current.holdGate(true);
+    });
+    await act(async () => {
+      result.current.holdGate(false);
+    });
+    await settle();
+
+    await leave(calls);
+    expect(result.current.locked).toBe(false);
+
+    await act(async () => {
+      result.current.holdGate(false);
+    });
+    await settle();
+
+    await leave(calls);
+    await waitFor(() => expect(result.current.locked).toBe(true));
+  });
+
+  it('expires a hold nobody released, rather than disabling the lock for good', async () => {
+    // `holdGate(true)` with no matching `false` — a throw between the two, which
+    // is one missing try/finally away at every call site. Without a ceiling the
+    // app lock is off for the rest of the process and nothing says so.
+    const calls = listen();
+    const result = await opened();
+
+    // fake timers only from here: the ceiling is five minutes, and `opened()`
+    // above needs the real ones to wait out the sheet guard
+    jest.useFakeTimers();
+    try {
+      result.current.holdGate(true);
+      // the ceiling is the only timer outstanding, and it mutates refs rather
+      // than state — so it needs advancing, not a React flush
+      jest.advanceTimersByTime(HOLD_CEILING_MS + 1000);
+      jest.useRealTimers();
+      await leave(calls);
+      expect(result.current.locked).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

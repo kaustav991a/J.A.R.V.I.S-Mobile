@@ -229,9 +229,17 @@ export function ChatScreen() {
     // the camera had even opened — which is the wrong call twice over: the link is
     // usually about to come back, and the camera itself is what takes it away, so
     // the state before is not the state that matters. `sendPhoto` waits instead.
+    // `finally`, because an unreleased hold used to disable the app lock for the
+    // whole life of the process — the gate reads the flag on every departure and
+    // returns early. The provider now expires a hold on its own as well; this is
+    // the half that keeps it from ever needing to.
     holdGate(true);
-    const result = await takeShot('camera');
-    holdGate(false);
+    let result: Awaited<ReturnType<typeof takeShot>>;
+    try {
+      result = await takeShot('camera');
+    } finally {
+      holdGate(false);
+    }
     if (!result.ok) {
       // changing your mind is not a failure and gets no toast
       if (!result.cancelled) toast.show(result.problem, 'bad');
@@ -330,9 +338,15 @@ export function ChatScreen() {
     // The microphone request is a system dialog, and the app-lock gate reads any
     // departure as the phone leaving your hand — so asking to record answered
     // itself with a fingerprint prompt. Held across the request, released after.
+    // released in a `finally` for the reason `sendShot` is: a hold that never
+    // comes back leaves the app lock silently switched off
     holdGate(true);
-    const allowed = await prepareToRecord();
-    holdGate(false);
+    let allowed: boolean;
+    try {
+      allowed = await prepareToRecord();
+    } finally {
+      holdGate(false);
+    }
     if (!allowed) {
       toast.show('Microphone permission is off', 'bad');
       return;

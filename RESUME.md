@@ -71,6 +71,41 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ 2026-08-19, fourth pass: the app lock, and one flag doing two jobs
+
+**487 tests, 40 suites, `tsc --noEmit` clean.** Third audit slice —
+`security/AuthProvider.tsx` and `lib/biometrics.ts`, 525 lines. **`biometrics.ts`
+came out clean**: the always-`strong` rule, the synchronous-throw guard, the
+`Array.isArray` defence and the 90s race are all correct as written.
+
+Everything found was the same mechanism: `authing` was one boolean, and three
+different things raise it.
+
+1. **A hold nobody released disabled the app lock permanently.** `holdGate(true)`
+   with no matching `false` — one missing `try/finally` away at every call site —
+   left the flag up for the life of the process. Every departure after that
+   returned early and `setLocked(true)` was never reached again, with nothing on
+   screen saying the lock was off. There is a **`HOLD_CEILING_MS` (5 min)** now,
+   and `try/finally` at both `ChatScreen` call sites.
+2. **Overlapping holds released each other.** The camera's settle timer cleared
+   the flag while the microphone permission dialog was still up — so the answer to
+   "may I record" was a fingerprint prompt over the top of it, which is the loop
+   `holdGate` exists to prevent. `holds` is a counter now, and the settle only
+   fires when the last holder lets go.
+3. **A toggle that could not be moved.** With no biometric and no passcode,
+   `setAppLock(false)` asked for a prompt nothing could answer. The gate is
+   already inert in that state, so it just switches off.
+
+### A test trap worth knowing, cost about half an hour
+
+**`act(() => ...)` synchronously does not flush in RNTL 14.** A `holdGate` called
+inside a bare `act()` appeared to run — the code executed, the logs proved it —
+and the state assertion afterwards still read the old value. Every one of these
+must be `await act(async () => { ... })`. The failure looks exactly like a broken
+implementation, and the implementation was fine.
+
+---
+
 ## ▶ 2026-08-19, third pass: the reducer, the frames and the notifications
 
 **485 tests, 40 suites, `tsc --noEmit` clean.** Second audit slice — `ws/frames.ts`,
