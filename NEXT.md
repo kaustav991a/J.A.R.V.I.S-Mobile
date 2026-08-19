@@ -91,7 +91,9 @@ already spent for that window.
 **The test is a weekday evening, phone untouched, app not opened.** If the
 notification arrives near 19:00 by itself, this is closed. If it does not:
 
-
+```
+adb shell dumpsys jobscheduler | grep -A 4 jarvis
+```
 
 `timeout-reg` and `timeout-total` are the numbers that matter — they were at 13
 against limits of 3 and 10. If they are climbing again, something in the task is
