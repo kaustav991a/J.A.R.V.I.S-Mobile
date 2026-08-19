@@ -58,31 +58,19 @@ async function coordsFor(d: Departure): Promise<{ lat: number; lon: number } | n
   return fix ? { lat: fix.lat, lon: fix.lon } : null;
 }
 
-TaskManager.defineTask(COMMUTE_TASK, async () => {
-  /**
-   * The journal rides this schedule rather than asking Android for one of its
-   * own.
-   *
-   * A second background registration competes with the first for the same
-   * budget, and between a life-log and a briefing with a deadline the briefing
-   * wins every time. Wrapped in its own try so it can never be the reason the
-   * briefing did not run — and it costs nothing to skip, because every usage
-   * query is retroactive and the next run collects what this one missed.
-   */
+
+/**
+ * Collect and share, after the briefing has had the time it needs.
+ *
+ * Every exit from the task runs this, and it can never change what the task
+ * reports: a journal failure is not a briefing failure.
+ */
+async function catchUpJournal(): Promise<void> {
   try {
     const journal = await openJournal();
     const at = Date.now();
     await syncUsage(journal, androidSource, at);
 
-    /**
-     * And tell the gateway what changed, which is where the phone's watching
-     * finally reaches J.A.R.V.I.S. himself.
-     *
-     * Here rather than on a screen: a standing claim about someone should be
-     * revised because the week moved, not because he happened to open a tab.
-     * `shareFacts` sends only what actually changed and forgets what it
-     * replaced, so the ordinary case is no network at all.
-     */
     const endpoints = await loadEndpoints();
     const token = await loadToken();
     const api = createApi({
@@ -99,17 +87,42 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
   } catch {
     // the journal never bills the briefing for its failures
   }
+}
+
+TaskManager.defineTask(COMMUTE_TASK, async () => {
+  /**
+   * The briefing goes FIRST, and the journal waits its turn.
+   *
+   * It was the other way round for a few hours, and Android noticed:
+   * `dumpsys jobscheduler` reported this app at 13 timeouts in a day against
+   * limits of 3 and 10, which quota-throttles the task — so the briefing would
+   * have stopped running at all. A first journal sync writes some seventeen
+   * thousand rows, and a headless task does not have that kind of time.
+   *
+   * Wrapping the journal so it could not FAIL the briefing was not enough: it
+   * could still spend the whole budget before the briefing began. Order is the
+   * fix. The thing with a deadline goes first, and the journal takes whatever
+   * is left — which costs it nothing, because every usage query is retroactive
+   * and the next run collects what this one missed.
+   */
+
 
   try {
     const settings = await loadCommute();
     const now = new Date();
     const departure = dueDeparture(now, settings);
-    if (!departure) return BackgroundTask.BackgroundTaskResult.Success;
+    if (!departure) {
+      await catchUpJournal();
+      return BackgroundTask.BackgroundTaskResult.Success;
+    }
 
     const today = dayKey(now);
     // the same umbrella three times teaches you to swipe without reading — and
     // this is per departure, so the morning cannot silence the evening
-    if (await alreadyBriefed(departure.placeId, today)) return BackgroundTask.BackgroundTaskResult.Success;
+    if (await alreadyBriefed(departure.placeId, today)) {
+      await catchUpJournal();
+      return BackgroundTask.BackgroundTaskResult.Success;
+    }
 
     const at = await coordsFor(departure);
     if (!at) return BackgroundTask.BackgroundTaskResult.Failed;
@@ -152,6 +165,7 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
       data: { kind: 'commute', placeId: departure.placeId },
     });
     await markBriefed(departure.placeId, today);
+    await catchUpJournal();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
     return BackgroundTask.BackgroundTaskResult.Failed;
