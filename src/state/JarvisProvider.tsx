@@ -549,8 +549,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     }
     let alive = true;
     void postNow({
-      title: 'Someone at the desk',
-      body: `Was this you? The desk locks itself in ${Math.max(1, Math.round((alert.deadline - Date.now()) / 1000))}s.`,
+      title: 'Someone is at your desk, sir',
+      body: `Was that you? The desk locks itself in ${Math.max(1, Math.round((alert.deadline - Date.now()) / 1000))}s.`,
       channel: WATCH_CHANNEL,
       category: WATCH_CATEGORY,
       // ongoing, so Android cannot fold it into an auto-group and a stray swipe
@@ -768,7 +768,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     notifiedFor.current = newest.at;
     if (!shouldNotifyReply({ appActive: appActive.current, simulated })) return;
     void postNow({
-      title: 'J.A.R.V.I.S. replied',
+      // the name alone, not "J.A.R.V.I.S. replied" — a butler does not announce that
+      // he is about to speak, and the body is the reply itself
+      title: 'J.A.R.V.I.S.',
       body: newest.text.length > 140 ? `${newest.text.slice(0, 139)}…` : newest.text,
       data: { kind: 'reply' },
     });
@@ -794,8 +796,8 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     if (!arrived || simulated) return;
     haptic.good();
     void postNow({
-      title: 'J.A.R.V.I.S. is on full power',
-      body: 'The desk is online. PC control, files and terminal are available again.',
+      title: 'At your full disposal, sir',
+      body: 'The desk is online — PC control, files and the terminal are available again.',
       data: { kind: 'desk_link' },
     });
   }, [deskLinked, simulated]);

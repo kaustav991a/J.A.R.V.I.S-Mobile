@@ -81,8 +81,14 @@ export type Briefing = { title: string; body: string };
  */
 export type BriefingOutcome =
   | { state: 'briefing'; briefing: Briefing }
-  /** the forecast was read, and there is nothing worth carrying anything for */
-  | { state: 'clear' }
+  /**
+   * The forecast was read and there is nothing worth carrying anything for — but it
+   * still carries a briefing, because since 2026-08-18 a quiet day is announced too.
+   * The state is kept separate from `briefing` so the difference stays inspectable:
+   * PREVIEW words them differently, and re-muting the quiet case later is then a
+   * one-line change rather than an archaeology exercise.
+   */
+  | { state: 'clear'; briefing: Briefing }
   /** the forecast could not be read, so nothing is known either way */
   | { state: 'unavailable'; reason: 'network' | 'http' | 'no-hours' | 'no-window' };
 
@@ -309,36 +315,74 @@ export async function commuteBriefing(
     const maxWind = winds.length ? Math.max(...winds) : 0;
     const storm = codes.some((c) => THUNDER.has(c));
 
+    /**
+     * The voice is the butler's, and it is load-bearing.
+     *
+     * These lines are read half-awake, on a lock screen, by someone deciding whether
+     * to pick something up on the way out. So: address him, state the measurement,
+     * then recommend — never the reverse. A recommendation with no figure behind it
+     * cannot be disagreed with, and "Take an umbrella" from a machine that will not
+     * say why is the tone this app exists to avoid.
+     */
     const notes: string[] = [];
-    if (storm) notes.push('Thunderstorms forecast — worth leaving early or waiting it out.');
+    if (storm) {
+      notes.push('Thunderstorms are forecast, sir — leaving early or waiting it out would both be sensible.');
+    }
     if (maxChance >= RAIN_CHANCE || totalMm >= RAIN_MM) {
       notes.push(
-        `Rain likely on the way out — ${Math.round(maxChance)}% chance` +
+        `Rain is likely on your way out, sir — a ${Math.round(maxChance)}% chance` +
           (totalMm >= RAIN_MM ? `, around ${totalMm.toFixed(1)} mm` : '') +
-          '. Take an umbrella.'
+          '. I would take an umbrella.'
       );
     }
     if (maxTemp !== null && maxTemp >= HOT_C) {
-      notes.push(`It reaches ${Math.round(maxTemp)}°C — carry water, and something for your head.`);
+      notes.push(`It reaches ${Math.round(maxTemp)}°C, sir. Water, and something for your head.`);
     }
     if (minTemp !== null && minTemp <= COLD_C) {
-      notes.push(`Down to ${Math.round(minTemp)}°C — take a jacket.`);
+      notes.push(`Down to ${Math.round(minTemp)}°C, sir. A jacket, I would suggest.`);
     }
-    if (maxWind >= WINDY_KMH) notes.push(`Windy, gusting ${Math.round(maxWind)} km/h.`);
-
-    // the one silence that is an answer: read, and there is nothing to say
-    if (!notes.length) return { state: 'clear' };
+    if (maxWind >= WINDY_KMH) {
+      notes.push(`Wind gusting to ${Math.round(maxWind)} km/h, sir.`);
+    }
 
     // both ends carry the meridiem even when they share one: this label read
     // "08:00–11:00" on a briefing its owner believed was set for the evening, and
     // the redundancy is what would have shown him otherwise
     const window = `${hourLabel(d.hour)}–${hourLabel((d.hour + 3) % 24)}`;
+
+    /**
+     * A quiet day still gets a briefing, and it carries the figures.
+     *
+     * The original design stayed silent here, on the reasoning that a notification
+     * every morning saying "it's fine" is one you stop reading. That was overruled
+     * deliberately on 2026-08-18: silence is indistinguishable from the feature
+     * being broken, and it had been read as broken for four days straight — the
+     * 7 PM briefing on the 18th was correct silence and cost an evening of
+     * debugging to prove it.
+     *
+     * So the reassurance is not the word "fine". It names the temperature, the rain
+     * chance and the wind, which is enough to disagree with if it is wrong — an
+     * empty "nothing to worry about" would be the same unfalsifiable silence with a
+     * buzz attached.
+     */
+    if (!notes.length) {
+      return {
+        state: 'clear',
+        briefing: {
+          title: `Your route from ${d.label} is clear, sir`,
+          body:
+            `Nothing to carry. ${maxTemp === null ? '' : `${Math.round(maxTemp)}°C, `}` +
+            `a ${Math.round(maxChance)}% chance of rain, wind ${Math.round(maxWind)} km/h (${window}).`,
+        },
+      };
+    }
+
     return {
       state: 'briefing',
       briefing: {
         // named, because two of these arrive in a day and a shade holding both has
         // to say which door each one is about
-        title: `Before you leave ${d.label}`,
+        title: `Before you leave ${d.label}, sir`,
         body: `${notes.join(' ')} (${window})`,
       },
     };

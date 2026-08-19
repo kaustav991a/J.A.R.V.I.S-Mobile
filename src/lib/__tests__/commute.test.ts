@@ -268,9 +268,48 @@ describe('commuteBriefing outcomes', () => {
     const out = await commuteBriefing(22.57, 88.36, home, when);
     expect(out.state).toBe('briefing');
     if (out.state !== 'briefing') throw new Error('narrowing');
-    expect(out.briefing.title).toBe('Before you leave Home');
+    expect(out.briefing.title).toBe('Before you leave Home, sir');
     expect(out.briefing.body).toContain('umbrella');
     // the window still names both ends with a meridiem, which is the 08-14 fix
     expect(out.briefing.body).toContain('8 AM–11 AM');
+  });
+
+  /**
+   * A quiet day is announced too, as of 2026-08-18.
+   *
+   * It used to stay silent, on the reasoning that a daily "it's fine" is one you
+   * stop reading. Overruled: on the 18th an unremarkable evening produced no
+   * notification, that was *correct*, and it still read as the feature being broken
+   * — as it had for four days. A briefing indistinguishable from a broken briefing
+   * is not doing its job.
+   */
+  it('announces a quiet day rather than saying nothing at all', async () => {
+    serve(payload([mild(8), mild(9), mild(10)]));
+    const out = await commuteBriefing(22.57, 88.36, home, when);
+    if (out.state !== 'clear') throw new Error('narrowing');
+    expect(out.briefing.title).toBe('Your route from Home is clear, sir');
+    expect(out.briefing.body).toContain('Nothing to carry');
+  });
+
+  it('puts the measured figures in the all-clear, so it can be disagreed with', async () => {
+    // "nothing to worry about" with no numbers behind it is the same unfalsifiable
+    // silence with a buzz attached
+    serve(payload([mild(8), mild(9), mild(10)]));
+    const out = await commuteBriefing(22.57, 88.36, home, when);
+    if (out.state !== 'clear') throw new Error('narrowing');
+    expect(out.briefing.body).toContain('28°C');
+    expect(out.briefing.body).toContain('5% chance of rain');
+    expect(out.briefing.body).toContain('6 km/h');
+    expect(out.briefing.body).toContain('8 AM–11 AM');
+  });
+
+  it('addresses him, because the voice is the butler’s', async () => {
+    serve(payload([wet(8), mild(9), mild(10)]));
+    const out = await commuteBriefing(22.57, 88.36, home, when);
+    if (out.state !== 'briefing') throw new Error('narrowing');
+    expect(out.briefing.body).toContain('sir');
+    // measurement before recommendation: a suggestion with no figure behind it is
+    // the tone this app exists to avoid
+    expect(out.briefing.body).toContain('80% chance');
   });
 });

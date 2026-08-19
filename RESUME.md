@@ -71,6 +71,92 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ START HERE — 2026-08-19: the wording is proven in the bundle, C is not yet retested
+
+The four files from the 18th are **committed** now. What moved today:
+
+| Thing | State |
+| --- | --- |
+| Butler wording in the served bundle | **verified** — all ten strings, one hit each |
+| `464 tests`, `tsc --noEmit` | **green**, re-run on this machine |
+| `GROQ_VISION_MODEL` on Render | **set by hand**, service back up |
+| Bug C retest (pocketed reply) | **still not done** — needs the phone |
+| `run_harnesses.py` against `15b8f72` | **still never run** — no Python on this machine |
+
+### The bundle grep that said 0 was the grep, not Metro
+
+`grep -c "is clear, sir"` on the served bundle returned **0** on the 18th and it was
+never explained. It is explained now: a full fetch is **10.4 MB**, and every one of
+the ten new butler strings is in it exactly once. Whatever the earlier command
+measured, it was not a whole bundle — the download was truncated when `/tmp`
+disappeared under it. **Use the scratchpad, and check the file size before believing
+a zero.**
+
+```bash
+curl -s "http://localhost:8081/index.bundle?platform=android&dev=true" -o b.js
+ls -l b.js        # ~10.4 MB. A short file makes every grep below meaningless.
+grep -c "is clear, sir" b.js
+```
+
+### Still owed, and it needs the phone
+
+**Retest C now that the gateway fix is deployed.** Every earlier failure of C predates
+the 6:39 PM deploy on the 18th, so none of them tested the actual fix. Send a message
+from Chat, leave the app entirely within a second or two, wait ~20s. `apps_linked`
+must read 0 while away (that part is already measured).
+
+### Owed on the desk, not reachable from here
+
+**`run_harnesses.py` has never run against `15b8f72`.** `test_web_freshness.py`
+(11 checks) is written and registered but **never executed** — this machine has no
+Python at all. Expect 81 harnesses, not 80, and run it with the venv.
+
+### `GROQ_VISION_MODEL` is set, and nothing proves it from outside
+
+Set on Render by hand on 2026-08-19, service confirmed up. **`/health` does not print
+the Groq vision model id** — `brains.vision` names the *provider*, not the model — so
+the only proof is a real photo turn. Until someone sends one, bug 5 is *probably*
+closed, not *known* closed.
+
+It is dashboard-only: **`render.yaml` still has no `GROQ_VISION_MODEL` key**, so a
+Blueprint re-sync will drop it silently. That is a jarvis-brain change, and it is owed.
+
+### The redeploy cost what it always costs
+
+`/health` straight after: `facts_known: 0`, `has_desk_key: false`,
+`fact_outbox.depth: 0`, `desk_linked: false`. Expected — gateway memory lives in
+process RAM — but it means **the desk has to re-pair** before sealed turns flow again.
+
+### A standalone APK exists and is NOT installed
+
+`android/app/build/outputs/apk/release/app-release.apk` — **44.9 MB**, arm64-only,
+built in 2m 2s from the code above. Deliberately not installed: the phone still
+carries the debug build, so Fast Refresh still works and the two checks above are
+cheap. Installing it ends that and costs ~2 minutes of Gradle per JS change after.
+
+### "Phone says connecting" was not a bug
+
+The screen was off. Screen off → app backgrounded → `LinkMachine.suspend` closes the
+socket on purpose → `apps_linked: 0`, and the wake re-probes. Measured the same
+minute: Render `/health` answers in **0.34–0.41s** and the LAN probe fails fast, so
+a re-dial is about a second. The 30–60s reconnects seen earlier were Render
+cold-starting right after a deploy, not a standing cost of the suspend change.
+
+Worth keeping in mind anyway: **every screen-off now costs a re-probe on wake.** If
+that ever reads as slow on a cold free-tier host, the targeted fix is to remember
+the last good mode and dial it directly on resume rather than paying `chooseMode`
+again — cloud is network-independent, so skipping the probe is safe for that case
+and not for `lan`.
+
+### Memory was misread once today — do not repeat it
+
+`/health` showing `memory: {configured: true, ready: false, broken: false}` and
+`facts_known: 0` is **not** a fault. `_memory_ready()` is lazy: `_db_ready` starts
+false and flips on first use, and a genuine failure latches `_db_broken` to true.
+`broken: false` means untouched since the restart, nothing more.
+
+---
+
 ## Resume point — 2026-08-18: four reported bugs, and one of them was not a bug
 
 **461 tests, `tsc --noEmit` clean.** Nothing native changed — all of this ships in a

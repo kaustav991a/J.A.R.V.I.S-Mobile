@@ -9,7 +9,6 @@ import {
   loadCommute,
   markBriefed,
 } from './commute';
-import { hourLabel } from './commute';
 import type { Departure } from './commute';
 import { currentFix, hasLocation, loadShareLocation } from './place';
 import { loadKnown } from './knownPlaces';
@@ -85,13 +84,19 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
      */
     if (outcome.state === 'unavailable') return BackgroundTask.BackgroundTaskResult.Failed;
 
-    // silence is an answer: a notification every morning saying "it's fine" is one
-    // you stop reading, and then you miss the morning it is not
-    if (outcome.state === 'clear') {
-      await markBriefed(departure.placeId, today);
-      return BackgroundTask.BackgroundTaskResult.Success;
-    }
-
+    /**
+     * Both a warning and an all-clear are posted, and only the failure is silent.
+     *
+     * This used to return early on `clear` without notifying, because a daily "it's
+     * fine" is one you stop reading. Overruled on 2026-08-18: an unremarkable
+     * evening produced no notification, which was correct and was still read as the
+     * feature being broken — it had been read that way for four days. A briefing you
+     * cannot tell apart from a broken briefing is not doing its job.
+     *
+     * `unavailable` stays silent on purpose. Announcing "all clear" when the lookup
+     * failed would be the one genuinely dishonest message this feature could send,
+     * and it is also the common case on this phone, whose background network is cut.
+     */
     await postNow({
       title: outcome.briefing.title,
       body: outcome.briefing.body,
@@ -162,10 +167,10 @@ export async function commuteTaskAvailable(): Promise<boolean> {
 export async function previewBriefing(placeId: string): Promise<string | null> {
   const { departures } = await loadCommute();
   const departure = departures.find((d) => d.placeId === placeId);
-  if (!departure) return 'No such departure';
+  if (!departure) return 'There is no such departure, sir.';
 
   const at = await coordsFor(departure);
-  if (!at) return `Set ${departure.label} on this screen first, or turn on location sharing`;
+  if (!at) return `I need ${departure.label} named on this screen first, sir — or location sharing turned on.`;
 
   const outcome = await commuteBriefing(at.lat, at.lon, departure);
 
@@ -179,30 +184,22 @@ export async function previewBriefing(placeId: string): Promise<string | null> {
    * claiming nothing to report is the lie this feature kept telling.
    */
   if (outcome.state === 'unavailable') {
-    return `Could not reach the forecast (${outcome.reason}). Nothing was posted.`;
+    return `I could not reach the forecast, sir (${outcome.reason}). Nothing was posted.`;
   }
 
   /**
-   * A preview always posts, even when there is nothing to warn about.
+   * Preview posts whatever the real thing would have posted, which is now both cases.
    *
-   * The scheduled briefing is right to stay silent — a notification every morning
-   * saying "it's fine" is one you stop reading. A *preview* is the opposite: it is
-   * pressed to find out whether any of this works, and answering it with a toast
-   * that fades in three seconds is how "I pressed preview and got nothing" came to
-   * mean both "it is broken" and "there was nothing to say". Those need to look
-   * different, and only the notification path proves the channel, the permission
-   * and the delivery all the way through.
+   * It used to word the quiet case differently — "A real briefing would have stayed
+   * quiet" — because the scheduled one was silent then and the preview had to explain
+   * the difference. Since the quiet day is announced too, that explanation would be
+   * describing behaviour the app no longer has, so preview shows the same text a real
+   * briefing sends. What it proves is unchanged: the channel, the permission and the
+   * delivery, end to end, without waiting on Android's scheduler.
    */
   await postNow({
-    title:
-      outcome.state === 'briefing'
-        ? outcome.briefing.title
-        : `Nothing to report for ${departure.label}`,
-    body:
-      outcome.state === 'briefing'
-        ? outcome.briefing.body
-        : `No rain, heat or wind worth mentioning between ${hourLabel(departure.hour)} and ` +
-          `${hourLabel((departure.hour + 3) % 24)}. A real briefing would have stayed quiet.`,
+    title: outcome.briefing.title,
+    body: outcome.briefing.body,
     channel: GENERAL_CHANNEL,
     data: { kind: 'commute', placeId: departure.placeId, preview: true },
   });
