@@ -201,6 +201,29 @@ describe('useLink', () => {
     expect(FakeMachine.last?.resumes).toBeGreaterThan(0);
   });
 
+  /**
+   * Android does not always hand over `active -> background` cleanly.
+   *
+   * A power-button press, and some launcher paths, go `active -> inactive ->
+   * background`. The handler asked for the pair, so `lastAppState` was already
+   * `'inactive'` when `background` arrived, `leaving` was false, and `suspend()`
+   * never ran — the socket stayed open, the gateway kept counting this phone as a
+   * listening client, and `deliver()` therefore saw no reason to push. That is the
+   * pocketed reply going missing again, through a door the fix did not cover.
+   *
+   * What matters is the state arrived at, not the step before it.
+   */
+  it('suspends when background arrives by way of inactive, not only straight from active', async () => {
+    await renderHook(() => useLink({ onFrame: jest.fn(), machineFactory: factory, token: 'sekrit' }));
+    await act(async () => {
+      FakeMachine.last!.push({ mode: 'cloud', status: 'open', lastError: null });
+      const onChange = appStateListener();
+      onChange('inactive');
+      onChange('background');
+    });
+    expect(FakeMachine.last?.suspends).toBe(1);
+  });
+
   it('holds the link through an inactive blip, which is not going away', async () => {
     // a notification shade, a permission sheet, a call overlay — the user is still
     // in the app, and dropping the link for these is the churn the old test feared

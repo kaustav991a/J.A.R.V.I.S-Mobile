@@ -412,7 +412,35 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         dispatch({ type: 'frame', frame: demoReply(trimmed), at: Date.now() });
         return;
       }
-      await api.backdoor(trimmed);
+      /**
+       * The turn that could not be carried says so, rather than disappearing.
+       *
+       * Both paths gone — socket shut, gateway unreachable — used to reject out of
+       * here into `.catch(() => {})` at all four call sites. The local echo was
+       * already in the log by then, so the chat showed the question exactly as it
+       * looks while J.A.R.V.I.S. is thinking, and nothing ever arrived. There was
+       * no way to tell a lost message from a slow one, which is the single thing
+       * this app is most often accused of.
+       *
+       * Flat, and with no wit in it, for the reason the `unavailable` briefing is:
+       * a line whose job is admitting nothing happened reads as though something
+       * did once a remark is attached to it.
+       */
+      try {
+        await api.backdoor(trimmed);
+      } catch {
+        dispatch({
+          type: 'frame',
+          frame: {
+            kind: 'status',
+            status: 'error',
+            message:
+              'That did not get through, sir. No link to the desk, and the gateway did not answer — nothing was sent.',
+            user: null,
+          },
+          at: Date.now(),
+        });
+      }
     },
     [api, link, demo, connected, shareLocation]
   );

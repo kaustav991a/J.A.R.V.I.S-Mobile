@@ -269,4 +269,67 @@ describe('LinkMachine', () => {
     stale.emit({ status: 'online', message: 'from the past' });
     expect(h.frames).toEqual([]);
   });
+
+  /**
+   * Two probes in flight at once used to leave a live socket behind.
+   *
+   * `reprobe()` tears down and then awaits `chooseMode`. A second one entering
+   * during that await tore down nothing — `socket` was already null — so both
+   * reached `connect()`, the second overwrote `this.socket`, and the first was
+   * never closed. Its handlers stayed attached and the far end kept counting it:
+   * one phone, several entries in the gateway's `_app_clients`, which is the list
+   * `deliver()` now trusts before it decides a push is unnecessary.
+   *
+   * Three callers can overlap in normal use — the 5s watchdog tick, the network
+   * state listener, and the return to the foreground — and `chooseMode` does real
+   * network work between them.
+   */
+  it('leaves exactly one socket alive when two probes race', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    FakeSocket.opened[0].open();
+
+    // deliberately not awaited in turn: both are in flight before either resolves,
+    // which is the whole shape of the bug
+    const a = h.machine.reprobe();
+    const b = h.machine.reprobe();
+    await Promise.all([a, b]);
+
+    expect(FakeSocket.opened.filter((s) => !s.closed)).toHaveLength(1);
+  });
+
+  /**
+   * A suspend has to win against a probe that was already in the air.
+   *
+   * Backgrounding calls `suspend()`, which blocks the *watchdog* — but an
+   * in-flight `reprobe()` is past that guard and lands afterwards, opening a
+   * socket for an app nobody is looking at. That is the phantom the suspend
+   * exists to prevent, arriving by another door.
+   */
+  it('does not open a socket that a suspend beat to it', async () => {
+    const h = build(lanUp());
+    const probing = h.machine.reprobe();
+    h.machine.suspend();
+    await probing;
+    expect(FakeSocket.opened).toHaveLength(0);
+    expect(h.machine.snapshot.status).toBe('closed');
+  });
+
+  /**
+   * The error that explains a close arrives after it.
+   *
+   * `onclose` used to null `this.socket`, so the `onerror` that followed failed
+   * the `isCurrent()` guard and `lastError` kept whatever it had — usually null.
+   * The connection screen then reported a dead link with no reason, which is the
+   * one question it exists to answer.
+   */
+  it('records why a socket died when the error follows the close', async () => {
+    const h = build(lanUp());
+    await h.machine.start();
+    const s = FakeSocket.opened[0];
+    s.open();
+    s.onclose?.();
+    s.onerror?.(new Error('ECONNRESET'));
+    expect(h.machine.snapshot.lastError).toBe('ECONNRESET');
+  });
 });

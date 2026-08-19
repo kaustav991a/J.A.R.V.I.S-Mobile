@@ -44,6 +44,18 @@ export class LinkMachine {
   private stopped = false;
   /** away, rather than switched off: blocks the watchdog, not a deliberate dial */
   private suspended = false;
+  /**
+   * Which dial is the current one. Bumped by every `reprobe()`, and by anything
+   * that ends a dial — `stop()` and `suspend()`.
+   *
+   * `reprobe()` awaits `chooseMode()`, and everything that happens during that
+   * await has to be able to invalidate what comes after it. Without this, two
+   * overlapping probes both reached `connect()` and the first socket was
+   * overwritten rather than closed: still open, still counted by the gateway as a
+   * listening phone. Three callers can overlap in ordinary use — the 5s tick, the
+   * network listener, the return to the foreground.
+   */
+  private gen = 0;
 
   constructor(private deps: MachineDeps) {}
 
@@ -70,6 +82,8 @@ export class LinkMachine {
 
   stop(): void {
     this.stopped = true;
+    // a probe already past its `stopped` check must not land after this
+    this.gen++;
     this.teardown();
     this.set({ status: 'closed' });
   }
@@ -107,6 +121,15 @@ export class LinkMachine {
      * else.
      */
     this.suspended = true;
+    /**
+     * And the latch alone is not enough either, for the same reason it was needed.
+     *
+     * `suspended` blocks `tick()`, but a `reprobe()` already awaiting `chooseMode`
+     * is past every guard there is — it lands a moment later and opens a socket for
+     * an app nobody is looking at. That is the phantom this method exists to
+     * prevent, arriving through the door the latch does not cover.
+     */
+    this.gen++;
     this.teardown();
     this.set({ status: 'closed' });
   }
@@ -142,13 +165,17 @@ export class LinkMachine {
 
   async reprobe(): Promise<void> {
     if (this.stopped) return;
+    const gen = ++this.gen;
     // a deliberate dial ends the suspension — coming back is exactly what this is
     this.suspended = false;
     this.teardown();
     this.set({ status: 'probing' });
 
     const mode = await chooseMode(this.deps.endpoints, { fetchImpl: this.deps.fetchImpl });
-    if (this.stopped) return;
+    // anything that happened during the probe wins: a later dial, a stop, a
+    // suspend. Losing the race means going quietly — the winner owns the socket,
+    // and touching the snapshot here would report a mode nobody is connected in
+    if (this.stopped || gen !== this.gen) return;
 
     if (mode === 'offline') {
       this.set({ mode, status: 'closed' });
@@ -182,7 +209,15 @@ export class LinkMachine {
     };
     socket.onclose = () => {
       if (!isCurrent()) return;
-      this.socket = null;
+      /**
+       * The reference is kept, deliberately.
+       *
+       * Nulling it here made the socket stop being "current", and the `onerror`
+       * that explains the close arrives *after* it — so the reason was dropped and
+       * the connection screen showed a dead link with no cause, which is the one
+       * question it exists to answer. Nothing reads `socket` without also checking
+       * `status`, and `teardown()` is what actually clears it.
+       */
       this.set({ status: 'closed' });
     };
     socket.onerror = (e) => {

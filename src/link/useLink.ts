@@ -151,14 +151,22 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
     const appSub = AppState.addEventListener('change', (s) => {
       const returned = s === 'active' && lastAppState !== 'active';
       /**
-       * `background` only, never `inactive`.
+       * `background` only, never `inactive` — but it is the state ARRIVED AT that
+       * decides, not the step before it.
        *
        * `inactive` is a notification shade, a permission sheet, a call overlay —
        * moments the user is still in the app. Dropping the link for those would
        * reconnect several times a minute, which is the churn the guard above exists
-       * to prevent.
+       * to prevent. So `inactive` still never suspends.
+       *
+       * This asked for the `active -> background` pair, and Android does not always
+       * provide it: a power-button press goes `active -> inactive -> background`, so
+       * `lastAppState` was `'inactive'` by the time `background` arrived and the
+       * suspend was skipped entirely. The socket stayed open, the gateway went on
+       * counting this phone among its listeners, and `deliver()` saw no reason to
+       * push — the pocketed reply lost again, by a route the original fix missed.
        */
-      const leaving = s === 'background' && lastAppState === 'active';
+      const leaving = s === 'background' && lastAppState !== 'background';
       lastAppState = s;
       // Unconditional, not only on a detected return: the suspend latch blocks the
       // watchdog, and the watchdog is the only thing that recovers a link nothing

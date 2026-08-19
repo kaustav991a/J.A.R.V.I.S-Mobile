@@ -71,6 +71,68 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ START HERE — 2026-08-19, later: four bugs found by audit, all four fixed
+
+**478 tests, 40 suites, `tsc --noEmit` clean.** Two commits: `83914b9` (the JARVIS
+voice) and the audit fixes above it. Nothing pushed yet at time of writing.
+
+Two of these were the same failure wearing different clothes — a socket the gateway
+still counts while nobody is holding it — which is exactly what `deliver()` on the
+brain side now trusts before it decides a push is unnecessary. **The two repos are
+still coupled; do not revert one alone.**
+
+| # | Where | What it was |
+| --- | --- | --- |
+| 1 | `src/link/useLink.ts:405` | `background` only suspended when it arrived *straight* from `active` |
+| 2 | `src/link/machine.ts` `reprobe()` | two probes in flight left the first socket open forever |
+| 3 | `src/state/JarvisProvider.tsx` `sendCommand` | a message both paths refused vanished with no word |
+| 4 | `src/link/machine.ts` `onclose` | the error explaining a close was discarded |
+
+### 1. Android does not always go `active -> background`
+
+A power-button press goes `active -> inactive -> background`. The handler asked for
+the pair, so `lastAppState` was `'inactive'` when `background` landed, `leaving` was
+false, and **`suspend()` never ran** — socket open, phone still counted, no push.
+The 2026-08-18 pocketed-reply fix was bypassable from the day it shipped.
+
+Now `lastAppState !== 'background'`: the state arrived at decides, not the step
+before it. `inactive` still never suspends, which is what the blip guard is for.
+
+### 2. Racing probes leaked a live socket each time
+
+`reprobe()` tears down, then awaits `chooseMode()`. A second one entering during
+that await tore down nothing — `socket` was already null — so both reached
+`connect()` and the first was overwritten rather than closed. **This is a plausible
+source of the historical `apps_linked: 4` for one phone.**
+
+Fixed with a generation counter, bumped by `reprobe()`, `stop()` and `suspend()`.
+The suspend bump matters on its own: the latch blocks `tick()`, but a probe already
+awaiting is past every guard and would land afterwards, opening a socket for a
+backgrounded app.
+
+### 3. A message could vanish silently — the complaint, located
+
+Socket shut *and* gateway unreachable meant `sendCommand` rejected into
+`.catch(() => {})` at all four call sites, with the local echo already in the log.
+The chat showed the question exactly as it looks while J.A.R.V.I.S. is thinking.
+Now the failure is spoken, flat and without wit, same rule as `unavailable`.
+
+### 4. The close had no reason attached
+
+`onclose` nulled `this.socket`, so the `onerror` that follows failed `isCurrent()`
+and `lastError` kept whatever it had. The Connection screen showed a dead link and
+no cause. The reference is kept now; `teardown()` is what clears it.
+
+### Still owed, unchanged by any of this
+
+- **Bug C retest on the phone.** Fixes 1 and 2 make the gateway's view honest; only
+  a real pocketed turn proves the pair works end to end.
+- **`run_harnesses.py` against `15b8f72`** — no Python on this machine. Expect 81.
+- **`GROQ_VISION_MODEL`** is set on Render but absent from `render.yaml`, so a
+  Blueprint re-sync drops it. Only a real photo turn proves it took.
+
+---
+
 ## ▶ START HERE — 2026-08-19: the wording is proven in the bundle, C is not yet retested
 
 The four files from the 18th are **committed** now. What moved today:
