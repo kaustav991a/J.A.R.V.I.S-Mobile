@@ -32,6 +32,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withPackageQueries",
       "expo-secure-store",
       "expo-font",
       [

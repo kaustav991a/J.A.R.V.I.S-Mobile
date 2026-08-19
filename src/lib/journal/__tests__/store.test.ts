@@ -134,3 +134,26 @@ describe('the journal store', () => {
     expect(await j.size()).toEqual({ events: 1, daily: 1 });
   });
 });
+
+/**
+ * One connection per file, for the life of the process.
+ *
+ * The screen, the background task and the manual button each opened their own
+ * connection to the same database. Two of those mid-transaction is how the
+ * device produced `cannot start a transaction within a transaction`.
+ */
+describe('opening the journal more than once', () => {
+  it('hands the same connection back for the same file', async () => {
+    const a = await openJournal('shared-test.db');
+    const b = await openJournal('shared-test.db');
+    expect(a).toBe(b);
+  });
+
+  it('never shares an in-memory database, because every test wants an empty one', async () => {
+    const a = await openJournal(':memory:');
+    const b = await openJournal(':memory:');
+    expect(a).not.toBe(b);
+    await a.putEvents([{ at: 1, kind: 'unlock', app: null }]);
+    expect((await b.size()).events).toBe(0);
+  });
+});

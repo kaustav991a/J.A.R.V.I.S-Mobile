@@ -50,7 +50,33 @@ const since = async (j: Journal, source: string, now: number, firstRun: number):
   return mark === null ? now - firstRun : Math.max(0, mark - OVERLAP_MS);
 };
 
-export async function syncUsage(j: Journal, source: UsageSource, now: number): Promise<SyncResult> {
+/**
+ * The tail of the queue of syncs. One runs at a time, process-wide.
+ *
+ * This function has three callers by design — the screen, the manual button, and
+ * the background task — and nothing stopped two of them overlapping. On the
+ * device that produced `cannot start a transaction within a transaction` and,
+ * before that, an outright hang: two transactions on one database, interleaved.
+ *
+ * Serialised rather than coalesced. A second caller genuinely wants a second
+ * read: the first may have started before the event it is looking for existed,
+ * and handing back the earlier answer would be a stale reading presented as a
+ * fresh one.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+
+export function syncUsage(j: Journal, source: UsageSource, now: number): Promise<SyncResult> {
+  // `.then` on both settlements: a failed sync must not poison the queue for
+  // every sync after it
+  const next = queue.then(
+    () => runSync(j, source, now),
+    () => runSync(j, source, now)
+  );
+  queue = next.catch(() => undefined);
+  return next;
+}
+
+async function runSync(j: Journal, source: UsageSource, now: number): Promise<SyncResult> {
   try {
     // Asked every time rather than cached. This permission is granted and
     // revoked by hand in a Settings screen, and the app is never told either

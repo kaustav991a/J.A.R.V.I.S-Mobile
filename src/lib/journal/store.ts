@@ -90,7 +90,34 @@ export type Journal = {
   size(): Promise<{ events: number; daily: number }>;
 };
 
-export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> {
+/**
+ * One connection per database, for the life of the process.
+ *
+ * Three things open the journal — the screen, the background task, and whatever
+ * asks it a question — and each used to get its own connection to the same file.
+ * Two connections mid-transaction on one SQLite file is how the device produced
+ * `cannot start a transaction within a transaction`.
+ *
+ * `:memory:` is deliberately never cached: every test wants an empty database,
+ * and handing the second caller the first one's rows would make the whole suite
+ * agree with itself about nothing.
+ */
+const open = new Map<string, Promise<Journal>>();
+
+export function openJournal(name = 'jarvis-journal.db'): Promise<Journal> {
+  if (name === ':memory:') return build(name);
+  const existing = open.get(name);
+  if (existing) return existing;
+  const fresh = build(name).catch((e: unknown) => {
+    // a failed open must not be remembered as the connection
+    open.delete(name);
+    throw e;
+  });
+  open.set(name, fresh);
+  return fresh;
+}
+
+async function build(name: string): Promise<Journal> {
   const db = await SQLite.openDatabaseAsync(name);
   await db.execAsync(SCHEMA);
 

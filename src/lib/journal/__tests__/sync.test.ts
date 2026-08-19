@@ -84,3 +84,44 @@ describe('syncing usage into the journal', () => {
     expect(await j.watermark('events')).toBeNull();
   });
 });
+
+/**
+ * The device found this one, and it is a design gap rather than a slip.
+ *
+ * `syncUsage` has three callers by design — the Journal screen, its manual
+ * button, and the background task that rides the commute briefing — and nothing
+ * stopped two of them running at once. Two transactions on one database gave
+ * `cannot start a transaction within a transaction`, and before that an outright
+ * hang with no error at all.
+ */
+describe('two syncs at once', () => {
+  it('runs them one after another rather than on top of each other', async () => {
+    const j = await fresh();
+    let inside = 0;
+    let overlapped = false;
+    const slow: UsageSource = {
+      ...fakeSource(),
+      queryEvents: async () => {
+        inside += 1;
+        if (inside > 1) overlapped = true;
+        await new Promise((r) => setTimeout(r, 20));
+        inside -= 1;
+        return [];
+      },
+    };
+
+    // deliberately not awaited in turn: both are in flight before either resolves
+    await Promise.all([syncUsage(j, slow, NOW), syncUsage(j, slow, NOW), syncUsage(j, slow, NOW)]);
+
+    expect(overlapped).toBe(false);
+  });
+
+  it('lets the next sync run after one of them fails', async () => {
+    // a poisoned queue would be worse than the collision it replaced
+    const j = await fresh();
+    const bad = await syncUsage(j, fakeSource({ throws: 'native gone' }), NOW);
+    expect(bad.state).toBe('error');
+    const good = await syncUsage(j, fakeSource(), NOW);
+    expect(good.state).toBe('ok');
+  });
+});

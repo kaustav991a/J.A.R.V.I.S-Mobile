@@ -57,8 +57,11 @@ jest.mock('expo-sqlite', () => {
   const plain = (row) => (row == null ? null : { ...row });
 
   return {
-    openDatabaseAsync: async (name) => {
-      const db = new DatabaseSync(name === ':memory:' ? ':memory:' : `:memory:${name}`);
+    openDatabaseAsync: async () => {
+      // always in memory, whatever the name: nothing here should touch a real
+      // file, and the one-connection-per-name caching being tested lives in the
+      // store above this
+      const db = new DatabaseSync(':memory:');
       return {
         execAsync: async (sql) => db.exec(sql),
         runAsync: async (sql, ...params) => {
