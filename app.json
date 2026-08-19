@@ -42,6 +42,7 @@
     },
     "plugins": [
       "./plugins/withPackageQueries",
+      "./plugins/withArm64Only",
       "expo-secure-store",
       "expo-font",
       [
