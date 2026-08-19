@@ -119,3 +119,23 @@ jest.mock('./modules/usage-stats', () => ({
   queryDaily: async () => [],
   queryEvents: async () => [],
 }));
+
+/**
+ * expo-updates, which must never run in a test.
+ *
+ * Installing it made the App smoke test take 92 SECONDS to mount, up from under
+ * a second, and fail its 5s timeout whenever the machine was busy. The runtime
+ * checks for an update on startup, and with no update server reachable under
+ * jest that check sits there waiting. Nothing in this app imports it directly —
+ * it is Expo's own startup integration — so the mock only has to exist.
+ */
+jest.mock('expo-updates', () => ({
+  isEnabled: false,
+  channel: null,
+  runtimeVersion: 'test',
+  updateId: null,
+  checkForUpdateAsync: jest.fn().mockResolvedValue({ isAvailable: false }),
+  fetchUpdateAsync: jest.fn().mockResolvedValue({ isNew: false }),
+  reloadAsync: jest.fn().mockResolvedValue(undefined),
+  useUpdates: () => ({ isUpdateAvailable: false, isUpdatePending: false }),
+}));

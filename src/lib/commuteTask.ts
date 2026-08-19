@@ -3,6 +3,10 @@ import * as TaskManager from 'expo-task-manager';
 import { openJournal } from './journal/store';
 import { androidSource } from './journal/source';
 import { syncUsage } from './journal/sync';
+import { rollup } from './journal/rollup';
+import { shareFacts } from './journal/facts';
+import { loadEndpoints, loadToken } from './../link/config';
+import { createApi } from './../api/client';
 import { GENERAL_CHANNEL, postNow } from './notify';
 import {
   alreadyBriefed,
@@ -67,7 +71,31 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
    */
   try {
     const journal = await openJournal();
-    await syncUsage(journal, androidSource, Date.now());
+    const at = Date.now();
+    await syncUsage(journal, androidSource, at);
+
+    /**
+     * And tell the gateway what changed, which is where the phone's watching
+     * finally reaches J.A.R.V.I.S. himself.
+     *
+     * Here rather than on a screen: a standing claim about someone should be
+     * revised because the week moved, not because he happened to open a tab.
+     * `shareFacts` sends only what actually changed and forgets what it
+     * replaced, so the ordinary case is no network at all.
+     */
+    const endpoints = await loadEndpoints();
+    const token = await loadToken();
+    const api = createApi({
+      baseUrl: endpoints.cloudBase ?? endpoints.deskBase,
+      cloudUrl: endpoints.cloudBase,
+      token,
+    });
+    await shareFacts({
+      rollup: await rollup(journal, at),
+      known: await journal.allLabels(),
+      remember: (fact) => api.remember(fact),
+      forget: (fact) => api.forget(fact),
+    });
   } catch {
     // the journal never bills the briefing for its failures
   }
