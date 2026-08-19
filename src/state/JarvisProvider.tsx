@@ -320,8 +320,21 @@ export function JarvisProvider({ children }: PropsWithChildren) {
 
   // the live endpoints, not the build defaults: after re-pairing, REST has to
   // follow the socket to the new desk rather than staying on the old address
+  /**
+   * The desk only when the socket actually found a desk. Otherwise the cloud.
+   *
+   * This asked for `mode === 'cloud'` and fell back to the desk address for
+   * every other mode — including `offline` and the moment before a first probe
+   * finishes. The stored desk address on this phone is `http://127.0.0.1:8787`,
+   * which is the phone itself, so REST posted into nothing.
+   *
+   * That is what produced "That did not get through, sir" on a message sent
+   * while the socket was still coming up: `link.send()` correctly returned
+   * false, the REST fallback was correctly reached, and it was aimed at
+   * localhost. The one path that exists for exactly this case could not work.
+   */
   const base = useMemo(
-    () => (link.mode === 'cloud' && endpoints.cloudBase ? endpoints.cloudBase : endpoints.deskBase),
+    () => (link.mode === 'lan' ? endpoints.deskBase : endpoints.cloudBase ?? endpoints.deskBase),
     [link.mode, endpoints]
   );
 

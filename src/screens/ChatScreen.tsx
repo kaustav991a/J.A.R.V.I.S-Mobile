@@ -193,9 +193,23 @@ export function ChatScreen() {
       list.current?.scrollToOffset({ offset: 0, animated: true });
     });
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    /**
+     * `keyboardWillHide` as well, and not as a nicety.
+     *
+     * Reported from the device: the composer went up with the keyboard and
+     * stayed there after it went down. `keyboardDidHide` does not reliably fire
+     * on Android 15 under edge-to-edge when the keyboard is dismissed by the
+     * back gesture rather than by tapping away — so the height stayed at its
+     * last value and the composer sat stranded above where it belongs.
+     *
+     * Two listeners for one transition is not duplication: `setKeyboardHeight(0)`
+     * twice is the same state, and either one arriving is enough.
+     */
+    const willHide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
     return () => {
       show.remove();
       hide.remove();
+      willHide.remove();
     };
   }, []);
 
