@@ -1,4 +1,4 @@
-import { describeUpdate, shortId } from '../updates';
+import { describeUpdate, shortId, versionLine } from '../updates';
 import type { UpdateState } from '../updates';
 
 const state = (over: Partial<UpdateState> = {}): UpdateState => ({
@@ -78,5 +78,26 @@ describe('showing a version to a person', () => {
   it('says nothing rather than null', () => {
     expect(shortId(null)).toBe('—');
     expect(shortId(undefined)).toBe('—');
+  });
+});
+
+describe('telling one build from another at a glance', () => {
+  it('dates the running bundle, because that is what changes when a push lands', () => {
+    // the update id is a UUID and the runtime version a 40-char hash; neither
+    // answers "did my push arrive" without cross-referencing something
+    const line = versionLine('1.0.0', new Date(2026, 7, 19, 18, 42));
+    expect(line).toBe('v1.0.0 · updated 19 Aug 18:42');
+  });
+
+  it('pads the clock so two builds sort by eye', () => {
+    expect(versionLine('1.0.0', new Date(2026, 7, 5, 9, 7))).toContain('5 Aug 09:07');
+  });
+
+  it('calls the shipped bundle built in rather than inventing a date for it', () => {
+    expect(versionLine('1.0.0', null)).toBe('v1.0.0 · built in');
+  });
+
+  it('says so when even the app version is missing', () => {
+    expect(versionLine(null, null)).toBe('v? · built in');
   });
 });

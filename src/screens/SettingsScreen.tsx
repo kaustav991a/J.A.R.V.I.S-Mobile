@@ -8,6 +8,9 @@ import { SettingsRow } from '../components/ui/SettingsRow';
 import { useToast } from '../components/ui/Toast';
 import { useJarvis } from '../state/JarvisProvider';
 import { COLOR, RADIUS, SPACE } from '../theme/tokens';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
+import { versionLine } from '../lib/updates';
 import { APP_VERSION } from '../data/fixtures';
 import { TABS_ID } from '../navigation/types';
 import type { SettingsStackParams, TabParams } from '../navigation/types';
@@ -107,7 +110,10 @@ export function SettingsScreen() {
           testID="settings-updates"
           icon="cloud-download-outline"
           title="Updates"
-          subtitle="What version is running, and whether a newer one is waiting"
+          // the running version on the row itself, so "did my push land" is
+          // answered without opening anything. The publish time is the part that
+          // changes; the id and the runtime hash tell a person nothing at a glance
+          subtitle={versionLine(Constants.expoConfig?.version, Updates.createdAt)}
           onPress={() => nav.navigate('Updates')}
           last
         />

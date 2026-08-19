@@ -5,7 +5,8 @@ import { Card, InfoRow } from '../components/ui/Card';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
 import { COLOR } from '../theme/tokens';
-import { describeUpdate, shortId } from '../lib/updates';
+import Constants from 'expo-constants';
+import { describeUpdate, shortId, versionLine } from '../lib/updates';
 
 /**
  * What version is running, and the one button that does the next useful thing.
@@ -20,8 +21,10 @@ import { describeUpdate, shortId } from '../lib/updates';
  * the user work out which applies.
  */
 export function UpdatesScreen() {
-  const { isUpdateAvailable, isUpdatePending, isChecking, isDownloading, checkError, downloadError } =
+  const { currentlyRunning, isUpdateAvailable, isUpdatePending, isChecking, isDownloading, checkError, downloadError } =
     Updates.useUpdates();
+  /** what is running, in the one form that changes the moment a push lands */
+  const version = versionLine(Constants.expoConfig?.version, currentlyRunning?.createdAt ?? null);
   /** a check has completed since this screen opened, so "up to date" can be said */
   const [checked, setChecked] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -64,6 +67,8 @@ export function UpdatesScreen() {
   return (
     <Screen testID="updates-screen">
       <ScreenTitle title="UPDATES" caption={Updates.isEnabled ? 'OVER THE AIR' : 'DEVELOPMENT'} back />
+
+      <Hint testID="updates-version">{version}</Hint>
 
       <SectionLabel>Status</SectionLabel>
       <MonoCard testID="updates-headline" text={reading.headline} />

@@ -119,3 +119,23 @@ export function shortId(value: string | null | undefined): string {
   if (!value) return '—';
   return value.length <= 12 ? value : `${value.slice(0, 8)}…`;
 }
+
+/**
+ * One line that answers "which one am I running".
+ *
+ * The update id is a UUID and the runtime version a 40-character hash: precise,
+ * and useless at a glance. **When the running bundle was published** is the
+ * field that actually answers the question, because it is the thing that changes
+ * the moment a push lands.
+ *
+ * `Built in` for the bundle that shipped inside the APK — it has no publish date
+ * of its own, and dating it by the install would be inventing one.
+ */
+export function versionLine(appVersion: string | null | undefined, publishedAt: Date | null | undefined): string {
+  const v = appVersion ? `v${appVersion}` : 'v?';
+  if (!publishedAt) return `${v} · built in`;
+  const d = publishedAt;
+  const p = (n: number) => String(n).padStart(2, '0');
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${v} · updated ${d.getDate()} ${MONTHS[d.getMonth()]} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
