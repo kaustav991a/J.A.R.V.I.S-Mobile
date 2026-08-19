@@ -71,6 +71,81 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ 2026-08-19, evening: the phone journal — piece 1 is built
+
+**527 tests, 45 suites, `tsc --noEmit` clean.** New subsystem, and the first of
+four pieces towards J.A.R.V.I.S. knowing him from having watched rather than
+from having been told.
+
+Read `docs/superpowers/specs/2026-08-19-phone-journal-design.md` first, then
+`docs/superpowers/plans/2026-08-19-phone-journal.md`.
+
+### What exists now
+
+| Layer | File | What |
+| --- | --- | --- |
+| native | `modules/usage-stats/` | a local Expo module, Android only, ~120 lines of Kotlin |
+| store | `src/lib/journal/store.ts` | `expo-sqlite`. Every SQL statement in the app is in this one file |
+| words | `src/lib/journal/digest.ts` | pure functions; a day in J.A.R.V.I.S.'s voice |
+| source | `src/lib/journal/source.ts` | the `UsageSource` interface, and the fake everything above is tested against |
+| sync | `src/lib/journal/sync.ts` | watermarks, overlap, four outcomes |
+| screen | `src/screens/JournalScreen.tsx` | Settings → Journal |
+
+### The decisions worth not relitigating
+
+- **Phone-only storage.** Raw rows never leave the device. What travels later is
+  a summary, which is the shape the ask envelope already uses for location.
+- **Our own native module**, not `@brighthustle/react-native-usage-stats-manager`
+  — last published two years ago, and a stale old-arch bridge against Expo 57 is
+  precisely the trap `AGENTS.md` names as this project's costliest recurring bug.
+- **Nothing is collected.** Android records usage whether an app asks or not;
+  every call here reads what the system already wrote. That is why the journal
+  costs no battery, and it is why the collector can be lazy — every query is
+  retroactive inside its window, so a missed run costs nothing.
+- **Two tables, two fidelities.** Events are precise and Android keeps ~7 days;
+  daily buckets are coarse and it keeps up to 2 years. **A first launch is not a
+  blank slate** — it is months of history arriving at once.
+- **No launch count.** `UsageStats.mLaunchCount` is hidden API with no public
+  getter. Pickups come from `KEYGUARD_HIDDEN` instead — an app arriving in front
+  while the phone is already in your hand is not a pickup.
+
+### Two traps this cost, both worth more than the fix
+
+1. **SQLite treats two NULLs as DISTINCT inside a primary key.** While `app` was
+   nullable, every unlock re-inserted itself on each overlapping sync — one copy
+   per run, forever, with the pickup count climbing by however often the app was
+   opened. The store's own test missed it (two different timestamps); the sync
+   tests caught it. `app` is `NOT NULL DEFAULT ''` now, translated at the store
+   boundary so nothing above has to know.
+2. **jest-expo automocks expo-sqlite's native side**, so `NativeDatabase` is not
+   a constructor and every query throws. Mocking the *store* would have thrown
+   away the only thing worth testing. **Node 24 ships `node:sqlite`**, so
+   `jest-setup.js` maps expo's async surface onto it — real SQL, no new
+   dependency. Reuse that adapter rather than reinventing it.
+
+### The device checklist is the other half
+
+None of the above is proved by a green suite. The Kotlin, the AppOps permission
+check and the Settings grant have no jest coverage and are not claimed to. The
+checklist at the bottom of the plan is what covers them.
+
+### What is NOT built, and the order it comes in
+
+| # | Piece | Gives |
+| --- | --- | --- |
+| 1b | notifications, location timeline, archive import | the other three sources |
+| 2 | recall layer | answers about the past, colours every reply, and the send-and-confirm queue to the gateway |
+| 3 | pattern layer | the weekly portrait |
+| 4 | anticipation | speaks first — and needs 2–4 weeks of collection before "unusual" means anything |
+
+**Sharing with the desk is piece 2, and the pipe already exists**: `POST /app-fact`
+on the gateway, `api.remember()` in the app, facts into Postgres and into every
+system prompt. What it still needs is an unacknowledged-and-resend queue owned by
+the phone, because the gateway's outbox lives in process RAM and a Render restart
+has already destroyed the desk key and 26 sealed turns.
+
+---
+
 ## ▶ 2026-08-19, fourth pass: the app lock, and one flag doing two jobs
 
 **487 tests, 40 suites, `tsc --noEmit` clean.** Third audit slice —
