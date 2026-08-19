@@ -81,16 +81,31 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
      * have to know that, so the translation lives here and nowhere else.
      */
     async putEvents(rows) {
+      if (rows.length === 0) return 0;
       let written = 0;
-      for (const r of rows) {
-        const res = await db.runAsync(
-          'INSERT OR IGNORE INTO events (at, kind, app) VALUES (?, ?, ?)',
-          r.at,
-          r.kind,
-          r.app ?? ''
+      /**
+       * One transaction, one prepared statement, measured on the device.
+       *
+       * This was a bare `runAsync` per row, and a first sync — seven days of
+       * events, tens of thousands of rows — was still crawling minutes later:
+       * every call is a bridge round-trip AND its own implicit transaction, so
+       * each row cost a commit and an fsync. The jest suite could never show it,
+       * because in-process SQLite makes the same loop instant. The phone showed
+       * it in about four minutes of watching a counter climb.
+       */
+      await db.withTransactionAsync(async () => {
+        const insert = await db.prepareAsync(
+          'INSERT OR IGNORE INTO events (at, kind, app) VALUES ($at, $kind, $app)'
         );
-        written += res.changes;
-      }
+        try {
+          for (const r of rows) {
+            const res = await insert.executeAsync({ $at: r.at, $kind: r.kind, $app: r.app ?? '' });
+            written += res.changes;
+          }
+        } finally {
+          await insert.finalizeAsync();
+        }
+      });
       return written;
     },
 
@@ -101,17 +116,25 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
      * grows, so replacing is right and summing would double-count it.
      */
     async putDaily(rows) {
+      if (rows.length === 0) return 0;
       let written = 0;
-      for (const r of rows) {
-        const res = await db.runAsync(
-          `INSERT INTO daily (day, app, ms) VALUES (?, ?, ?)
-           ON CONFLICT (day, app) DO UPDATE SET ms = excluded.ms`,
-          r.day,
-          r.app,
-          r.ms
+      // batched for the same reason as `putEvents`: two years of daily buckets
+      // is thousands of rows, and a commit per row is what made the first sync
+      // look like a hang
+      await db.withTransactionAsync(async () => {
+        const upsert = await db.prepareAsync(
+          `INSERT INTO daily (day, app, ms) VALUES ($day, $app, $ms)
+           ON CONFLICT (day, app) DO UPDATE SET ms = excluded.ms`
         );
-        written += res.changes;
-      }
+        try {
+          for (const r of rows) {
+            const res = await upsert.executeAsync({ $day: r.day, $app: r.app, $ms: r.ms });
+            written += res.changes;
+          }
+        } finally {
+          await upsert.finalizeAsync();
+        }
+      });
       return written;
     },
 

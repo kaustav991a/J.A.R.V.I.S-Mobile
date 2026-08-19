@@ -67,6 +67,34 @@ jest.mock('expo-sqlite', () => {
         },
         getAllAsync: async (sql, ...params) => db.prepare(sql).all(...bind(params)).map(plain),
         getFirstAsync: async (sql, ...params) => plain(db.prepare(sql).get(...bind(params))),
+        /**
+         * Real transactions and real prepared statements, because the store uses
+         * both — and it uses them for a reason the device taught: a commit per
+         * row turned a first sync into a four-minute crawl.
+         */
+        withTransactionAsync: async (task) => {
+          db.exec('BEGIN');
+          try {
+            await task();
+            db.exec('COMMIT');
+          } catch (e) {
+            db.exec('ROLLBACK');
+            throw e;
+          }
+        },
+        prepareAsync: async (sql) => {
+          const st = db.prepare(sql);
+          // node:sqlite matches named parameters without their prefix, and expo
+          // binds them with one — so `$at` is handed over as `at`
+          const strip = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.replace(/^[$:@]/, ''), v]));
+          return {
+            executeAsync: async (params) => {
+              const r = st.run(Array.isArray(params) ? params : strip(params ?? {}));
+              return { changes: Number(r.changes), lastInsertRowId: Number(r.lastInsertRowid) };
+            },
+            finalizeAsync: async () => {},
+          };
+        },
         closeAsync: async () => db.close(),
       };
     },

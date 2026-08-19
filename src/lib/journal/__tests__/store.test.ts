@@ -101,6 +101,32 @@ describe('the journal store', () => {
     expect(left.map((e) => e.app)).toEqual(['new.app']);
   });
 
+  /**
+   * A first sync is a week of events, and that is not a handful of rows.
+   *
+   * Measured on the device: 5,250 rows in and still climbing minutes later,
+   * because `putEvents` was a bare `runAsync` per row — a bridge round-trip and
+   * its own implicit transaction each time, so every row cost a commit and an
+   * fsync. In-process SQLite makes the same loop instant, which is exactly why
+   * no test caught it and the phone did.
+   *
+   * This pins the volume, not the speed: a timing assertion here would measure
+   * the machine running it. What it guarantees is that the batched path stays
+   * correct at a realistic size.
+   */
+  it('takes a week of events in one call, without losing or duplicating any', async () => {
+    const j = await fresh();
+    const week = Array.from({ length: 5000 }, (_, i) => ({
+      at: 1_700_000_000_000 + i * 1000,
+      kind: i % 2 === 0 ? ('foreground' as const) : ('background' as const),
+      app: `com.app${i % 40}`,
+    }));
+    expect(await j.putEvents(week)).toBe(5000);
+    // and the same week again, which is what an overlapping window sends
+    expect(await j.putEvents(week)).toBe(0);
+    expect((await j.size()).events).toBe(5000);
+  });
+
   it('reports what it is holding, so the screen can say so', async () => {
     const j = await fresh();
     await j.putEvents([{ at: 1000, kind: 'unlock', app: null }]);
