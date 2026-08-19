@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
+import { DarkTheme, NavigationContainer, createNavigationContainerRef, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, View } from 'react-native';
@@ -135,10 +135,28 @@ const TAB_ICON: Record<keyof TabParams, keyof typeof Ionicons.glyphMap> = {
   Settings: 'settings-outline',
 };
 
+/**
+ * A handle on the navigator for things that live ABOVE it.
+ *
+ * `JarvisProvider` receives a tapped notification and has no navigation of its
+ * own — it wraps the navigator rather than sitting inside it. A ref is the
+ * documented way across that boundary.
+ *
+ * `isReady()` matters on a cold start: the tap that launched the app arrives
+ * before the navigator has mounted, and navigating then is silently dropped.
+ */
+export const navigationRef = createNavigationContainerRef<TabParams>();
+
+/** Go to the conversation, from anywhere, if there is a navigator to go with */
+export function openChat(): void {
+  if (!navigationRef.isReady()) return;
+  navigationRef.navigate('Commands', { screen: 'CommandsHome' });
+}
+
 export function RootNavigator() {
   return (
     <View style={styles.root}>
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer ref={navigationRef} theme={navTheme}>
         {/* Home sits in the MIDDLE of five, not at the left end.
             It is the screen you return to, so it belongs under the thumb rather
             than in the corner — and a dial with the resting position at one end

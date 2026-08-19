@@ -61,6 +61,7 @@ import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { loadKnown, nameFor } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
+import { openChat } from '../navigation/RootNavigator';
 import { COLOR } from '../theme/tokens';
 
 export type JarvisContextValue = {
@@ -782,9 +783,25 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     let alive = true;
     // the cold-start case: tapped while the app was dead, so no listener ever saw it
     void replyFromLaunch().then((reply) => {
-      if (alive && reply) take(reply);
+      if (!alive || !reply) return;
+      take(reply);
+      // launched BY the notification, so the conversation is the destination.
+      // `openChat` checks the navigator is ready first — on a cold start this
+      // runs before it has mounted, and navigating then is silently dropped
+      openChat();
     });
-    const off = onPushReply(take);
+    /**
+     * A tapped reply opens the conversation; an arriving one does not.
+     *
+     * Tapping the answer is a request to see it — landing on whatever tab
+     * happened to be open, with the reply somewhere behind it, is the version of
+     * this that was reported. An answer that merely ARRIVES is different: yanking
+     * him out of the screen he chose would be the app deciding for him.
+     */
+    const off = onPushReply((reply, tapped) => {
+      take(reply);
+      if (tapped) openChat();
+    });
 
     /**
      * And on every return, read the shade rather than trusting we were told.

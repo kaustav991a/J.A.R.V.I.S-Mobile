@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
+  type SharedValue,
   clamp,
   interpolate,
   runOnJS,
@@ -445,6 +446,23 @@ function TabDetent({
     transform: [{ scale: 0.8 + pulse.value * 0.35 }],
   }));
 
+  /**
+   * The dots' travel, one pass per cycle and never reversed.
+   *
+   * `withRepeat(..., true)` would play the hop backwards on alternate cycles,
+   * which reads as a wobble rather than a bounce. Each dot takes the same ramp
+   * and offsets where it enters it, so the three of them chase one another the
+   * way a typing indicator does.
+   */
+  const hop = useSharedValue(0);
+  useEffect(() => {
+    if (!busy) {
+      hop.value = 0;
+      return;
+    }
+    hop.value = withRepeat(withTiming(1, { duration: 900 }), -1, false);
+  }, [busy, hop]);
+
   const tap = Gesture.Tap()
     .maxDistance(12)
     .onEnd((_e, ok) => {
@@ -480,11 +498,20 @@ function TabDetent({
               <Text style={styles.badgeText}>{badge > 9 ? '9+' : String(badge)}</Text>
             </View>
           ) : null}
+          {/* three dots rather than one pulse: a single blob reads as a badge or
+              a glitch, and this is the same gesture the chat's own typing
+              indicator makes — so the tab and the conversation agree about what
+              is happening. `pulseStyle` still drives the whole row's fade, which
+              is what makes it appear and leave rather than snap. */}
           {busy ? (
             <Animated.View
               testID={`tab-thinking-${label}`}
-              style={[styles.pulse, { backgroundColor: accent }, pulseStyle]}
-            />
+              style={[styles.typing, pulseStyle]}
+            >
+              <TypingDot progress={hop} phase={0} color={accent} />
+              <TypingDot progress={hop} phase={0.18} color={accent} />
+              <TypingDot progress={hop} phase={0.36} color={accent} />
+            </Animated.View>
           ) : null}
         </View>
         <Animated.Text numberOfLines={1} style={[styles.label, { color: accent }, labelStyle]}>
@@ -493,6 +520,27 @@ function TabDetent({
       </Animated.View>
     </GestureDetector>
   );
+}
+
+/**
+ * One dot of the three, hopping on its own offset of a shared ramp.
+ *
+ * Its own component so each dot gets its own `useAnimatedStyle` — hooks cannot
+ * be called in a loop over a list whose length might change, and three is a
+ * constant here only by convention.
+ *
+ * No default parameter in the worklet, ever: the closure is built from the
+ * identifiers in the body, so a default compiles, passes jest on the JS thread,
+ * and then throws once per frame on the UI thread. See AGENTS.md.
+ */
+function TypingDot({ progress, phase, color }: { progress: SharedValue<number>; phase: number; color: string }) {
+  const style = useAnimatedStyle(() => {
+    // a single hump across the cycle: 0 at both ends, 1 in the middle
+    const t = (progress.value + phase) % 1;
+    const lift = Math.sin(t * Math.PI);
+    return { opacity: 0.35 + lift * 0.65, transform: [{ translateY: -lift * 3 }] };
+  });
+  return <Animated.View style={[styles.typingDot, { backgroundColor: color }, style]} />;
 }
 
 const styles = StyleSheet.create({
@@ -559,6 +607,10 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   pulse: { position: 'absolute', top: -5, right: -7, width: 7, height: 7, borderRadius: 3.5 },
+  // the row sits where the single dot used to, widened for three. The detent
+  // clips at 44px, so this stays inside the headroom the 20px glyph leaves
+  typing: { position: 'absolute', top: -4, right: -13, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  typingDot: { width: 4, height: 4, borderRadius: 2 },
   label: {
     ...TYPE.dataLabel,
     fontSize: 11,

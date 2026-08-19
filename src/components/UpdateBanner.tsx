@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Updates from 'expo-updates';
 import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
@@ -22,6 +22,33 @@ import { useAppearance } from '../theme/appearance';
  */
 export function UpdateBanner() {
   const { isUpdatePending } = Updates.useUpdates();
+
+  /**
+   * Check on every return, not only at a cold launch.
+   *
+   * `checkAutomatically: ON_LOAD` fires once, when the process starts. On a
+   * phone that keeps this app resident for days that is almost never — so an
+   * update published in the afternoon would wait for a reboot to be noticed,
+   * and "reopen it twice" became the way to get anything.
+   *
+   * There is no background check available: `expo-updates` cannot run while the
+   * app is closed and nothing can push it awake. Coming back to the app is the
+   * next best moment, and it costs one small request.
+   */
+  useEffect(() => {
+    if (!Updates.isEnabled) return;
+    const look = () => {
+      void Updates.checkForUpdateAsync()
+        .then((found) => (found.isAvailable ? Updates.fetchUpdateAsync() : null))
+        // silent: a failed check is not worth interrupting anyone over, and the
+        // Updates screen says so plainly when he goes looking
+        .catch(() => undefined);
+    };
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') look();
+    });
+    return () => sub.remove();
+  }, []);
   const { accent } = useAppearance();
   const insets = useSafeAreaInsets();
   const [dismissed, setDismissed] = useState(false);

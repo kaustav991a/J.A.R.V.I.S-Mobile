@@ -5,6 +5,8 @@ import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
 import { ArcReactor } from '../components/ArcReactor';
 import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
+import * as Updates from 'expo-updates';
+import { versionLine } from '../lib/updates';
 import { APP_VERSION } from '../data/fixtures';
 
 export function AboutScreen() {
@@ -20,7 +22,11 @@ export function AboutScreen() {
             subject rather than a status light */}
         <ArcReactor size={112} status="online" label="" monogram="J" />
         <Text style={styles.name}>JARVIS</Text>
-        <Text testID="about-version" style={styles.version}>{`Version ${APP_VERSION}`}</Text>
+        {/* the number AND when this bundle was published: the number moves when
+            a new build ships, the date moves when an over-the-air update lands,
+            and only the pair of them says which code is actually running */}
+        <Text testID="about-version" style={styles.version}>{`Version `}</Text>
+        <Text testID="about-bundle" style={styles.bundle}>{versionLine(null, Updates.createdAt).replace('v? · ', '')}</Text>
         <Text style={styles.blurb}>Your intelligent assistant for automation and productivity.</Text>
       </View>
 
@@ -45,6 +51,7 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', paddingVertical: SPACE.xl, gap: SPACE.xs },
   name: { ...TYPE.wordmark, fontSize: 18, color: COLOR.white, marginLeft: 10, marginTop: SPACE.md },
   version: { ...TYPE.dataLabel, color: COLOR.dim },
+  bundle: { ...TYPE.dataLabel, color: COLOR.dim, opacity: 0.75 },
   blurb: {
     ...TYPE.meta,
     color: COLOR.dim,

@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 /**
  * Fixture data for the screens whose backend routes are not reachable from
  * this machine. Scripts map to the backend's `/api/tasks`, recent commands to
@@ -72,4 +73,11 @@ OS             : Windows 11
 
 All systems operational.`;
 
-export const APP_VERSION = '1.0.0';
+/**
+ * The version the app is actually configured with, not a copy of it.
+ *
+ * This was the literal `'1.0.0'`, duplicated from `app.json` — so bumping the
+ * real one would have left About and Settings confidently stating the old
+ * number, with nothing to notice the drift.
+ */
+export const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';

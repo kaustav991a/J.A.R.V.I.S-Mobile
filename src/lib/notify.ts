@@ -490,16 +490,19 @@ export function replyFromData(raw: unknown, body: string | null | undefined): Pu
  * are looking at something else, the other is you coming back to it. Either way
  * the conversation should already contain it by the time the chat is on screen.
  */
-export function onPushReply(cb: (reply: PushedReply) => void): () => void {
+export function onPushReply(cb: (reply: PushedReply, tapped: boolean) => void): () => void {
   try {
     const shown = Notifications.addNotificationReceivedListener((n) => {
       const r = replyFromData(n?.request?.content?.data ?? null, n?.request?.content?.body);
-      if (r) cb(r);
+      // arrived while looking at something else: take it in, do not yank him
+      // out of whatever screen he is on
+      if (r) cb(r, false);
     });
     const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
       const content = response?.notification?.request?.content;
       const r = replyFromData(content?.data ?? null, content?.body);
-      if (r) cb(r);
+      // he tapped the answer, so the answer is what he wants to see
+      if (r) cb(r, true);
     });
     return () => {
       shown.remove();

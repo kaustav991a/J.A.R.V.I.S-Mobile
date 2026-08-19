@@ -138,4 +138,5 @@ jest.mock('expo-updates', () => ({
   fetchUpdateAsync: jest.fn().mockResolvedValue({ isNew: false }),
   reloadAsync: jest.fn().mockResolvedValue(undefined),
   useUpdates: jest.fn(() => ({ isUpdateAvailable: false, isUpdatePending: false })),
+  isEnabled: false,
 }));

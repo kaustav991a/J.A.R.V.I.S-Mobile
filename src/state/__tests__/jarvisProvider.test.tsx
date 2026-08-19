@@ -16,12 +16,13 @@ import { JarvisProvider, useJarvis } from '../JarvisProvider';
 const mockSend = jest.fn();
 const mockBackdoor = jest.fn();
 const mockRegisterPush = jest.fn().mockResolvedValue(undefined);
+const mockOpenChat = jest.fn();
 /** the link state the provider sees; cloud+open is what push registration needs */
 const mockLink = { mode: 'offline', status: 'closed' };
 /** the provider's own onFrame, captured so a test can land a frame on it */
 const mockFrames: { onFrame: ((f: unknown, at: number) => void) | null } = { onFrame: null };
 /** the provider's pushed-reply handler, captured so a test can deliver one */
-const mockPush: { take: ((r: { text: string }) => void) | null } = { take: null };
+const mockPush: { take: ((r: { text: string }, tapped: boolean) => void) | null } = { take: null };
 
 jest.mock('../../link/useLink', () => ({
   useLink: (opts: { onFrame: (f: unknown, at: number) => void }) => {
@@ -59,7 +60,7 @@ jest.mock('../../lib/notify', () => ({
   // returns the unsubscribe itself, not a subscription object — the effect calls it
   onAlertTapped: jest.fn(() => jest.fn()),
   pendingReplies: jest.fn().mockResolvedValue([]),
-  onPushReply: (cb: (r: { text: string }) => void) => {
+  onPushReply: (cb: (r: { text: string }, tapped: boolean) => void) => {
     mockPush.take = cb;
     return jest.fn();
   },
@@ -68,6 +69,10 @@ jest.mock('../../lib/notify', () => ({
   registerForPush: jest.fn().mockResolvedValue('ExponentPushToken[test]'),
   shouldNotifyReply: jest.fn(() => false),
 }));
+
+// lazily, because the factory runs when JarvisProvider is imported — before the
+// const above it has initialised
+jest.mock('../../navigation/RootNavigator', () => ({ openChat: () => mockOpenChat() }));
 
 jest.mock('../../lib/haptics', () => ({ haptic: { good: jest.fn() } }));
 
@@ -246,7 +251,7 @@ describe('a reply that arrives as a push', () => {
       </JarvisProvider>
     );
     await act(async () => {
-      mockPush.take?.({ text: 'A 24 minute drive, sir.' });
+      mockPush.take?.({ text: 'A 24 minute drive, sir.' }, false);
     });
     expect(view.getByTestId('log').props.children).toContain('jarvis: A 24 minute drive, sir.');
     view.unmount();
@@ -262,8 +267,8 @@ describe('a reply that arrives as a push', () => {
       </JarvisProvider>
     );
     await act(async () => {
-      mockPush.take?.({ text: 'Twice, sir.' });
-      mockPush.take?.({ text: 'Twice, sir.' });
+      mockPush.take?.({ text: 'Twice, sir.' }, false);
+      mockPush.take?.({ text: 'Twice, sir.' }, false);
     });
     const log = view.getByTestId('log').props.children as string;
     expect(log.split('Twice, sir.').length - 1).toBe(1);
@@ -340,6 +345,41 @@ describe('coming back to a reply that arrived while away', () => {
     const log = view.getByTestId('log').props.children as string;
     expect(log.split('Once only, sir.').length - 1).toBe(1);
     notify.pendingReplies.mockResolvedValue([]);
+    view.unmount();
+  });
+});
+
+/**
+ * Tapping the answer is a request to see it. Landing on whatever tab happened to
+ * be open, with the reply somewhere behind it, is the version that was reported.
+ */
+describe('tapping a reply notification', () => {
+  it('opens the conversation', async () => {
+    mockOpenChat.mockClear();
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockPush.take?.({ text: 'Twenty minutes, sir.' }, true);
+    });
+    expect(mockOpenChat).toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('stays put when one merely arrives', async () => {
+    // pulling him out of the screen he chose would be the app deciding for him
+    mockOpenChat.mockClear();
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockPush.take?.({ text: 'No rush, sir.' }, false);
+    });
+    expect(mockOpenChat).not.toHaveBeenCalled();
     view.unmount();
   });
 });
