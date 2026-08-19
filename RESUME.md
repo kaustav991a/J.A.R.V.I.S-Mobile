@@ -71,6 +71,80 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ 2026-08-19, late: the journal is VERIFIED ON THE DEVICE
+
+**536 tests, 45 suites, `tsc --noEmit` clean — and, unlike everything above this
+line, the journal has actually run on the phone.** Measured, not inferred:
+
+```
+digest: 5h 32m on the phone, sir, across 38 pickups.
+        Gmail 2h 12m, eFootball™ 1h 25m, Facebook 26m.
+sync:   {"state":"ok","events":17530,"daily":360}
+```
+
+A cold sync from an empty database writes **17,530 events and 360 day-totals in
+one pass**, and the database is about 1.8 MB.
+
+### What the device found that 536 green tests never could
+
+Four defects, all in the same afternoon, none reachable from jest.
+
+1. **A commit per row.** Every `runAsync` is a bridge round-trip AND its own
+   implicit transaction, so each row cost an fsync. The first sync was 5,250 rows
+   in and still climbing after minutes. Now chunked — 200 rows per statement,
+   inside one transaction.
+2. **A prepared statement inside `withTransactionAsync` hung the app outright.**
+   No error, no log past `permission: granted`, database left at 63 bytes.
+   Multi-row `VALUES` avoids prepared statements entirely and is fewer
+   round-trips than one anyway.
+3. **Concurrent syncs.** Three triggers by design — screen, manual button,
+   background task — and nothing serialised them. Two transactions on one
+   database gave `cannot start a transaction within a transaction`. Syncs now
+   queue process-wide, and `openJournal` caches one connection per file.
+4. **Package visibility.** Android 11 made it opt-in, so `getApplicationInfo`
+   throws for third-party packages: 86 asked about, **36 named**. The digest read
+   `Gm 2h 12m, Pesam 1h 25m, Katana 26m` — Gmail, eFootball, Facebook. Fixed with
+   a `<queries>` MAIN/LAUNCHER block via `plugins/withPackageQueries.js`, not
+   `QUERY_ALL_PACKAGES`. **The figures were never affected** — `UsageStatsManager`
+   is a system service and visibility filtering does not touch it.
+
+### And one claim of mine that was simply wrong
+
+I said a first launch arrives with **months** of history. It arrives with about
+**ten days**. Android keeps four SEPARATE aggregates — daily 7 days, weekly 4
+weeks, monthly 6 months, yearly 2 years — and only the daily one is per-day.
+Measured on this phone: **10 days of daily buckets, exactly 7 days of events.**
+
+That sharpens what this piece is for rather than shrinking it. **The journal's
+job is keeping what Android throws away after a week.** Depth is earned by
+running it. It also makes the background leg load-bearing rather than an
+optimisation: miss more than a week and those days are gone for good.
+
+### Traps for whoever works on this next
+
+- **Do not delete the database out from under a running app.** It leaves a hot
+  `jarvis-journal.db-journal` and every open after that fails with
+  `database is locked`. Force-stop first, then delete BOTH files. One "bug" this
+  afternoon was entirely this.
+- **`console.log` goes to Metro, not `logcat`**, on bridgeless RN. Reading
+  logcat for JS output wastes ten minutes.
+- **Metro dies during `expo run:android`** and sometimes leaves a hung node
+  process holding 8081 that answers nothing. Kill it by PID and restart.
+- **`adb shell input tap` is refused on this phone** — MIUI wants "USB debugging
+  (Security settings)" enabled separately. UI automation is not available; the
+  screen has to be driven by hand.
+- **Git Bash rewrites `/sdcard/...`** into `/Files/Git/sdcard/...`. Use the
+  PowerShell tool for `adb shell` paths.
+
+### Still unverified
+
+The **Journal screen itself** — the data path underneath it is proven, and its
+logic has five tests, but nobody has looked at it on the device. The denial path
+especially: revoke usage access, return, and it must say *"I cannot see your
+usage"* rather than *"Nothing recorded"*.
+
+---
+
 ## ▶ 2026-08-19, evening: the phone journal — piece 1 is built
 
 **527 tests, 45 suites, `tsc --noEmit` clean.** New subsystem, and the first of
