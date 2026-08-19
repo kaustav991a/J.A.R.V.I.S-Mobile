@@ -18,6 +18,7 @@ import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
 import { syncCommuteTask } from './src/lib/commuteTask';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { UpdateBanner } from './src/components/UpdateBanner';
 import { BlurTargetProvider } from './src/components/ui/Glass';
 import { AppearanceProvider } from './src/theme/appearance';
 import { JarvisProvider, useJarvis } from './src/state/JarvisProvider';
@@ -165,6 +166,9 @@ export default function App() {
                     the whole app until it lifts. */}
                 {launching ? null : <Gate />}
                 <Watch />
+                {/* over the navigator and under the gate: an update is worth
+                    saying wherever he is, and never over a locked app */}
+                {launching ? null : <UpdateBanner />}
               </ToastProvider>
               </ReactorHandoffProvider>
             </JarvisProvider>
