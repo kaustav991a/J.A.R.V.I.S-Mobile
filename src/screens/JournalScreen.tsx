@@ -4,12 +4,13 @@ import { Card, InfoRow } from '../components/ui/Card';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
 import { COLOR } from '../theme/tokens';
-import { say, summarise } from '../lib/journal/digest';
+import { say, summarise, syncLine } from '../lib/journal/digest';
 import type { Reading } from '../lib/journal/digest';
 import { androidSource, dayKey } from '../lib/journal/source';
 import { openJournal } from '../lib/journal/store';
 import type { Journal } from '../lib/journal/store';
 import { syncUsage } from '../lib/journal/sync';
+import type { SyncResult } from '../lib/journal/sync';
 
 /**
  * What the journal has actually collected.
@@ -24,6 +25,16 @@ export function JournalScreen() {
   const [held, setHeld] = useState<{ events: number; daily: number }>({ events: 0, daily: 0 });
   const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  /**
+   * What the last sync did, and when.
+   *
+   * Reported from the device: **Sync now** a minute after the screen had already
+   * synced changed no counts, because there was nothing new — and the screen said
+   * nothing, so a correct answer and a dead button looked identical. It took a
+   * second tap that happened to add five moments to establish the first had
+   * worked at all.
+   */
+  const [last, setLast] = useState<{ result: SyncResult; at: number } | null>(null);
   /** opened once and kept, so a sync does not reopen the file each time */
   const journal = useRef<Journal | null>(null);
 
@@ -32,7 +43,9 @@ export function JournalScreen() {
     try {
       journal.current = journal.current ?? (await openJournal());
       const j = journal.current;
-      const outcome = await syncUsage(j, androidSource, Date.now());
+      const ranAt = Date.now();
+      const outcome = await syncUsage(j, androidSource, ranAt);
+      setLast({ result: outcome, at: ranAt });
 
       setHeld(await j.size());
       setNames(await j.allLabels());
@@ -107,6 +120,9 @@ export function JournalScreen() {
           last
         />
       )}
+      {/* always rendered, including when nothing changed: a sync that found
+          nothing is an answer, and it has to look like one */}
+      <Hint testID="journal-last">{busy ? 'Reading…' : syncLine(last?.result ?? null, last?.at ?? null)}</Hint>
 
       <Hint>
         Android records this whether anything asks or not — the journal only reads what is already there, which is why it

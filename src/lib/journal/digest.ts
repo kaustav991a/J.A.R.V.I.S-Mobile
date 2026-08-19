@@ -1,4 +1,8 @@
+import { clockLabel } from '../commute';
 import type { DailyRow, UsageEvent } from './store';
+
+/** the shape `syncUsage` returns; imported as a type so the two files stay acyclic */
+import type { SyncResult as SyncOutcome } from './sync';
 
 /**
  * What a day looked like, and how to say it out loud.
@@ -93,5 +97,34 @@ export function say(reading: Reading, known: Record<string, string> = {}): strin
       const named = reading.top.map((t) => `${appLabel(t.app, known)} ${duration(t.ms)}`).join(', ');
       return `${duration(reading.total)} on the phone, sir, across ${reading.pickups} pickups. ${named}.`;
     }
+  }
+}
+
+/**
+ * What the last sync did, in one line.
+ *
+ * Exists because a working button looked broken: tapping **Sync now** a minute
+ * after the screen had already synced changed no counts, because there was
+ * genuinely nothing new — and the screen said nothing at all, so the only honest
+ * outcome was indistinguishable from a dead button. That is the same confusion
+ * as the briefing that was correctly silent and the Vitals panel that was
+ * correctly empty, and this project has now paid for it three times.
+ *
+ * Only `events` is reported as new. `daily` counts rows *touched*, and an upsert
+ * that writes an identical value still reports a change — so calling it "new"
+ * would be a number that never reads zero, which is worse than no number.
+ */
+export function syncLine(result: SyncOutcome | null, at: number | null): string {
+  if (!result || at === null) return 'Not synced yet, sir.';
+  const t = clockLabel(new Date(at).getHours(), new Date(at).getMinutes());
+  switch (result.state) {
+    case 'denied':
+      return `Last looked at ${t}. I cannot see your usage, sir — the permission is off.`;
+    case 'error':
+      return `Last tried at ${t}, sir, and it failed (${result.problem}).`;
+    case 'ok':
+      return result.events === 0
+        ? `Last synced ${t}. Nothing new since — the day totals were refreshed regardless.`
+        : `Last synced ${t}. ${result.events} new ${result.events === 1 ? 'moment' : 'moments'}.`;
   }
 }

@@ -82,3 +82,22 @@ describe('the Journal screen', () => {
     await waitFor(() => expect(getByTestId('journal-digest').props.children).toContain('SQLITE_BUSY'));
   });
 });
+
+/**
+ * Reported from the device: **Sync now** changed no counts, because there was
+ * nothing new — and the screen said nothing at all, so a correct answer and a
+ * dead button were indistinguishable.
+ */
+describe('the Journal screen after a sync', () => {
+  it('says a sync that found nothing found nothing', async () => {
+    mockSync.mockResolvedValue({ state: 'ok', events: 0, daily: 24 });
+    const { getByTestId } = await mount();
+    await waitFor(() => expect(getByTestId('journal-last').props.children).toContain('Nothing new'));
+  });
+
+  it('says what a sync added when it added something', async () => {
+    mockSync.mockResolvedValue({ state: 'ok', events: 5, daily: 24 });
+    const { getByTestId } = await mount();
+    await waitFor(() => expect(getByTestId('journal-last').props.children).toContain('5 new moments'));
+  });
+});

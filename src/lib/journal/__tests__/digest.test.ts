@@ -1,4 +1,4 @@
-import { appLabel, say, summarise } from '../digest';
+import { appLabel, say, summarise, syncLine } from '../digest';
 import type { DailyRow, UsageEvent } from '../store';
 
 const daily = (app: string, ms: number): DailyRow => ({ day: '2026-08-19', app, ms });
@@ -135,5 +135,58 @@ describe('naming an app the way its owner would', () => {
     const line = say(summarise([daily('com.facebook.katana', 3_600_000)], [unlock(1)]), known);
     expect(line).toContain('Facebook');
     expect(line).not.toContain('Katana');
+  });
+});
+
+/**
+ * A working button that looked broken.
+ *
+ * Reported from the device: tapping **Sync now** a minute after the screen had
+ * already synced changed no counts. That was correct — there was genuinely
+ * nothing new — but the screen said nothing, so the honest outcome and a dead
+ * button were indistinguishable. The next tap added five, which is how it was
+ * eventually established that the first tap had worked.
+ */
+describe('saying what the last sync did', () => {
+  const at = new Date(2026, 7, 19, 12, 50).getTime();
+
+  it('names what was added, when there was something', () => {
+    const line = syncLine({ state: 'ok', events: 5, daily: 24 }, at);
+    expect(line).toContain('12:50 PM');
+    expect(line).toContain('5 new moments');
+  });
+
+  it('says one moment rather than 1 moments', () => {
+    expect(syncLine({ state: 'ok', events: 1, daily: 0 }, at)).toContain('1 new moment.');
+  });
+
+  /**
+   * The whole point. Nothing new is a real answer and has to look like one.
+   */
+  it('says nothing was new, rather than saying nothing at all', () => {
+    const line = syncLine({ state: 'ok', events: 0, daily: 24 }, at);
+    expect(line).toContain('Nothing new');
+    expect(line).toContain('12:50 PM');
+  });
+
+  it('never reports day totals as new, because an unchanged upsert still counts', () => {
+    // `daily` is rows touched, not rows added — surfacing it as new would be a
+    // number that can never read zero, which is worse than no number
+    const line = syncLine({ state: 'ok', events: 0, daily: 24 }, at);
+    expect(line).not.toContain('24');
+  });
+
+  it('keeps saying it cannot see when the permission is gone', () => {
+    expect(syncLine({ state: 'denied' }, at)).toContain('cannot see');
+  });
+
+  it('names a failure and when it happened', () => {
+    const line = syncLine({ state: 'error', problem: 'database is locked' }, at);
+    expect(line).toContain('database is locked');
+    expect(line).toContain('12:50 PM');
+  });
+
+  it('admits it has not run yet rather than implying an empty result', () => {
+    expect(syncLine(null, null)).toContain('Not synced yet');
   });
 });
