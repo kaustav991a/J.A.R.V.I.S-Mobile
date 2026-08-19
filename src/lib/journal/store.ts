@@ -57,13 +57,33 @@ CREATE TABLE IF NOT EXISTS daily (
   PRIMARY KEY (day, app)
 );
 CREATE TABLE IF NOT EXISTS sync (source TEXT PRIMARY KEY, through INTEGER NOT NULL);
+-- what each package is actually called. Kept rather than looked up on every
+-- read, so a history entry keeps its name after the app is uninstalled.
+CREATE TABLE IF NOT EXISTS labels (app TEXT PRIMARY KEY, label TEXT NOT NULL);
 `;
+
+/**
+ * Rows per statement.
+ *
+ * 200 × 3 columns is 600 bind variables, comfortably inside SQLite's limit
+ * (999 on the older builds, 32,766 on current ones) with room for a fourth
+ * column later. Large enough that a week of events is a few dozen statements
+ * rather than tens of thousands.
+ */
+const CHUNK = 200;
+
+/** `(?, ?, ?), (?, ?, ?), …` — one group per row */
+const values = (rows: number, cols: number): string =>
+  Array.from({ length: rows }, () => `(${Array.from({ length: cols }, () => '?').join(', ')})`).join(', ');
 
 export type Journal = {
   putEvents(rows: UsageEvent[]): Promise<number>;
   putDaily(rows: DailyRow[]): Promise<number>;
   eventsBetween(from: number, to: number): Promise<UsageEvent[]>;
   dailyFor(day: string): Promise<DailyRow[]>;
+  putLabels(map: Record<string, string>): Promise<void>;
+  /** every package name this journal knows a real name for */
+  allLabels(): Promise<Record<string, string>>;
   watermark(source: string): Promise<number | null>;
   setWatermark(source: string, through: number): Promise<void>;
   prune(now: number): Promise<number>;
@@ -91,7 +111,7 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
       if (rows.length === 0) return 0;
       let written = 0;
       /**
-       * One transaction, one prepared statement, measured on the device.
+       * One transaction, a few dozen statements, measured on the device.
        *
        * This was a bare `runAsync` per row, and a first sync — seven days of
        * events, tens of thousands of rows — was still crawling minutes later:
@@ -99,18 +119,21 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
        * each row cost a commit and an fsync. The jest suite could never show it,
        * because in-process SQLite makes the same loop instant. The phone showed
        * it in about four minutes of watching a counter climb.
+       *
+       * The obvious repair — a prepared statement inside the transaction — hung
+       * the device outright: the probe logged `permission: granted` and never
+       * reached the next line, with the database left at 63 bytes. Multi-row
+       * `VALUES` needs no prepared statement at all, and is fewer round-trips
+       * than one anyway: a week of events becomes a few dozen statements.
        */
       await db.withTransactionAsync(async () => {
-        const insert = await db.prepareAsync(
-          'INSERT OR IGNORE INTO events (at, kind, app) VALUES ($at, $kind, $app)'
-        );
-        try {
-          for (const r of rows) {
-            const res = await insert.executeAsync({ $at: r.at, $kind: r.kind, $app: r.app ?? '' });
-            written += res.changes;
-          }
-        } finally {
-          await insert.finalizeAsync();
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const slice = rows.slice(i, i + CHUNK);
+          const res = await db.runAsync(
+            `INSERT OR IGNORE INTO events (at, kind, app) VALUES ${values(slice.length, 3)}`,
+            slice.flatMap((r) => [r.at, r.kind, r.app ?? ''])
+          );
+          written += res.changes;
         }
       });
       return written;
@@ -129,17 +152,14 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
       // still hundreds on a first run, and a commit each is what made that run
       // look like a hang
       await db.withTransactionAsync(async () => {
-        const upsert = await db.prepareAsync(
-          `INSERT INTO daily (day, app, ms) VALUES ($day, $app, $ms)
-           ON CONFLICT (day, app) DO UPDATE SET ms = excluded.ms`
-        );
-        try {
-          for (const r of rows) {
-            const res = await upsert.executeAsync({ $day: r.day, $app: r.app, $ms: r.ms });
-            written += res.changes;
-          }
-        } finally {
-          await upsert.finalizeAsync();
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const slice = rows.slice(i, i + CHUNK);
+          const res = await db.runAsync(
+            `INSERT INTO daily (day, app, ms) VALUES ${values(slice.length, 3)}
+             ON CONFLICT (day, app) DO UPDATE SET ms = excluded.ms`,
+            slice.flatMap((r) => [r.day, r.app, r.ms])
+          );
+          written += res.changes;
         }
       });
       return written;
@@ -161,6 +181,36 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
         'SELECT day, app, ms FROM daily WHERE day = ? ORDER BY ms DESC',
         day
       )) as DailyRow[];
+    },
+
+    /**
+     * Names are stored, not looked up on every read.
+     *
+     * `PackageManager` only knows about apps that are still installed, so
+     * resolving at display time would silently rename a year of history to
+     * `com.something` the day you uninstall it. Written once and kept.
+     */
+    async putLabels(map) {
+      const rows = Object.entries(map);
+      if (rows.length === 0) return;
+      await db.withTransactionAsync(async () => {
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const slice = rows.slice(i, i + CHUNK);
+          await db.runAsync(
+            `INSERT INTO labels (app, label) VALUES ${values(slice.length, 2)}
+             ON CONFLICT (app) DO UPDATE SET label = excluded.label`,
+            slice.flat()
+          );
+        }
+      });
+    },
+
+    async allLabels() {
+      const rows = (await db.getAllAsync('SELECT app, label FROM labels')) as {
+        app: string;
+        label: string;
+      }[];
+      return Object.fromEntries(rows.map((r) => [r.app, r.label]));
     },
 
     async watermark(source) {

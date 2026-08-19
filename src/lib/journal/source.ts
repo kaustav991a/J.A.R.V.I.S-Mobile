@@ -17,6 +17,8 @@ export interface UsageSource {
   openSettings(): Promise<void>;
   queryDaily(from: number, to: number): Promise<DailyRow[]>;
   queryEvents(from: number, to: number): Promise<UsageEvent[]>;
+  /** package name -> the label Android shows; unknown packages map to themselves */
+  labels(packages: string[]): Promise<Record<string, string>>;
 }
 
 const KINDS: EventKind[] = ['foreground', 'background', 'screen_on', 'screen_off', 'unlock'];
@@ -52,6 +54,9 @@ export const androidSource: UsageSource = {
       ms: r.ms,
     }));
   },
+  async labels(packages) {
+    return packages.length === 0 ? {} : await native.labels(packages);
+  },
   async queryEvents(from, to) {
     // an unrecognised kind is dropped rather than stored as itself: the store's
     // type is a closed set, and a row that satisfies no branch of the digest is
@@ -64,7 +69,7 @@ export const androidSource: UsageSource = {
 
 /** the stand-in for the native module, for every test above this file */
 export function fakeSource(
-  seed: Partial<{ grant: Grant; daily: DailyRow[]; events: UsageEvent[]; throws: string }> = {}
+  seed: Partial<{ grant: Grant; daily: DailyRow[]; events: UsageEvent[]; labels: Record<string, string>; throws: string }> = {}
 ): UsageSource {
   const boom = () => {
     if (seed.throws) throw new Error(seed.throws);
@@ -89,6 +94,11 @@ export function fakeSource(
     async queryEvents(from, to) {
       boom();
       return (seed.events ?? []).filter((e) => e.at >= from && e.at <= to);
+    },
+    async labels(packages) {
+      boom();
+      // an unknown package maps to itself, which is what the native side does
+      return Object.fromEntries(packages.map((p) => [p, seed.labels?.[p] ?? p]));
     },
   };
 }

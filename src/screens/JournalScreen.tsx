@@ -22,6 +22,7 @@ import { syncUsage } from '../lib/journal/sync';
 export function JournalScreen() {
   const [reading, setReading] = useState<Reading>({ state: 'empty' });
   const [held, setHeld] = useState<{ events: number; daily: number }>({ events: 0, daily: 0 });
+  const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   /** opened once and kept, so a sync does not reopen the file each time */
   const journal = useRef<Journal | null>(null);
@@ -34,6 +35,7 @@ export function JournalScreen() {
       const outcome = await syncUsage(j, androidSource, Date.now());
 
       setHeld(await j.size());
+      setNames(await j.allLabels());
 
       // The sync's own verdict decides what is said, not the rows that came
       // back. A denied read and an empty day both produce no rows, and calling
@@ -70,7 +72,7 @@ export function JournalScreen() {
       <ScreenTitle title="JOURNAL" caption={denied ? 'NO ACCESS' : 'ON THIS PHONE'} back />
 
       <SectionLabel>Today</SectionLabel>
-      <MonoCard testID="journal-digest" text={say(reading)} />
+      <MonoCard testID="journal-digest" text={say(reading, names)} />
 
       <SectionLabel>Held on this device</SectionLabel>
       <Card testID="journal-held">

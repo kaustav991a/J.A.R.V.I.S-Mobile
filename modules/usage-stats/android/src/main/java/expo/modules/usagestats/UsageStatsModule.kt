@@ -99,6 +99,30 @@ class UsageStatsModule : Module() {
     }
 
     /**
+     * What these packages are actually called.
+     *
+     * The package name is not a name. `com.google.android.gm` is Gmail,
+     * `com.facebook.katana` is Facebook — Katana being Facebook's own codename
+     * for the Android app — and `jp.konami.pesam` is eFootball. Guessing from the
+     * string produced "Gm", "Katana" and "Pesam" on the first real digest, which
+     * is worse than useless: the figures were right and unreadable.
+     *
+     * A package that is no longer installed keeps its package name, because a
+     * label that has gone is not a reason to lose the history attached to it.
+     */
+    AsyncFunction("labels") { packages: List<String> ->
+      val ctx = appContext.reactContext ?: return@AsyncFunction emptyMap<String, String>()
+      val pm = ctx.packageManager
+      packages.associateWith { pkg ->
+        try {
+          pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: Exception) {
+          pkg
+        }
+      }
+    }
+
+    /**
      * Precise moments, which is the half with a short memory — roughly a week.
      *
      * Only five event types are kept. The rest are the system talking to itself,

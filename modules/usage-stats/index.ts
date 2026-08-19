@@ -38,3 +38,8 @@ export async function queryEvents(
 ): Promise<{ at: number; kind: string; app: string | null }[]> {
   return await native.queryEvents(from, to);
 }
+
+/** package name -> the label Android shows for it; unknown packages map to themselves */
+export async function labels(packages: string[]): Promise<Record<string, string>> {
+  return await native.labels(packages);
+}

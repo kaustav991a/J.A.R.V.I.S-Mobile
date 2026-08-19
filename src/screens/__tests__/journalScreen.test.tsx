@@ -14,6 +14,9 @@ jest.mock('../../lib/journal/sync', () => ({ syncUsage: (...a: unknown[]) => moc
 jest.mock('../../lib/journal/store', () => ({
   openJournal: async () => ({
     size: async () => mockSize(),
+    // what Android calls each package, kept by the journal — without it the
+    // digest would print "Katana" where the screen should read "Facebook"
+    allLabels: async () => ({ 'com.instagram.android': 'Instagram' }),
     dailyFor: async () => [{ day: '2026-08-19', app: 'com.instagram.android', ms: 3_600_000 }],
     eventsBetween: async () => [{ at: 1, kind: 'unlock', app: null }],
   }),

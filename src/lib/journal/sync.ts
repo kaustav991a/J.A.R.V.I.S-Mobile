@@ -69,6 +69,20 @@ export async function syncUsage(j: Journal, source: UsageSource, now: number): P
     const wroteDaily = await j.putDaily(daily);
 
     /**
+     * Ask what the new packages are called, once each, ever.
+     *
+     * Only the ones this journal has never seen: labels do not change, the call
+     * touches `PackageManager` per package, and a first sync carries a couple of
+     * hundred of them. Everything after that asks about the handful you have
+     * installed since.
+     */
+    const seen = await j.allLabels();
+    const fresh = [...new Set([...daily.map((d) => d.app), ...events.map((e) => e.app)])].filter(
+      (a): a is string => typeof a === 'string' && a !== '' && !(a in seen)
+    );
+    if (fresh.length) await j.putLabels(await source.labels(fresh));
+
+    /**
      * The watermarks move only after the writes succeeded.
      *
      * Advancing them first would turn one failed sync into a permanent hole:

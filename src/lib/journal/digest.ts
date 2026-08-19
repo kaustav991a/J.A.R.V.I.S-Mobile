@@ -50,13 +50,20 @@ const duration = (ms: number): string => {
 /**
  * A package name, turned into something a person recognises.
  *
- * The real label lives in `PackageManager` and would cost another native call
- * for a cosmetic gain; the last meaningful segment is right almost always and
- * wrong harmlessly. `com.instagram.android` ends in a platform word, so a
- * trailing `android` is skipped — unless that is all there is, because a label
- * of nothing is worse than a label of "Android".
+ * `known` is what Android's `PackageManager` actually calls each package, kept
+ * in the journal. This was originally the last-segment guess alone, on the
+ * reasoning that a native call was "a cosmetic gain" — the first real digest off
+ * the phone read **"Gm 2h 12m, Pesam 1h 25m, Katana 26m"** and settled it. Those
+ * are Gmail, eFootball and Facebook, whose Android package has been
+ * `com.facebook.katana` since long before anyone reading this cared. The figures
+ * were right and the line was unreadable.
+ *
+ * The guess stays as the fallback, for a package that has since been
+ * uninstalled and was never named while it was there.
  */
-export function appLabel(pkg: string): string {
+export function appLabel(pkg: string, known: Record<string, string> = {}): string {
+  const real = known[pkg];
+  if (real && real !== pkg) return real;
   const parts = pkg.split('.').filter((p) => p && p !== 'android');
   const last = parts[parts.length - 1] ?? pkg;
   return last.charAt(0).toUpperCase() + last.slice(1);
@@ -66,7 +73,7 @@ export function appLabel(pkg: string): string {
  * The voice rules from `commute.ts` apply here too: the figure first, the
  * remark after it, `sir` at most once, and no exclamation marks anywhere.
  */
-export function say(reading: Reading): string {
+export function say(reading: Reading, known: Record<string, string> = {}): string {
   switch (reading.state) {
     case 'denied':
       /**
@@ -83,7 +90,7 @@ export function say(reading: Reading): string {
     case 'empty':
       return 'Nothing recorded for that day, sir.';
     case 'measured': {
-      const named = reading.top.map((t) => `${appLabel(t.app)} ${duration(t.ms)}`).join(', ');
+      const named = reading.top.map((t) => `${appLabel(t.app, known)} ${duration(t.ms)}`).join(', ');
       return `${duration(reading.total)} on the phone, sir, across ${reading.pickups} pickups. ${named}.`;
     }
   }

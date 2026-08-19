@@ -97,3 +97,43 @@ describe('naming an app', () => {
     expect(appLabel('android')).toBe('Android');
   });
 });
+
+/**
+ * The first real digest off the phone read:
+ *
+ *     5h 13m on the phone, sir, across 34 pickups. Gm 2h 12m, Pesam 1h 25m, Katana 26m.
+ *
+ * Gmail, eFootball and Facebook. The figures were right and the line was
+ * unreadable, which is the whole reason the journal now keeps what Android
+ * actually calls each package.
+ */
+describe('naming an app the way its owner would', () => {
+  const known = {
+    'com.google.android.gm': 'Gmail',
+    'jp.konami.pesam': 'eFootball',
+    'com.facebook.katana': 'Facebook',
+  };
+
+  it('prefers the name Android gives it', () => {
+    expect(appLabel('com.google.android.gm', known)).toBe('Gmail');
+    expect(appLabel('com.facebook.katana', known)).toBe('Facebook');
+    expect(appLabel('jp.konami.pesam', known)).toBe('eFootball');
+  });
+
+  it('falls back to the guess for a package nothing ever named', () => {
+    // uninstalled before it was ever seen: a bad name beats no name
+    expect(appLabel('com.whatsapp', known)).toBe('Whatsapp');
+  });
+
+  it('ignores a label that is only the package name repeated back', () => {
+    // that is what the native side returns for an app no longer installed, and
+    // taking it literally would print the raw package where a guess reads better
+    expect(appLabel('com.miui.player', { 'com.miui.player': 'com.miui.player' })).toBe('Player');
+  });
+
+  it('carries the real names into the spoken line', () => {
+    const line = say(summarise([daily('com.facebook.katana', 3_600_000)], [unlock(1)]), known);
+    expect(line).toContain('Facebook');
+    expect(line).not.toContain('Katana');
+  });
+});
