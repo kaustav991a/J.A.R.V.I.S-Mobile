@@ -49,6 +49,8 @@ export type SettingsStackParams = {
    * has *watched* and never leaves the device.
    */
   Journal: undefined;
+  /** what version is running, and the one button that moves it forward */
+  Updates: undefined;
   About: undefined;
 };
 

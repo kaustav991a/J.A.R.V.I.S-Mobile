@@ -22,6 +22,7 @@ import { SecurityScreen } from '../screens/SecurityScreen';
 import { PlacesScreen } from '../screens/PlacesScreen';
 import { MemoryScreen } from '../screens/MemoryScreen';
 import { JournalScreen } from '../screens/JournalScreen';
+import { UpdatesScreen } from '../screens/UpdatesScreen';
 import { TABS_ID } from './types';
 import type {
   CommandsStackParams,
@@ -119,6 +120,7 @@ function SettingsStackScreens() {
       <SettingsStack.Screen name="Places" component={PlacesScreen} />
       <SettingsStack.Screen name="Memory" component={MemoryScreen} />
       <SettingsStack.Screen name="Journal" component={JournalScreen} />
+      <SettingsStack.Screen name="Updates" component={UpdatesScreen} />
       <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>
   );

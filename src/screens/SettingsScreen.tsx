@@ -102,6 +102,13 @@ export function SettingsScreen() {
           title="Journal"
           subtitle="How this phone is used, kept on the phone and nowhere else"
           onPress={() => nav.navigate('Journal')}
+        />
+        <SettingsRow
+          testID="settings-updates"
+          icon="cloud-download-outline"
+          title="Updates"
+          subtitle="What version is running, and whether a newer one is waiting"
+          onPress={() => nav.navigate('Updates')}
           last
         />
       </View>
