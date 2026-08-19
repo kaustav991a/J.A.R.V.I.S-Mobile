@@ -47,3 +47,6 @@ yarn-error.*
 google-services.json
 GoogleService-Info.plist
 .expo-metro.log
+
+# local Expo module build output
+modules/*/android/build/
