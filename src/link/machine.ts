@@ -56,6 +56,17 @@ export class LinkMachine {
    * network listener, the return to the foreground.
    */
   private gen = 0;
+  /**
+   * Whether a probe is genuinely running right now.
+   *
+   * NOT `status === 'probing'`, which is what this guard used first and which is
+   * not the same claim. A superseded `reprobe()` returns early without touching
+   * the snapshot, so 'probing' outlives the probe that set it — and with several
+   * callers (the foreground return, the network listener, the 5s tick) racing to
+   * supersede one another, the machine could sit labelled 'probing' with nothing
+   * whatever in flight. The watchdog then declined to rescue it, permanently.
+   */
+  private probing = false;
 
   constructor(private deps: MachineDeps) {}
 
@@ -171,7 +182,16 @@ export class LinkMachine {
     this.teardown();
     this.set({ status: 'probing' });
 
-    const mode = await chooseMode(this.deps.endpoints, { fetchImpl: this.deps.fetchImpl });
+    this.probing = true;
+    let mode: LinkMode;
+    try {
+      mode = await chooseMode(this.deps.endpoints, { fetchImpl: this.deps.fetchImpl });
+    } finally {
+      // only the current probe may declare the machine idle. A superseded one
+      // clearing this would tell the watchdog nothing is in flight while the
+      // winner is still out.
+      if (gen === this.gen) this.probing = false;
+    }
     // anything that happened during the probe wins: a later dial, a stop, a
     // suspend. Losing the race means going quietly — the winner owns the socket,
     // and touching the snapshot here would report a mode nobody is connected in
@@ -303,7 +323,7 @@ export class LinkMachine {
      * reached `connect()` — leaking a socket, which is what the counter fixed,
      * but at least one of them connected.
      */
-    if (this.snap.status === 'probing') return;
+    if (this.probing) return;
     const watchdogMs = this.deps.watchdogMs ?? 30000;
     const quietFor = this.lastFrameAt === null ? Infinity : this.deps.now() - this.lastFrameAt;
     const dead = this.snap.status === 'closed';

@@ -408,3 +408,51 @@ describe('a socket that is refused rather than opened', () => {
     expect(h.machine.snapshot.lastError).toContain('ECONNRESET');
   });
 });
+
+/**
+ * The second attempt at the watchdog guard, and why it had to change again.
+ *
+ * Guarding on `status === 'probing'` was not the same claim as "a probe is
+ * running". A superseded `reprobe()` returns early without touching the
+ * snapshot, so that status outlives the probe that set it — and with the
+ * foreground return, the network listener and the 5s tick all racing to
+ * supersede one another, the machine could sit labelled 'probing' with nothing
+ * in flight at all. The watchdog then declined to rescue it, permanently, and
+ * the phone showed "connecting" until it was restarted.
+ */
+describe('the watchdog after probes have raced', () => {
+  it('is not left permanently disarmed by a superseded probe', async () => {
+    const h = build(allDown());
+
+    // two dials in flight at once, the first superseded by the second
+    const a = h.machine.reprobe();
+    const b = h.machine.reprobe();
+    await Promise.all([a, b]);
+
+    // nothing is in flight now, whatever the snapshot last said
+    h.clock.t = 60000;
+    await h.machine.tick();
+
+    // the watchdog acted: a fourth probe ran rather than being skipped forever
+    expect((h.machine as unknown as { probing: boolean }).probing).toBe(false);
+    expect(h.snapshots.filter((s) => s.status === 'probing').length).toBeGreaterThan(2);
+  });
+
+  it('still leaves a genuinely live probe alone', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow = jest.fn(async () => {
+      await gate;
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const h = build(slow);
+    const dialling = h.machine.start();
+    await h.machine.tick();
+    await h.machine.tick();
+
+    release();
+    await dialling;
+    expect(FakeSocket.opened).toHaveLength(1);
+  });
+});
