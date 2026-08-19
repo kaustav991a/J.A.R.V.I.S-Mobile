@@ -271,6 +271,23 @@ export class LinkMachine {
     // as dead. That reconnect is what kept the gateway believing a pocketed phone
     // was still listening.
     if (this.stopped || this.suspended) return;
+    /**
+     * A probe already in flight owns the next connection. Leave it alone.
+     *
+     * Interrupting one is not a retry, it is a restart — and since `reprobe()`
+     * bumps the generation counter, the probe it interrupts can never finish.
+     * `lastFrameAt` is null until something connects, so `quietFor` is Infinity
+     * and this watchdog fires on EVERY tick; with `chooseMode` taking longer
+     * than one tick on a cold host, each tick cancelled the probe the previous
+     * tick had started, `connect()` was never reached, and the app sat on
+     * "connecting" indefinitely.
+     *
+     * Reported from the device on 2026-08-19, and it is a regression from the
+     * generation counter added the same day: before that, racing probes both
+     * reached `connect()` — leaking a socket, which is what the counter fixed,
+     * but at least one of them connected.
+     */
+    if (this.snap.status === 'probing') return;
     const watchdogMs = this.deps.watchdogMs ?? 30000;
     const quietFor = this.lastFrameAt === null ? Infinity : this.deps.now() - this.lastFrameAt;
     const dead = this.snap.status === 'closed';

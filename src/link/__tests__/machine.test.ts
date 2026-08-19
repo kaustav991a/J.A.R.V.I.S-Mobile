@@ -333,3 +333,39 @@ describe('LinkMachine', () => {
     expect(h.machine.snapshot.lastError).toBe('ECONNRESET');
   });
 });
+
+/**
+ * A watchdog that cancels the probe it is waiting on never connects at all.
+ *
+ * `lastFrameAt` is null until something connects, so `quietFor` is Infinity and
+ * `tick()` fires every time. Once `reprobe()` gained a generation counter, each
+ * of those ticks invalidated the probe the previous tick had started — and with
+ * `chooseMode` slower than one tick on a cold host, `connect()` was never
+ * reached. Reported from the device as "connecting" forever.
+ */
+describe('the watchdog while a probe is in flight', () => {
+  it('leaves an unfinished probe alone instead of restarting it', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow = jest.fn(async () => {
+      await gate;
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const h = build(slow);
+    const dialling = h.machine.start();
+    expect(h.machine.snapshot.status).toBe('probing');
+
+    // several ticks land while the probe is still out
+    await h.machine.tick();
+    await h.machine.tick();
+    await h.machine.tick();
+
+    release();
+    await dialling;
+
+    // the original probe survived and opened exactly one socket
+    expect(FakeSocket.opened).toHaveLength(1);
+    expect(h.machine.snapshot.status).toBe('connecting');
+  });
+});
