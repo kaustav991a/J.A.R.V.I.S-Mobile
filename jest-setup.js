@@ -72,3 +72,19 @@ jest.mock('expo-sqlite', () => {
     },
   };
 });
+
+/**
+ * The usage-stats native module, which by definition cannot exist under jest.
+ *
+ * `requireNativeModule` throws at import time off-device, so without this the
+ * journal's source layer takes the suite down before a test runs. Nothing above
+ * `source.ts` uses this mock — they all take a `fakeSource` — so it only has to
+ * be importable, and the real behaviour is checked on the phone.
+ */
+jest.mock('./modules/usage-stats', () => ({
+  ping: () => 'usage-stats native alive',
+  permission: () => 'granted',
+  openSettings: () => true,
+  queryDaily: async () => [],
+  queryEvents: async () => [],
+}));

@@ -34,7 +34,12 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS events (
   at   INTEGER NOT NULL,
   kind TEXT    NOT NULL,
-  app  TEXT,
+  -- '' rather than NULL for the events that belong to no app, and NOT NULL to
+  -- keep it that way. SQLite treats two NULLs as DISTINCT inside a primary key,
+  -- so a nullable column here silently defeated the whole point of the key:
+  -- unlocks and screen events re-inserted on every overlapping sync, one copy
+  -- per run, forever. The empty string collides with itself the way a key must.
+  app  TEXT    NOT NULL DEFAULT '',
   PRIMARY KEY (at, kind, app)
 );
 CREATE INDEX IF NOT EXISTS events_at ON events (at);
@@ -71,10 +76,9 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
      * event on the boundary is never dropped between runs, and that is only
      * safe when writing the same event twice costs nothing.
      *
-     * Screen and unlock rows carry a null `app`, and SQLite does not treat two
-     * NULLs as equal in a primary key — so those are never collapsed into one
-     * another by this, which is exactly what is wanted and is worth knowing
-     * before anyone "fixes" the key.
+     * `app` is normalised to '' on the way in and back to null on the way out.
+     * The column cannot be nullable — see the schema — and callers should not
+     * have to know that, so the translation lives here and nowhere else.
      */
     async putEvents(rows) {
       let written = 0;
@@ -83,7 +87,7 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
           'INSERT OR IGNORE INTO events (at, kind, app) VALUES (?, ?, ?)',
           r.at,
           r.kind,
-          r.app
+          r.app ?? ''
         );
         written += res.changes;
       }
@@ -112,11 +116,14 @@ export async function openJournal(name = 'jarvis-journal.db'): Promise<Journal> 
     },
 
     async eventsBetween(from, to) {
-      return (await db.getAllAsync(
+      const rows = (await db.getAllAsync(
         'SELECT at, kind, app FROM events WHERE at >= ? AND at <= ? ORDER BY at ASC',
         from,
         to
-      )) as UsageEvent[];
+      )) as { at: number; kind: EventKind; app: string }[];
+      // the '' sentinel is a storage detail; above this line an event that
+      // belongs to no app has no app
+      return rows.map((r) => ({ ...r, app: r.app === '' ? null : r.app }));
     },
 
     async dailyFor(day) {

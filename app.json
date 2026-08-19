@@ -23,7 +23,8 @@
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.PACKAGE_USAGE_STATS"
       ],
       "googleServicesFile": "./google-services.json"
     },

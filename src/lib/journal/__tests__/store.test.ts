@@ -44,15 +44,32 @@ describe('the journal store', () => {
   });
 
   it('keeps a screen event, which belongs to no app at all', async () => {
-    // `app` is null on these, and a naive composite key drops every one of them
-    // after the first — SQLite does not treat two NULLs as equal, which is what
-    // makes this work and also what makes it worth pinning
     const j = await fresh();
     await j.putEvents([
       { at: 1000, kind: 'unlock', app: null },
       { at: 2000, kind: 'unlock', app: null },
     ]);
-    expect(await j.eventsBetween(0, 3000)).toHaveLength(2);
+    const rows = await j.eventsBetween(0, 3000);
+    expect(rows).toHaveLength(2);
+    // and it comes back with no app, not with the sentinel the column holds
+    expect(rows[0].app).toBeNull();
+  });
+
+  /**
+   * The bug the sync tests caught and this file originally missed.
+   *
+   * SQLite treats two NULLs as DISTINCT inside a primary key, so while `app` was
+   * nullable an unlock re-inserted itself on every overlapping sync — one copy
+   * per run, forever, and the pickup count climbing with the number of times the
+   * app happened to be opened. The first version of this test used two different
+   * timestamps and sailed straight past it.
+   */
+  it('does not duplicate an app-less event when the same window is read again', async () => {
+    const j = await fresh();
+    const row = { at: 1000, kind: 'unlock' as const, app: null };
+    await j.putEvents([row]);
+    expect(await j.putEvents([row])).toBe(0);
+    expect(await j.eventsBetween(0, 2000)).toHaveLength(1);
   });
 
   it('takes the newest figure for a day that is read again', async () => {
