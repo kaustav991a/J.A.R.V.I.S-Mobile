@@ -36,7 +36,10 @@ import {
   postNow,
   registerForPush,
   shouldNotifyReply,
+  onPushReply,
+  replyFromLaunch,
 } from '../lib/notify';
+import type { PushedReply } from '../lib/notify';
 import { haptic } from '../lib/haptics';
 import {
   FIX_TTL_MS,
@@ -732,6 +735,42 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   }, []);
 
   /**
+   * A reply that arrived as a push belongs in the conversation, not only in the shade.
+   *
+   * The gateway pushes the answer when it cannot reach the phone over the socket
+   * — which, since `LinkMachine.suspend` closes on background, is every turn you
+   * start and then pocket. Nothing here consumed those, so the answer was shown
+   * as a notification and never entered the log: you came back to your own
+   * question, no answer under it, and a typing indicator still going. Reported
+   * from the device on 2026-08-19, and it is the missing half of the pocketed-
+   * reply fix rather than a separate bug — the push was arriving all along.
+   *
+   * Dispatched as a `status` frame so it takes the reducer's existing path: the
+   * chat gains a J.A.R.V.I.S. turn, `speaking` clears the thinking state, and the
+   * consecutive-duplicate guard there collapses the case where the same answer
+   * arrives twice — once pushed, once down a socket that reopened underneath it.
+   */
+  useEffect(() => {
+    const take = (reply: PushedReply) =>
+      dispatch({
+        type: 'frame',
+        frame: { kind: 'status', status: 'speaking', message: reply.text, user: null },
+        at: Date.now(),
+      });
+
+    let alive = true;
+    // the cold-start case: tapped while the app was dead, so no listener ever saw it
+    void replyFromLaunch().then((reply) => {
+      if (alive && reply) take(reply);
+    });
+    const off = onPushReply(take);
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
+  /**
    * Replies you have not seen, and a notification for the ones that arrive while
    * you are not looking.
    *
@@ -835,7 +874,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       // he is about to speak, and the body is the reply itself
       title: 'J.A.R.V.I.S.',
       body: newest.text.length > 140 ? `${newest.text.slice(0, 139)}…` : newest.text,
-      data: { kind: 'reply' },
+      // marked local so the push listener does not feed this back into the chat:
+      // the text is already in the log, and re-injecting it would be an echo
+      data: { kind: 'reply', local: true },
     });
   }, [hud.chat, simulated]);
 

@@ -17,6 +17,8 @@ const mockSend = jest.fn();
 const mockBackdoor = jest.fn();
 /** the provider's own onFrame, captured so a test can land a frame on it */
 const mockFrames: { onFrame: ((f: unknown, at: number) => void) | null } = { onFrame: null };
+/** the provider's pushed-reply handler, captured so a test can deliver one */
+const mockPush: { take: ((r: { text: string }) => void) | null } = { take: null };
 
 jest.mock('../../link/useLink', () => ({
   useLink: (opts: { onFrame: (f: unknown, at: number) => void }) => {
@@ -53,6 +55,11 @@ jest.mock('../../lib/notify', () => ({
   dismiss: jest.fn().mockResolvedValue(undefined),
   // returns the unsubscribe itself, not a subscription object — the effect calls it
   onAlertTapped: jest.fn(() => jest.fn()),
+  onPushReply: (cb: (r: { text: string }) => void) => {
+    mockPush.take = cb;
+    return jest.fn();
+  },
+  replyFromLaunch: jest.fn().mockResolvedValue(null),
   postNow: jest.fn().mockResolvedValue(undefined),
   registerForPush: jest.fn().mockResolvedValue(null),
   shouldNotifyReply: jest.fn(() => false),
@@ -214,5 +221,46 @@ describe('what a question carries', () => {
     expect(payload.usage).toEqual({ today: 42, pickups: 7, top: ['Gmail'], usual: 60, days: 3 });
     // and the question itself is still the question
     expect(payload.text).toBe('am I on my phone too much');
+  });
+});
+
+/**
+ * Reported from the device: send a message, background the app, and the answer
+ * arrives as a notification — but the chat comes back holding the question, no
+ * answer under it, and a typing indicator still going.
+ *
+ * The gateway had been pushing the reply all along. Nothing on this side
+ * consumed it.
+ */
+describe('a reply that arrives as a push', () => {
+  it('lands in the conversation, not only in the notification shade', async () => {
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockPush.take?.({ text: 'A 24 minute drive, sir.' });
+    });
+    expect(view.getByTestId('log').props.children).toContain('jarvis: A 24 minute drive, sir.');
+    view.unmount();
+  });
+
+  it('does not say the same thing twice when the socket delivers it as well', async () => {
+    // the answer can arrive pushed and then again down a socket that reopened
+    // underneath it; the reducer's consecutive-duplicate guard is what collapses
+    // that, and this pins that the push path goes through it
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockPush.take?.({ text: 'Twice, sir.' });
+      mockPush.take?.({ text: 'Twice, sir.' });
+    });
+    const log = view.getByTestId('log').props.children as string;
+    expect(log.split('Twice, sir.').length - 1).toBe(1);
+    view.unmount();
   });
 });

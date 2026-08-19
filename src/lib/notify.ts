@@ -456,3 +456,73 @@ export async function dismiss(id: string | null): Promise<void> {
     // already gone is the state we wanted
   }
 }
+
+/** a reply that reached the phone as a push rather than down the socket */
+export type PushedReply = { text: string };
+
+/**
+ * Read a reply out of a notification, or return null.
+ *
+ * The gateway pushes `{"kind": "reply"}` with the answer as the body when it
+ * cannot reach the phone over the socket — which, since `LinkMachine.suspend`,
+ * is every time the app is backgrounded mid-turn. Nothing consumed those, so the
+ * answer was shown in the shade and never entered the conversation: the chat
+ * came back holding a question, no answer, and a typing indicator that never
+ * stopped.
+ *
+ * `local` marks the notification this app raises for itself when a reply lands
+ * over the socket while it is off screen. That text is already in the chat, and
+ * feeding it back would be an echo.
+ */
+export function replyFromData(raw: unknown, body: string | null | undefined): PushedReply | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const d = raw as Record<string, unknown>;
+  if (d.kind !== 'reply') return null;
+  if (d.local === true) return null;
+  const text = typeof body === 'string' ? body.trim() : '';
+  return text ? { text } : null;
+}
+
+/**
+ * Replies arriving by push while the app is alive, and replies tapped.
+ *
+ * Both, because they are different moments: one is the answer landing while you
+ * are looking at something else, the other is you coming back to it. Either way
+ * the conversation should already contain it by the time the chat is on screen.
+ */
+export function onPushReply(cb: (reply: PushedReply) => void): () => void {
+  try {
+    const shown = Notifications.addNotificationReceivedListener((n) => {
+      const r = replyFromData(n?.request?.content?.data ?? null, n?.request?.content?.body);
+      if (r) cb(r);
+    });
+    const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
+      const content = response?.notification?.request?.content;
+      const r = replyFromData(content?.data ?? null, content?.body);
+      if (r) cb(r);
+    });
+    return () => {
+      shown.remove();
+      tapped.remove();
+    };
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * The reply that launched the app, if a pushed answer is what opened it.
+ *
+ * Read once at startup for the same reason `alertFromLaunch` is: a notification
+ * tapped while the app was dead reaches no listener and is recoverable only from
+ * here.
+ */
+export async function replyFromLaunch(): Promise<PushedReply | null> {
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    const content = response?.notification?.request?.content;
+    return replyFromData(content?.data ?? null, content?.body);
+  } catch {
+    return null;
+  }
+}

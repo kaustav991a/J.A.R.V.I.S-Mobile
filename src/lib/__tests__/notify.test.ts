@@ -8,6 +8,7 @@ import {
   postNow,
   prepare,
   shouldNotifyReply,
+  replyFromData,
 } from '../notify';
 
 // the factory may not close over anything out of scope, so the handles are
@@ -295,5 +296,34 @@ describe('shouldNotifyReply', () => {
 
   it('never notifies for the stand-in desk, whose replies are scripted', () => {
     expect(shouldNotifyReply({ appActive: false, simulated: true })).toBe(false);
+  });
+});
+
+/**
+ * The gateway pushes `{"kind": "reply"}` with the answer when it cannot reach
+ * the phone over the socket — which, since the app closes its socket on
+ * background, is every turn started and then pocketed. Nothing consumed those,
+ * so the answer appeared in the shade and never entered the conversation.
+ */
+describe('a reply that arrived as a push', () => {
+  it('is read out of the notification body', () => {
+    expect(replyFromData({ kind: 'reply' }, 'The office is a 24 minute drive, sir.')).toEqual({
+      text: 'The office is a 24 minute drive, sir.',
+    });
+  });
+
+  it('ignores the notification this app raised for itself', () => {
+    // that text is already in the chat log; feeding it back would be an echo
+    expect(replyFromData({ kind: 'reply', local: true }, 'already said')).toBeNull();
+  });
+
+  it('ignores anything that is not a reply', () => {
+    expect(replyFromData({ kind: 'intruder', id: 'x' }, 'someone is at your desk')).toBeNull();
+    expect(replyFromData(null, 'body')).toBeNull();
+  });
+
+  it('ignores a reply with no body, rather than adding an empty turn', () => {
+    expect(replyFromData({ kind: 'reply' }, '   ')).toBeNull();
+    expect(replyFromData({ kind: 'reply' }, undefined)).toBeNull();
   });
 });
