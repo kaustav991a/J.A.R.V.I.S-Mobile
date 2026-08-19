@@ -50,3 +50,6 @@ GoogleService-Info.plist
 
 # local Expo module build output
 modules/*/android/build/
+
+# built APKs, kept out of git — regenerate with android/gradlew assembleRelease
+builds/
