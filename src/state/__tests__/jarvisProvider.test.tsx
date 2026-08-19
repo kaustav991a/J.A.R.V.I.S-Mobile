@@ -58,6 +58,7 @@ jest.mock('../../lib/notify', () => ({
   dismiss: jest.fn().mockResolvedValue(undefined),
   // returns the unsubscribe itself, not a subscription object — the effect calls it
   onAlertTapped: jest.fn(() => jest.fn()),
+  pendingReplies: jest.fn().mockResolvedValue([]),
   onPushReply: (cb: (r: { text: string }) => void) => {
     mockPush.take = cb;
     return jest.fn();
@@ -293,6 +294,52 @@ describe('registering for push', () => {
 
     const [, , channels] = mockRegisterPush.mock.calls[0];
     expect(channels).toEqual({ general: 'general', watch: 'watch' });
+    view.unmount();
+  });
+});
+
+/**
+ * Neither notification listener covers the ordinary case.
+ *
+ * `addNotificationReceivedListener` fires only while the app is FOREGROUNDED and
+ * the response listener only when a notification is tapped — so asking
+ * something, pocketing the phone, and coming back by tapping the app icon hit
+ * neither. The answer was delivered, shown in the shade, and never entered the
+ * conversation. Reported from the device AFTER the listener work that was meant
+ * to fix exactly this.
+ */
+describe('coming back to a reply that arrived while away', () => {
+  it('takes replies out of the shade on return, without being told', async () => {
+    const notify = jest.requireMock('../../lib/notify') as { pendingReplies: jest.Mock };
+    notify.pendingReplies.mockResolvedValue([{ text: 'Twenty four minutes, sir.' }]);
+
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await waitFor(() =>
+      expect(view.getByTestId('log').props.children).toContain('jarvis: Twenty four minutes, sir.')
+    );
+    notify.pendingReplies.mockResolvedValue([]);
+    view.unmount();
+  });
+
+  it('does not double up when the same one is swept twice', async () => {
+    // the reducer's consecutive-duplicate guard is what absorbs this, and the
+    // sweep runs on every return to the foreground
+    const notify = jest.requireMock('../../lib/notify') as { pendingReplies: jest.Mock };
+    notify.pendingReplies.mockResolvedValue([{ text: 'Once only, sir.' }, { text: 'Once only, sir.' }]);
+
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await waitFor(() => expect(view.getByTestId('log').props.children).toContain('Once only, sir.'));
+    const log = view.getByTestId('log').props.children as string;
+    expect(log.split('Once only, sir.').length - 1).toBe(1);
+    notify.pendingReplies.mockResolvedValue([]);
     view.unmount();
   });
 });

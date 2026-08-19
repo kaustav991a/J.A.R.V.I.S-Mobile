@@ -526,3 +526,28 @@ export async function replyFromLaunch(): Promise<PushedReply | null> {
     return null;
   }
 }
+
+/**
+ * Replies sitting in the shade that this app has never taken in.
+ *
+ * `addNotificationReceivedListener` fires only while the app is FOREGROUNDED,
+ * and the response listener only when a notification is tapped. So the ordinary
+ * case — ask something, pocket the phone, come back by tapping the app icon —
+ * hit neither: the answer was delivered, shown, and never entered the
+ * conversation. Reported from the device on 2026-08-19, after the listener work
+ * that was supposed to have fixed exactly this.
+ *
+ * Reading the tray on every return is the reconciliation those listeners cannot
+ * do. It asks what is actually there rather than trusting that we were told.
+ */
+export async function pendingReplies(): Promise<PushedReply[]> {
+  try {
+    const shown = await Notifications.getPresentedNotificationsAsync();
+    return shown
+      .map((n) => replyFromData(n?.request?.content?.data ?? null, n?.request?.content?.body))
+      .filter((r): r is PushedReply => r !== null);
+  } catch {
+    // no tray access is not an empty tray, but there is nothing better to say
+    return [];
+  }
+}

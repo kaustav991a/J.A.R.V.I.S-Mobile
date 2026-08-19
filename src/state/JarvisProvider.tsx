@@ -38,6 +38,7 @@ import {
   registerForPush,
   shouldNotifyReply,
   onPushReply,
+  pendingReplies,
   replyFromLaunch,
 } from '../lib/notify';
 import type { PushedReply } from '../lib/notify';
@@ -784,9 +785,37 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       if (alive && reply) take(reply);
     });
     const off = onPushReply(take);
+
+    /**
+     * And on every return, read the shade rather than trusting we were told.
+     *
+     * Neither listener covers the ordinary case. `addNotificationReceivedListener`
+     * fires only while the app is FOREGROUNDED, and the response listener only
+     * when a notification is actually tapped — so asking something, pocketing the
+     * phone, and coming back by tapping the app icon hit neither. The answer was
+     * delivered, shown in the shade, and never entered the conversation.
+     * Reported from the device after the listener work that was meant to fix
+     * precisely this.
+     *
+     * Reconciling on `active` asks what is really in the tray. The reducer's
+     * consecutive-duplicate guard absorbs anything already taken in, so reading
+     * the same notification twice costs nothing.
+     */
+    const sweep = () => {
+      void pendingReplies().then((replies) => {
+        if (!alive) return;
+        for (const reply of replies) take(reply);
+      });
+    };
+    sweep();
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') sweep();
+    });
+
     return () => {
       alive = false;
       off();
+      sub.remove();
     };
   }, []);
 
