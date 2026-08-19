@@ -157,3 +157,56 @@ describe('opening the journal more than once', () => {
     expect((await b.size()).events).toBe(0);
   });
 });
+
+/**
+ * The aggregate reads the recall layer sits on.
+ *
+ * Deliberately SQL rather than pulling rows into JS: a week is roughly 17,000
+ * events on this phone, and counting them in the app would mean carrying all of
+ * them across the bridge to produce three numbers.
+ */
+describe('rolling the journal up', () => {
+  const seed = async () => {
+    const j = await fresh();
+    await j.putDaily([
+      { day: '2026-08-17', app: 'com.whatsapp', ms: 60_000 },
+      { day: '2026-08-17', app: 'com.google.android.gm', ms: 120_000 },
+      { day: '2026-08-18', app: 'com.whatsapp', ms: 30_000 },
+      { day: '2026-08-19', app: 'com.google.android.gm', ms: 90_000 },
+    ]);
+    return j;
+  };
+
+  it('totals each day across every app', async () => {
+    const j = await seed();
+    expect(await j.msByDay('2026-08-17', '2026-08-19')).toEqual([
+      { day: '2026-08-17', ms: 180_000 },
+      { day: '2026-08-18', ms: 30_000 },
+      { day: '2026-08-19', ms: 90_000 },
+    ]);
+  });
+
+  it('honours the window rather than totalling everything it holds', async () => {
+    const j = await seed();
+    expect(await j.msByDay('2026-08-18', '2026-08-19')).toHaveLength(2);
+  });
+
+  it('ranks apps across a span, not within one day', async () => {
+    const j = await seed();
+    expect(await j.appTotals('2026-08-17', '2026-08-19', 2)).toEqual([
+      { app: 'com.google.android.gm', ms: 210_000 },
+      { app: 'com.whatsapp', ms: 90_000 },
+    ]);
+  });
+
+  it('returns only the timestamps of one kind, so pickups can be counted cheaply', async () => {
+    const j = await fresh();
+    await j.putEvents([
+      { at: 1000, kind: 'unlock', app: null },
+      { at: 2000, kind: 'foreground', app: 'com.whatsapp' },
+      { at: 3000, kind: 'unlock', app: null },
+      { at: 9000, kind: 'unlock', app: null },
+    ]);
+    expect(await j.timesOfKind('unlock', 0, 5000)).toEqual([1000, 3000]);
+  });
+});

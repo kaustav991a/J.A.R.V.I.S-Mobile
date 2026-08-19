@@ -51,7 +51,9 @@ import {
 } from '../lib/place';
 import type { TrailStep } from '../lib/place';
 import { buildAsk } from '../lib/ask';
-import type { AskWhere } from '../lib/ask';
+import type { AskUsage, AskWhere } from '../lib/ask';
+import { usageForAsk } from '../lib/journal/rollup';
+import { openJournal } from '../lib/journal/store';
 import { loadKnown, nameFor } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { COLOR } from '../theme/tokens';
@@ -406,8 +408,27 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         }
       }
 
+      /**
+       * How the phone has been used travels with the question, like the clock
+       * and the named places already do.
+       *
+       * A summary, never rows — the journal's raw events stay on the device.
+       * It is what turns "am I on my phone too much" from a question he has to
+       * answer himself into one J.A.R.V.I.S. can, and it costs a few hundred
+       * bytes on a message that already carries a coordinate and a forecast.
+       *
+       * Its failure is silent by design, exactly as location's is: a journal
+       * that cannot be read must never be the reason a message does not go.
+       */
+      let usage: AskUsage | null = null;
+      try {
+        usage = await usageForAsk(await openJournal(), Date.now());
+      } catch {
+        // no journal, no usage block, same question
+      }
+
       // the socket is the fast path; REST is what works when it is not open
-      if (link.send(buildAsk({ text: trimmed, known, where }))) return;
+      if (link.send(buildAsk({ text: trimmed, known, where, usage }))) return;
       if (demo && !connected) {
         dispatch({ type: 'frame', frame: demoReply(trimmed), at: Date.now() });
         return;

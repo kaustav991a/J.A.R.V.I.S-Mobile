@@ -60,6 +60,10 @@ jest.mock('../../lib/notify', () => ({
 
 jest.mock('../../lib/haptics', () => ({ haptic: { good: jest.fn() } }));
 
+jest.mock('../../lib/journal/rollup', () => ({
+  usageForAsk: async () => ({ today: 42, pickups: 7, top: ['Gmail'], usual: 60, days: 3 }),
+}));
+
 jest.mock('../chatStore', () => ({
   loadChat: jest.fn().mockResolvedValue([]),
   saveChat: jest.fn().mockResolvedValue(undefined),
@@ -194,5 +198,21 @@ describe('the desk-watch notification', () => {
     expect(posted).toBeDefined();
     expect(posted.data.alertWhenOpen).toBe(true);
     view.unmount();
+  });
+});
+
+/**
+ * How the phone has been used travels with the question, like the clock and the
+ * named places already do — a summary, never rows.
+ */
+describe('what a question carries', () => {
+  it('takes today usage with it, so an ordinary reply is already informed', async () => {
+    mockSend.mockReturnValue(true);
+    await sendAndSettle('am I on my phone too much');
+
+    const payload = JSON.parse(mockSend.mock.calls[0][0] as string);
+    expect(payload.usage).toEqual({ today: 42, pickups: 7, top: ['Gmail'], usual: 60, days: 3 });
+    // and the question itself is still the question
+    expect(payload.text).toBe('am I on my phone too much');
   });
 });

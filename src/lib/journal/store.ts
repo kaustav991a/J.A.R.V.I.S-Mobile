@@ -28,6 +28,9 @@ export type UsageEvent = { at: number; kind: EventKind; app: string | null };
  */
 export type DailyRow = { day: string; app: string; ms: number };
 
+/** one app's foreground time summed across a span of days */
+export type DailyAppTotal = { app: string; ms: number };
+
 /**
  * Two years, matching the longest window Android will serve.
  *
@@ -81,6 +84,12 @@ export type Journal = {
   putDaily(rows: DailyRow[]): Promise<number>;
   eventsBetween(from: number, to: number): Promise<UsageEvent[]>;
   dailyFor(day: string): Promise<DailyRow[]>;
+  /** total foreground time per day across every app, oldest first */
+  msByDay(from: string, to: string): Promise<{ day: string; ms: number }[]>;
+  /** the heaviest apps across a span of days, not within one of them */
+  appTotals(from: string, to: string, limit: number): Promise<DailyAppTotal[]>;
+  /** just the timestamps of one kind — counting 17,000 events in JS to find 280 is not a plan */
+  timesOfKind(kind: EventKind, from: number, to: number): Promise<number[]>;
   putLabels(map: Record<string, string>): Promise<void>;
   /** every package name this journal knows a real name for */
   allLabels(): Promise<Record<string, string>>;
@@ -217,6 +226,34 @@ async function build(name: string): Promise<Journal> {
      * resolving at display time would silently rename a year of history to
      * `com.something` the day you uninstall it. Written once and kept.
      */
+    async msByDay(from, to) {
+      return (await db.getAllAsync(
+        'SELECT day, SUM(ms) AS ms FROM daily WHERE day >= ? AND day <= ? GROUP BY day ORDER BY day ASC',
+        from,
+        to
+      )) as { day: string; ms: number }[];
+    },
+
+    async appTotals(from, to, limit) {
+      return (await db.getAllAsync(
+        `SELECT app, SUM(ms) AS ms FROM daily WHERE day >= ? AND day <= ?
+         GROUP BY app ORDER BY ms DESC LIMIT ?`,
+        from,
+        to,
+        limit
+      )) as DailyAppTotal[];
+    },
+
+    async timesOfKind(kind, from, to) {
+      const rows = (await db.getAllAsync(
+        'SELECT at FROM events WHERE kind = ? AND at >= ? AND at <= ? ORDER BY at ASC',
+        kind,
+        from,
+        to
+      )) as { at: number }[];
+      return rows.map((r) => r.at);
+    },
+
     async putLabels(map) {
       const rows = Object.entries(map);
       if (rows.length === 0) return;

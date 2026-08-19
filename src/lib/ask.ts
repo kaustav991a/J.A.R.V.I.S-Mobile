@@ -95,14 +95,16 @@ export function buildAsk(parts: {
   text: string;
   known: KnownForAsk[];
   where?: AskWhere | null;
+  usage?: AskUsage | null;
   now?: Date;
 }): string {
-  const { text, known, where } = parts;
+  const { text, known, where, usage } = parts;
   return JSON.stringify({
     type: 'ask',
     text,
     when: localClock(parts.now),
     known,
+    ...(usage ? { usage } : {}),
     ...(where
       ? {
           where: {
@@ -117,3 +119,33 @@ export function buildAsk(parts: {
       : {}),
   });
 }
+
+/**
+ * How this phone has been used, in the few figures worth carrying.
+ *
+ * Summary, never rows. The journal's raw events stay on the device — this is the
+ * same bargain the `where` block already makes with location: the phone does the
+ * measuring and sends a conclusion, so the gateway is informed without the
+ * gateway holding a life-log.
+ *
+ * Deliberately small. It rides on EVERY question, so a block that grew with the
+ * journal would quietly become the largest thing the socket carries and would
+ * push the actual conversation out of the model's attention.
+ */
+export type AskUsage = {
+  /** minutes on the phone so far today */
+  today: number;
+  /** and how many times it has been picked up */
+  pickups: number;
+  /** the day's heaviest apps, by their real names, heaviest first */
+  top: string[];
+  /**
+   * The usual daily minutes, averaged over the completed days before today, and
+   * null when there are none. Null rather than zero: on the first day there is
+   * no baseline, and a zero would invite "far more than usual" about a person
+   * nobody has watched yet.
+   */
+  usual: number | null;
+  /** how many completed days that average rests on */
+  days: number;
+};
