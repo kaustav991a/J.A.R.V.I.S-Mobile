@@ -82,12 +82,28 @@ CREATE INDEX events_at ON events (at);
 
 -- coarse per-day totals. Android keeps up to 2 years, so day one is not day zero.
 CREATE TABLE daily (
-  day      TEXT    NOT NULL,    -- YYYY-MM-DD, local
-  app      TEXT    NOT NULL,
-  ms       INTEGER NOT NULL,
-  launches INTEGER NOT NULL,
+  day TEXT    NOT NULL,         -- YYYY-MM-DD, local
+  app TEXT    NOT NULL,
+  ms  INTEGER NOT NULL,         -- totalTimeInForeground
   PRIMARY KEY (day, app)        -- upserted; the newest read wins
 );
+```
+
+**No launch count on `daily`, deliberately.** `UsageStats.mLaunchCount` is hidden
+API — there is no public getter, and reaching for it through reflection is
+exactly the kind of thing that works on one phone and returns zero on the next.
+A per-app launch count can be derived from `ACTIVITY_RESUMED` rows in `events`
+when one is wanted, which means it is only available for the window Android
+still holds events for. Honest and narrow beats broad and wrong.
+
+**This slice counts pickups, not launches.** A pickup is a `KEYGUARD_HIDDEN`
+event — the phone actually coming into your hand. An app arriving in the
+foreground while you are already looking at the screen is not a pickup, and
+counting those inflates the figure severalfold in the direction that sounds
+impressive. Per-app launch counts wait for the recall layer, which is the first
+piece with a reason to ask for them.
+
+```sql
 
 -- how far each source has been pulled, so a sync asks only for what is new
 CREATE TABLE sync (source TEXT PRIMARY KEY, through INTEGER NOT NULL);
