@@ -38,6 +38,24 @@ const BULLET = /^\s*[-*]\s+(.*)$/;
 const NUMBERED = /^\s*(\d{1,2}\.)\s+(.*)$/;
 
 /**
+ * The model writes a whole list on ONE line, separated by literal bullet glyphs.
+ *
+ * Seen on the device 2026-08-20, in the first reply this parser ever rendered:
+ *
+ *     • **10 mins**: Warm-up (dynamic stretches) • **35 mins**: Full-body
+ *     strength (bodyweight squats) • **15 mins**: Cardio & cool-down
+ *
+ * One line, three items. The markdown was read correctly — the bold came out
+ * bold — and the list still arrived as a paragraph, because `BULLET` only ever
+ * looks at the start of a line and a `•` in the middle of one is just text.
+ *
+ * So the glyph is treated as a separator wherever it appears. Splitting on it is
+ * safe in a way splitting on `-` or `*` would not be: `•` has no other use in
+ * prose, where a hyphen is punctuation and an asterisk is arithmetic.
+ */
+const GLYPH_LIST = /\s*[•·]\s+/;
+
+/**
  * Whether a delimiter at `i` can open a run.
  *
  * The rule that keeps `5*3` as arithmetic. An opener must be followed by
@@ -215,6 +233,31 @@ export function parseRich(text: string): Block[] {
 
     if (!line.trim()) {
       endPara();
+      i += 1;
+      continue;
+    }
+
+    /**
+     * A line carrying bullet glyphs is a list, however it was punctuated.
+     *
+     * Two or more, because one `•` mid-sentence is more likely to be someone
+     * quoting a character than writing a list, and a single-item list is not a
+     * list. Text before the first glyph is its own paragraph — the model writes
+     * "Here is the plan: • one • two", and the lead-in is a sentence.
+     */
+    if ((line.match(/[•·]\s+/g) ?? []).length >= 2) {
+      const parts = line.split(GLYPH_LIST);
+      const lead = (parts.shift() ?? '').trim();
+      if (lead) {
+        para.push(lead);
+        endPara();
+      } else {
+        endPara();
+      }
+      for (const part of parts) {
+        const body = part.trim();
+        if (body) blocks.push({ kind: 'bullet', marker: '•', spans: inline(body) });
+      }
       i += 1;
       continue;
     }

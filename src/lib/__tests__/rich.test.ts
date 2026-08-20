@@ -84,6 +84,46 @@ describe('the markdown the brain actually writes', () => {
     });
   });
 
+  /**
+   * The shape the model actually sent, and the first thing this parser got wrong
+   * on a real reply.
+   *
+   * Read off the device 2026-08-20: the whole list arrived on ONE line separated
+   * by literal bullet glyphs. The markdown was handled correctly — the bold came
+   * out bold — and the list still rendered as a paragraph, because `BULLET` only
+   * looks at the start of a line and a `•` mid-line is just text.
+   */
+  it('splits a list the model wrote on one line', () => {
+    const one = '• **10 mins**: Warm-up • **35 mins**: Strength • **15 mins**: Cardio';
+    const blocks = parseRich(one);
+    expect(blocks.map((b) => b.kind)).toEqual(['bullet', 'bullet', 'bullet']);
+    expect(blocks[0]).toEqual({
+      kind: 'bullet',
+      marker: '•',
+      spans: [{ text: '10 mins', bold: true }, { text: ': Warm-up' }],
+    });
+  });
+
+  it('keeps a lead-in sentence out of the list it introduces', () => {
+    const blocks = parseRich('Here is the plan, sir. • squats • press');
+    expect(blocks.map((b) => b.kind)).toEqual(['para', 'bullet', 'bullet']);
+    expect(blocks[0]).toEqual({ kind: 'para', spans: [{ text: 'Here is the plan, sir.' }] });
+  });
+
+  /**
+   * One glyph mid-sentence is more likely someone quoting a character than
+   * writing a list, and a one-item list is not a list.
+   */
+  it('leaves a single bullet glyph as prose', () => {
+    const blocks = parseRich('the separator is • in that font');
+    expect(blocks.map((b) => b.kind)).toEqual(['para']);
+  });
+
+  it('does not split a bullet glyph inside a fence', () => {
+    const blocks = parseRich('```\nchoices: • a • b\n```');
+    expect(blocks[0]).toEqual({ kind: 'code', text: 'choices: • a • b' });
+  });
+
   it('reads a fenced block as one unbroken piece of code', () => {
     const blocks = parseRich('Try:\n```\nadb shell dumpsys jobscheduler\n```');
     expect(blocks[0]).toMatchObject({ kind: 'para' });

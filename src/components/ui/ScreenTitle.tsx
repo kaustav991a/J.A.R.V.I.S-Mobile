@@ -9,6 +9,15 @@ export type ScreenTitleProps = {
   title: string;
   /** the small line under it, e.g. "5 SAVED" */
   caption?: string;
+  /**
+   * Leave the caption's own case alone.
+   *
+   * The default shouts, which is right for the labels this was built for —
+   * "100 TURNS", "4 SCRIPTS" — and wrong for a sentence. Chat's opening line went
+   * out uppercased on 2026-08-20 and read as a system alarm rather than as
+   * someone speaking, which is the opposite of what it is for.
+   */
+  captionCase?: 'upper' | 'as-written';
   /** shows the back chevron; defaults to whatever the stack can do */
   back?: boolean;
   /** an action at the right edge */
@@ -21,7 +30,14 @@ export type ScreenTitleProps = {
  * cannot reach. Headers are off across the app: a 14px centred header title
  * over a screen whose own content shouts is a hierarchy with two heads.
  */
-export function ScreenTitle({ title, caption, back, trailing, testID }: ScreenTitleProps) {
+export function ScreenTitle({
+  title,
+  caption,
+  captionCase = 'upper',
+  back,
+  trailing,
+  testID,
+}: ScreenTitleProps) {
   const nav = useNavigation();
   const showBack = back ?? nav.canGoBack();
 
@@ -45,7 +61,11 @@ export function ScreenTitle({ title, caption, back, trailing, testID }: ScreenTi
         </Text>
         <View style={styles.trailing}>{trailing}</View>
       </View>
-      {caption ? <Text style={styles.caption}>{caption.toUpperCase()}</Text> : null}
+      {caption ? (
+        <Text style={[styles.caption, captionCase === 'as-written' && styles.captionSentence]}>
+          {captionCase === 'as-written' ? caption : caption.toUpperCase()}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -57,4 +77,7 @@ const styles = StyleSheet.create({
   title: { ...TYPE.wordmark, fontSize: 22, letterSpacing: 3, color: COLOR.white, flex: 1 },
   trailing: { marginLeft: SPACE.md },
   caption: { ...TYPE.dataLabel, color: COLOR.dim, letterSpacing: 1.5, marginTop: SPACE.sm },
+  // A label can afford wide tracking; a sentence cannot. At 1.5 the line wrapped
+  // to two on a 6-inch phone and read as spaced-out signage rather than prose.
+  captionSentence: { letterSpacing: 0.2, fontSize: 11, lineHeight: 16 },
 });

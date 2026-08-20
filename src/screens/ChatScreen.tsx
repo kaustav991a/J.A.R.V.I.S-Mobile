@@ -566,6 +566,8 @@ export function ChatScreen() {
           */}
           <ScreenTitle
             title="CHAT"
+            // it is prose, not a label — see `captionCase`
+            captionCase="as-written"
             caption={situationLine({
               now: minute,
               // `lan` is the desk. Mapped here rather than in `situation.ts`,
