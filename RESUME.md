@@ -35,9 +35,25 @@ this uid has none in the background. The app is the only thing that can unblock
 its own briefing. The fix is a gateway push, and **all four steps are now built**
 — endpoint, scheduler, server-side forecast, quiet gap.
 
-**None of it has been run against Python.** The briefing is code, not a proved
-feature. The honest order from here: `run_harnesses.py` on the desk, deploy,
-then one evening with the phone untouched.
+**The gateway is deployed and its logic is checked; the delivery is not proved.**
+All 38 pure-function checks passed against a standalone copy on 2026-08-20 —
+fire window, once-a-day guard, wording, midnight wrap — and `/health` answers
+with a `commute` block, so the running build is the fixed one. What has never
+happened is a briefing actually arriving.
+
+The OTA is published (runtime `ff3e7ae81ec0bea0`, group
+`ad5740a1-4f54-4837-b71b-721d4746a925`). The phone uploads its schedule only
+once that bundle is running AND the Places screen has been touched, so until
+`/health` shows `commute.departures` non-zero the gateway has nothing to send.
+
+Honest order from here: open the app and apply the update, touch Places, confirm
+`/health`, then one evening with the phone untouched. `run_harnesses.py` on the
+desk is still owed — the standalone check covered logic, not the harness files or
+the `/app-commute` route tests.
+
+**Known and deliberate:** the window label prints whole hours, so a 6:30 PM
+departure reads `(6 PM–9 PM)`. Inherited from `hourLabel(d.hour)`, which ignores
+minutes. Left matched on both sides rather than fixed on one.
 
 
 Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 and
