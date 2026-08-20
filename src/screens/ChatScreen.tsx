@@ -17,6 +17,7 @@ import { Touchable } from '../components/ui/Touchable';
 import { Glass } from '../components/ui/Glass';
 import { useToast } from '../components/ui/Toast';
 import { RichText } from '../components/ui/RichText';
+import { useReveal } from '../components/ui/useReveal';
 import { plainText } from '../lib/rich';
 import { CHROME, COLOR, RADIUS, SCRIM, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
@@ -645,7 +646,15 @@ export function ChatScreen() {
             // output rather than something J.A.R.V.I.S. said.
             renderItem={({ item, index }) => (
               <>
-                <Bubble entry={item} accent={accent} />
+                {/* Only the newest thing HE said is paced, and only while the tab is
+                    open. Index 0 is the newest turn — the list is inverted — and
+                    `animations` is the existing switch for exactly this kind of
+                    thing, so turning it off shows every reply whole. */}
+                <Bubble
+                  entry={item}
+                  accent={accent}
+                  reveal={index === 0 && item.from === 'jarvis' && animations && focused}
+                />
                 {/* The rule goes on the *oldest* turn of each day — a later index
                     is an older turn, so the boundary is where the next index is a
                     different day.
@@ -752,8 +761,27 @@ function SentPhoto({ uri }: { uri: string }) {
   );
 }
 
-function Bubble({ entry, accent, onPress }: { entry: ChatEntry; accent: string; onPress?: () => void }) {
+function Bubble({
+  entry,
+  accent,
+  onPress,
+  reveal = false,
+}: {
+  entry: ChatEntry;
+  accent: string;
+  onPress?: () => void;
+  /**
+   * Pace this reply on screen.
+   *
+   * True for the newest thing he has said and nothing else. Revealing an old turn
+   * would mean the conversation retyping itself every time the list scrolled, and
+   * revealing your own message would be the app pretending to think about what you
+   * had just typed.
+   */
+  reveal?: boolean;
+}) {
   const mine = entry.from === 'user';
+  const shown = useReveal(entry.text, reveal);
   return (
     <Touchable
       testID={`turn-${entry.at}`}
@@ -767,6 +795,9 @@ function Bubble({ entry, accent, onPress }: { entry: ChatEntry; accent: string; 
        * the marks are not speakable at all. `plainText` is the same content with
        * the punctuation taken out.
        */
+      // `entry.text`, not the revealed prefix: a screen reader must be given the
+      // answer, not a stopwatch. Reading a growing string aloud would announce the
+      // same sentence forty times.
       accessibilityLabel={`${mine ? 'You' : 'Jarvis'}: ${plainText(entry.text)}`}
       onPress={onPress}
       sink={onPress ? 0.01 : 0}
@@ -787,7 +818,7 @@ function Bubble({ entry, accent, onPress }: { entry: ChatEntry; accent: string; 
           same. Telling the persona "no markdown" would fight a habit the model
           keeps reaching for and throw away structure that is genuinely there.
         */}
-        <RichText text={entry.text} style={[styles.text, mine ? styles.textMine : null]} />
+        <RichText text={shown} style={[styles.text, mine ? styles.textMine : null]} />
       </View>
       <Text style={styles.time}>{`${mine ? 'You' : 'Jarvis'} · ${clock(entry.at)}`}</Text>
     </Touchable>
