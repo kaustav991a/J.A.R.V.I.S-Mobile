@@ -10,7 +10,24 @@ export type { TraceEntry, ParkedAction } from './types';
 const TRACE_CAP = 50;
 const CHAT_CAP = 100;
 
-export type ChatEntry = { from: 'jarvis' | 'user'; text: string; at: number };
+export type ChatEntry = {
+  from: 'jarvis' | 'user';
+  text: string;
+  at: number;
+  /**
+   * A local `file://` uri for a photo this turn sent.
+   *
+   * Optional and absent rather than undefined on an ordinary turn: the chat is
+   * persisted, and a key that means nothing would round-trip on every entry ever
+   * written.
+   *
+   * It can also stop resolving. The uri points into the app's cache, which
+   * Android is entitled to clear, so anything rendering this needs a fallback for
+   * a picture that is simply no longer there — the record of *having sent one*
+   * survives in `text` either way.
+   */
+  image?: string;
+};
 
 /**
  * A live desk-watch alert. At most one: the desk locks itself when the window
@@ -55,7 +72,7 @@ export type HudState = {
 
 export type HudAction =
   | { type: 'frame'; frame: JarvisFrame; at: number }
-  | { type: 'local_command'; text: string; at: number }
+  | { type: 'local_command'; text: string; at: number; image?: string }
   | { type: 'resolving'; id: string }
   | { type: 'resolved_local'; id: string }
   | { type: 'intruder_resolving'; id: string }
@@ -277,7 +294,20 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
     case 'local_command':
       return {
         ...state,
-        chat: cap([...state.chat, { from: 'user' as const, text: action.text, at: action.at }], CHAT_CAP),
+        chat: cap(
+          [
+            ...state.chat,
+            {
+              from: 'user' as const,
+              text: action.text,
+              at: action.at,
+              // spread rather than `image: action.image`, so a typed command's
+              // entry has no such key at all — see the note on `ChatEntry.image`
+              ...(action.image ? { image: action.image } : {}),
+            },
+          ],
+          CHAT_CAP
+        ),
       };
     case 'resolving':
       return {

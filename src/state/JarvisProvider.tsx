@@ -554,7 +554,15 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   const sendPhoto = useCallback(
     async (shot: { base64: string; uri: string }, caption: string) => {
       const said = caption.trim();
-      dispatch({ type: 'local_command', text: said ? `📷 ${said}` : '📷 Photo', at: Date.now() });
+      // The uri travels with it so the bubble can show the picture rather than the
+      // word "Photo". It was already in hand — `takeShot` returns both halves and
+      // only the base64 was ever used.
+      dispatch({
+        type: 'local_command',
+        text: said ? `📷 ${said}` : '📷 Photo',
+        at: Date.now(),
+        image: shot.uri,
+      });
       // waits for the socket: the camera it just came back from is exactly what
       // takes the socket away
       return sendWhenOpen(JSON.stringify({ type: 'photo', image: shot.base64, text: said }));

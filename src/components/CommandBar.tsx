@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,33 @@ import { CANCEL_SLIDE_PX, LOCK_SLIDE_PX } from '../lib/voice';
 
 export type CommandBarProps = {
   onSubmit: (text: string) => void;
+  /**
+   * Something staged above the field — today, a photo waiting to be sent.
+   *
+   * Rendered inside this component rather than beside it so the draft and the
+   * caption box are visibly one thing. A preview floating above a separate bar
+   * reads as a notification about a photo, not as a photo you are writing about.
+   */
+  attachment?: ReactNode;
+  /**
+   * Let SEND fire with nothing typed.
+   *
+   * Only true when something is attached, and it is what keeps the fast path
+   * open: a photo with no caption is still the common case, and if the change
+   * that added captions also made a caption compulsory, people would go back to
+   * not sending photos.
+   */
+  allowEmptySubmit?: boolean;
+  /**
+   * Text to put back into the field, once.
+   *
+   * This bar owns its field and clears it on submit, which is right for every
+   * other send. A photo whose send failed is the one case where the caption has
+   * to survive having been submitted — losing a typed question to a dropped
+   * socket would be worse than the immediate send it replaced.
+   */
+  restoreText?: string | null;
+  onRestored?: () => void;
   /** tapping the mic, where there is nothing to hold — e.g. a screen with no recorder */
   onVoice?: () => void;
   /**
@@ -65,14 +93,32 @@ export function CommandBar({
   placeholder = 'Speak or type…',
   leadingIcon,
   onCamera,
+  attachment,
+  allowEmptySubmit = false,
+  restoreText,
+  onRestored,
 }: CommandBarProps) {
   const [text, setText] = useState('');
-  const hasText = text.trim().length > 0;
+
+  /**
+   * Put a caption back after a failed send.
+   *
+   * `onRestored` fires so the owner can drop it — without that the effect would
+   * re-fill the field on every render that followed, and typing over it would be
+   * undone a keystroke later.
+   */
+  useEffect(() => {
+    if (restoreText === null || restoreText === undefined) return;
+    setText(restoreText);
+    onRestored?.();
+  }, [restoreText, onRestored]);
+  const hasText = text.trim().length > 0 || allowEmptySubmit;
   const holdToTalk = Boolean(onVoiceStart && onVoiceEnd);
 
   const submit = () => {
     const trimmed = text.trim();
-    if (disabled || !trimmed) return;
+    if (disabled) return;
+    if (!trimmed && !allowEmptySubmit) return;
     onSubmit(trimmed);
     setText('');
     // Sending from the return key blurs the field on its own — that is the
@@ -143,7 +189,15 @@ export function CommandBar({
    * guarantee that: React matches keyed children across renders regardless of how
    * many siblings appear or vanish beside them.
    */
-  return (
+  /**
+   * With something attached, the bar grows a row above itself.
+   *
+   * Wrapped only when there IS an attachment, so every other screen keeps the
+   * element tree it had — the row's children are matched by key across renders
+   * and an unconditional wrapper would remount the mic on screens that never
+   * attach anything.
+   */
+  const row = (
     <View style={[styles.bar, disabled && styles.disabled, recordingNow && styles.recording]}>
       {recordingNow && voice ? (
         <VoiceBar
@@ -251,9 +305,18 @@ export function CommandBar({
       )}
     </View>
   );
+
+  if (!attachment) return row;
+  return (
+    <View style={styles.stacked}>
+      {attachment}
+      {row}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  stacked: { alignSelf: 'stretch' },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
