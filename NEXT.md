@@ -1,4 +1,4 @@
-# What to build next
+now should # What to build next
 
 > Written 2026-08-19. Ordered by what is worth doing, not by size.
 > `RESUME.md` is the state of the world; this is the queue.
@@ -48,6 +48,58 @@ it currently says neither, so this needs a protocol addition on both sides:
 
 `ChatEntry` then grows a state, and the chat renders ticks. Do this as its own
 piece — it is the largest thing on this list.
+
+### 4a. Markdown arrives as literal asterisks — **OTA**
+
+Seen on the device 2026-08-20, in a reply from 08:29 that had been sitting in the
+chat unremarked:
+
+    • **10 mins**: Warm-up (dynamic stretches, jumping jacks)
+    • **35 mins**: Full-body strength (bodyweight squats, dumbbell press)
+
+The model writes markdown and the bubble is a plain `<Text>` —
+`ChatScreen.tsx:588`, `{entry.text}` straight through. So every list, every bold
+figure and every bit of code the brain emits arrives with its punctuation showing.
+
+**Render it; do not strip it.** Two options and the choice is not close. Telling
+the persona "no markdown" fights a habit the model will keep reaching for, and it
+throws away the structure that makes a workout list or a set of steps readable —
+the asterisks are ugly, but the thing they mark up is genuinely a list. Rendering
+keeps the meaning and fixes the appearance.
+
+**A deliberately small subset**, because a full markdown engine in a chat bubble
+is a dependency and a new class of layout bug:
+
+- `**bold**` and `*italic*`
+- `` `code` `` inline, monospace, and fenced blocks — the brain quotes commands
+- `- ` and `* ` and `1. ` bullets, one level, no nesting
+- nothing else. No tables, no links, no headings, no images. If one turns up
+  looking bad, add it then.
+
+Where it goes: one `<RichText>` in `src/components/ui/` that parses to
+`<Text>` spans, replacing line 588. Nothing else in the app needs it, and keeping
+it out of `Atoms.tsx` keeps a chat concern from becoming a global one.
+
+**Worth getting right, because a naive parser gets these wrong:**
+
+- **Do not break the accessibility label.** `ChatScreen.tsx:577` reads
+  `entry.text` for the screen reader. It should keep reading the *plain* text, not
+  the marked-up source and not the parsed tree.
+- **Selection must survive.** The bubble is selectable today; a tree of nested
+  `<Text>` keeps that only if the parent stays one `<Text>`, not a `<View>` of
+  `<Text>`s.
+- **Unmatched punctuation is not markup.** "5*3" and "he said *what*" and a lone
+  trailing asterisk all have to come out as themselves. A greedy regex turns
+  arithmetic into italics.
+- **A fenced block must scroll horizontally**, not wrap a command across four
+  lines and not push the bubble past the screen.
+- **The typing indicator and `TypeLine` feed the same string.** Whatever parses
+  has to tolerate a half-arrived token without throwing on every frame.
+
+Cheap, visible, and it makes every list the brain has ever sent readable
+retroactively — the chat re-renders from stored text.
+
+---
 
 ---
 

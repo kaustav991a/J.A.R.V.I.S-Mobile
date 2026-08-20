@@ -188,6 +188,13 @@ the gateway; all of it is presentation the phone already has the data for.
      history already stores a text stand-in (`[sent a photo] <caption>`) for the
      model's benefit; what the operator sees should be the picture.
 
+     Asked for directly on 2026-08-20, with a better reason than the aesthetic
+     one: **a reply about a photo cannot be judged without the photo.** Verifying
+     the `<think>` fix that day meant screenshotting the chat, and the bubble
+     said only "Photo" — so the answer could be read but not checked against what
+     had been sent. The word "Photo" is not a record of anything. This is the
+     part of §4b that pays for itself outside the moment of sending.
+
    *Touches:* `src/screens/ChatScreen.tsx`, the compose bar, and whatever holds
    the pending attachment. No native change, so it ships over the air.
 
