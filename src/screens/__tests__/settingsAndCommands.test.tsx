@@ -20,6 +20,8 @@ jest.mock('@react-navigation/native', () => ({
     const cleanup = cb();
     return cleanup;
   },
+  // Chat only ticks its clock while focused, so the stub has to answer this.
+  useIsFocused: () => true,
   useNavigation: () => ({
     navigate: mockNavigate,
     goBack: jest.fn(),

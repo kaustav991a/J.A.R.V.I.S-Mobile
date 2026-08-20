@@ -190,12 +190,18 @@ export function CommandBar({
    * many siblings appear or vanish beside them.
    */
   /**
-   * With something attached, the bar grows a row above itself.
+   * The bar itself, always inside the same wrapper.
    *
-   * Wrapped only when there IS an attachment, so every other screen keeps the
-   * element tree it had — the row's children are matched by key across renders
-   * and an unconditional wrapper would remount the mic on screens that never
-   * attach anything.
+   * The wrapper is unconditional and that is deliberate, having first been
+   * written the other way round. Returning the bare row when nothing is attached
+   * and a wrapped row when something is changes the element at the root, so React
+   * reconciles the old bar's children — the field, the mic, the send — against
+   * the new wrapper's, finds nothing matching, and remounts the lot. Attaching a
+   * photo would have torn down and rebuilt the text field it sits above, taking
+   * focus with it.
+   *
+   * Constant shape instead: `attachment` is a child that goes from null to an
+   * element, which mounts one thing and leaves the row alone.
    */
   const row = (
     <View style={[styles.bar, disabled && styles.disabled, recordingNow && styles.recording]}>
@@ -306,7 +312,6 @@ export function CommandBar({
     </View>
   );
 
-  if (!attachment) return row;
   return (
     <View style={styles.stacked}>
       {attachment}

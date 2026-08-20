@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommandBar } from '../components/CommandBar';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
@@ -131,21 +131,6 @@ export function ChatScreen() {
    * arrives while the chat is open has been seen, so leaving must not leave it
    * counted as unread.
    */
-  // Read on focus rather than on mount: the Places screen can change it while
-  // this screen stays alive behind the tab bar, and a line promising a briefing
-  // that was switched off an hour ago is worse than no line.
-  useFocusEffect(
-    useCallback(() => {
-      let alive = true;
-      void dueToday(new Date()).then((d) => {
-        if (alive) setNextBriefing(d);
-      });
-      return () => {
-        alive = false;
-      };
-    }, [])
-  );
-
   useFocusEffect(
     useCallback(() => {
       setChatFocused(true);
@@ -180,15 +165,55 @@ export function ChatScreen() {
    * wakeups for no visible difference.
    */
   const [minute, setMinute] = useState(() => new Date());
+  /**
+   * Only while the screen is actually being looked at.
+   *
+   * This screen stays mounted behind the tab bar for the life of the app, so an
+   * unconditional timer is a wakeup a minute forever for a line nobody can see —
+   * on a phone that is also holding a socket and a journal. Gating on focus
+   * costs one render when the tab is opened and nothing at all in between.
+   *
+   * The date is re-read on focus too, so coming back to a stale clock shows the
+   * right time immediately rather than at the next boundary.
+   */
+  const focused = useIsFocused();
   useEffect(() => {
+    if (!focused) return;
+    setMinute(new Date());
+  }, [focused]);
+  useEffect(() => {
+    if (!focused) return;
     const t = setTimeout(() => setMinute(new Date()), msToNextMinute());
     return () => clearTimeout(t);
     // re-armed by its own result: one timeout aimed at the next boundary keeps the
     // clock honest, where a 60s interval drifts away from it
-  }, [minute]);
+  }, [minute, focused]);
 
   /** the next briefing owed today, so he can mention it before it happens */
   const [nextBriefing, setNextBriefing] = useState<{ hour: number; minute: number; label: string } | null>(null);
+
+  /**
+   * Read on focus rather than on mount: the Places screen can change the schedule
+   * while this screen stays alive behind the tab bar, and a line promising a
+   * briefing that was switched off an hour ago is worse than no line.
+   *
+   * Placed directly under the state it writes, which is not merely tidy — it sat
+   * seventy lines ABOVE it at first. React defers a focus callback to an effect so
+   * the setter is assigned by the time it runs, and it worked; a test that invokes
+   * the callback during render hit the temporal dead zone and said so. The order
+   * was wrong either way, and only the harness was in a position to notice.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void dueToday(new Date()).then((d) => {
+        if (alive) setNextBriefing(d);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
 
   /** a photo taken and not yet sent. Null is the ordinary state of this screen. */
   const [draft, setDraft] = useState<{ base64: string; uri: string } | null>(null);
