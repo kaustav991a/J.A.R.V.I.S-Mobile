@@ -237,7 +237,20 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     }
     const fix = await currentFix();
     if (!fix) return;
-    setPlace(fix.place || `${fix.lat.toFixed(3)}, ${fix.lon.toFixed(3)}`);
+    /**
+     * A named place wins over whatever the geocoder called the neighbourhood.
+     *
+     * `nameFor` existed for exactly this and was only being used for the context
+     * sent with an ask (see `label` below). The state every screen reads went on
+     * showing the raw area, so standing in the office produced "Bidhannagar, West
+     * Bengal" — three words of administrative geography where the app already knew
+     * the answer was "Office".
+     *
+     * Noticed once the chat began saying this out loud rather than printing it in
+     * a corner: a status line can afford to be vague, a sentence cannot.
+     */
+    const known = nameFor(fix, await loadKnown());
+    setPlace(known || fix.place || `${fix.lat.toFixed(3)}, ${fix.lon.toFixed(3)}`);
     void rememberPlace(fix);
   }, [shareLocation]);
 

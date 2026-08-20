@@ -88,8 +88,17 @@ export function situationLine(s: Situation): string {
   // Three at most. Past that it stops being someone speaking and becomes a
   // panel, and Home is where panels live.
   const said = clauses.slice(0, 3);
-  const last = said.pop();
-  return said.length
-    ? `${clock}, sir. ${said.join(', ')} and ${last}.`
-    : `${clock}, sir. ${(last ?? '').charAt(0).toUpperCase()}${(last ?? '').slice(1)}.`;
+  const last = said.pop() ?? '';
+  const sentence = said.length ? `${said.join(', ')} and ${last}` : last;
+
+  /**
+   * A sentence begins with a capital, and this one did not.
+   *
+   * Read off the device: "3:20 PM, sir. you are at Bidhannagar…". The clauses are
+   * written lower-case because most of them are joined mid-sentence, and only the
+   * single-clause branch was capitalising — so the two-clause case shipped with a
+   * lower-case letter after a full stop. Done once, here, rather than at each
+   * \`clauses.push\`, which is where it would be forgotten next time.
+   */
+  return `${clock}, sir. ${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`;
 }

@@ -44,6 +44,33 @@ describe('the line the chat opens with', () => {
     expect(said).not.toContain('!');
   });
 
+  /**
+   * Read off the device 2026-08-20: "3:20 PM, sir. you are at Bidhannagar…".
+   *
+   * The clauses are written lower-case because most of them are joined
+   * mid-sentence, and only the single-clause branch was capitalising — so the
+   * two-clause case shipped with a lower-case letter after a full stop.
+   */
+  it('starts its sentence with a capital, however many clauses there are', () => {
+    const two = situationLine({
+      now: at(15, 20),
+      mode: 'cloud',
+      connected: true,
+      place: 'Bidhannagar',
+      briefing: { hour: 19, minute: 0, label: 'Office' },
+    });
+    expect(two).toBe('3:20 PM, sir. You are at Bidhannagar and Office briefing at 7:00 PM.');
+
+    const one = situationLine({
+      now: at(15, 20),
+      mode: 'cloud',
+      connected: true,
+      place: 'Bidhannagar',
+      briefing: null,
+    });
+    expect(one).toBe('3:20 PM, sir. You are at Bidhannagar.');
+  });
+
   it('names where he thinks you are, when he knows', () => {
     const said = situationLine({ now: at(9), mode: 'cloud', connected: true, place: 'Office', briefing: null });
     expect(said).toContain('Office');
