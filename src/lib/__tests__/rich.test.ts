@@ -75,6 +75,31 @@ describe('the markdown the brain actually writes', () => {
     expect(blocks.map((b) => (b.kind === 'bullet' ? b.marker : null))).toEqual(['•', '•', '1.']);
   });
 
+  /**
+   * The shape the model ACTUALLY sends, and the one that shipped broken.
+   *
+   * Read off the device 2026-08-20 after the first attempt at this: the glyph,
+   * one per line. `BULLET` matched `-` and `*` only, so every line fell through
+   * to the paragraph branch and the items were joined back into prose. The bold
+   * rendered correctly the whole time, which is what made it look like a styling
+   * problem and sent the first fix to the wrong place.
+   */
+  it('reads a glyph bullet at the start of a line', () => {
+    const real = [
+      'A balanced routine is ideal, Sir.',
+      '• **10 mins**: Warm-up',
+      '• **35 mins**: Strength',
+      '• **15 mins**: Cardio',
+    ].join('\n');
+    const blocks = parseRich(real);
+    expect(blocks.map((b) => b.kind)).toEqual(['para', 'bullet', 'bullet', 'bullet']);
+    expect(blocks[1]).toEqual({
+      kind: 'bullet',
+      marker: '•',
+      spans: [{ text: '10 mins', bold: true }, { text: ': Warm-up' }],
+    });
+  });
+
   it('keeps bold inside a bullet', () => {
     const blocks = parseRich('- **10 mins**: warm-up');
     expect(blocks[0]).toEqual({

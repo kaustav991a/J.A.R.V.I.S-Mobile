@@ -34,7 +34,26 @@ export type Block =
   | { kind: 'code'; text: string };
 
 const FENCE = /^\s*```/;
-const BULLET = /^\s*[-*]\s+(.*)$/;
+/**
+ * A bullet at the start of a line — and `•` belongs here, which it did not.
+ *
+ * This matched `-` and `*` only, because those are what markdown documents use.
+ * The model does not write markdown bullets. Measured on the device 2026-08-20,
+ * it emits the GLYPH, one per line:
+ *
+ *     • **10 mins**: Warm-up (dynamic stretches, jumping jacks)
+ *     • **35 mins**: Full-body strength (bodyweight squats)
+ *
+ * so every line fell through to the paragraph branch and the three items were
+ * joined back into one block of prose. The bold rendered correctly throughout,
+ * which is exactly what made this look like a styling problem rather than a
+ * parsing one — and why the first fix went to the wrong place.
+ *
+ * The inline split further down handles the other shape the model uses, the whole
+ * list on a single line, and needs two glyphs to fire — so it could never have
+ * caught this. Both shapes are real and neither subsumes the other.
+ */
+const BULLET = /^\s*[-*•·]\s+(.*)$/;
 const NUMBERED = /^\s*(\d{1,2}\.)\s+(.*)$/;
 
 /**
@@ -213,6 +232,35 @@ export function parseRich(text: string): Block[] {
       continue;
     }
 
+    /**
+     * A line carrying SEVERAL bullet glyphs is a whole list on one line.
+     *
+     * Checked before `BULLET`, and the order is the fix rather than an
+     * arrangement: once `BULLET` learned to match `•` it claimed such a line
+     * whole, turning three items into one bullet whose text contained the other
+     * two. First branch to match wins, so the more specific shape has to be
+     * asked about first.
+     *
+     * Two or more, because one `•` mid-sentence is more likely someone quoting a
+     * character than writing a list, and a one-item list is not a list. Text
+     * before the first glyph stays its own paragraph — the model writes "Here is
+     * the plan: • one • two", and the lead-in is a sentence.
+     */
+    if ((line.match(/[•·]\s+/g) ?? []).length >= 2) {
+      const parts = line.split(GLYPH_LIST);
+      const lead = (parts.shift() ?? '').trim();
+      if (lead) {
+        para.push(lead);
+      }
+      endPara();
+      for (const part of parts) {
+        const body = part.trim();
+        if (body) blocks.push({ kind: 'bullet', marker: '•', spans: inline(body) });
+      }
+      i += 1;
+      continue;
+    }
+
     const numbered = NUMBERED.exec(line);
     if (numbered) {
       endPara();
@@ -233,31 +281,6 @@ export function parseRich(text: string): Block[] {
 
     if (!line.trim()) {
       endPara();
-      i += 1;
-      continue;
-    }
-
-    /**
-     * A line carrying bullet glyphs is a list, however it was punctuated.
-     *
-     * Two or more, because one `•` mid-sentence is more likely to be someone
-     * quoting a character than writing a list, and a single-item list is not a
-     * list. Text before the first glyph is its own paragraph — the model writes
-     * "Here is the plan: • one • two", and the lead-in is a sentence.
-     */
-    if ((line.match(/[•·]\s+/g) ?? []).length >= 2) {
-      const parts = line.split(GLYPH_LIST);
-      const lead = (parts.shift() ?? '').trim();
-      if (lead) {
-        para.push(lead);
-        endPara();
-      } else {
-        endPara();
-      }
-      for (const part of parts) {
-        const body = part.trim();
-        if (body) blocks.push({ kind: 'bullet', marker: '•', spans: inline(body) });
-      }
       i += 1;
       continue;
     }
