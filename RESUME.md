@@ -1,31 +1,50 @@
 # Resume point — jarvis-mobile
 
-## 🏠 READ THIS FIRST — 2026-08-20, 5:30 PM. OTA applied; a gateway bug found.
+## 🏠 READ THIS FIRST — 2026-08-20, 6:35 PM
 
-The OTA is on the device and the gateway can finally see it. `/health`:
-`memory.ready: true`, `facts_known: 16`, `apps_linked: 1`, `push_targets: 1`,
-`commute: {tz: Asia/Calcutta, departures: 1, days_on: 5}`.
+`npm test` (684, 55 suites) and `npm run typecheck` both clean on the laptop this
+evening. **No app code changed today** — the day's work was two gateway fixes and
+the docs. `NEXT.md` was rewritten: four of its items had shipped and its first line
+was corrupted.
 
-**The first push-delivered briefing is due tonight, 7:00–7:20 PM.** Office
-coordinates are confirmed — the place was named while standing in the office.
-UptimeRobot now pings `/health` every 5 minutes, which is what stops the free
-tier sleeping through the fire window.
+### Tonight, and nothing is needed for it
 
-Nothing in this repo changed. Two things landed elsewhere:
+**The first push-delivered briefing is due 7:00–7:20 PM.** The gateway is armed:
+`push_targets: 1`, `commute: {tz: Asia/Calcutta, departures: 1, days_on: 5}`.
+Office coordinates are confirmed — the place was named while standing in the
+office. UptimeRobot pings `/health` every 5 minutes so the free tier cannot sleep
+through the window. It arrives as a notification; the Render log carries
+`[CLOUD] briefing pushed for Office (2026-08-20)` either way.
 
-- **A gateway bug, fixed and unrun.** A photo replied with
-  `[[LOOKUP: Royal Enfield Hunter 350 mileage ARAI real world]]` — the marker
-  itself. `see()` never had `think()`'s post-processing. See `jarvis-brain`'s
-  RESUME for the whole of it; the desk owes
-  `run_harnesses.py` (81 + 4 + 8 + **17 new**).
-- **A spec, awaiting review:**
-  `docs/superpowers/specs/2026-08-20-declared-rules-design.md`. Declared rules —
-  "tell me if I haven't called mom by 7", and "when I open Swiggy tell me what I
-  can eat". Ships over the air, no native module. Read it before it becomes a
-  plan.
+### What happened elsewhere today
 
-`npm test` (684, 55 suites) and `npm run typecheck` were both run on the laptop
-this evening and are clean.
+- **A photo replied with `[[LOOKUP: …]]`** — the marker itself, not an answer.
+  `see()` never had `think()`'s post-processing while using the persona that
+  teaches the marker. Fixed with a shared `_resolve_markers()`, deployed, and
+  **confirmed working on the device**.
+- **A deploy disarmed the briefing, twice.** Render wipes the disk on every
+  *deploy*, not every restart, and the schedule and push addresses were files. The
+  recovery this repo already has (`JarvisProvider.tsx:756`) is gated on
+  `link.status === 'open'` — and a photo answers over plain HTTP, so the app looked
+  connected while the gateway could reach nobody. Now in Postgres, on branch
+  `fix/durable-state`, **not merged**: pushing it would have wiped the state it
+  protects 25 minutes before the window.
+
+Both are `jarvis-brain`; read its RESUME for the detail. The desk owes
+`run_harnesses.py` — **81 + 4 + 8 + 17 + 17**, and none of it has ever run.
+
+### Next, and the queue is in `NEXT.md`
+
+**Declared rules** — spec at
+`docs/superpowers/specs/2026-08-20-declared-rules-design.md`, awaiting review.
+"Tell me if I haven't called mom by 7" (a clock question, so the gateway owns it)
+and "when I open Swiggy tell me what I can eat" (a phone question, carried by the
+background task that already runs). He asks rather than asserts, and stale state
+produces silence. Ships over the air, no native module.
+
+**Omnipresence** was asked for and is its own track — notification listener, SMS
+receiver, foreground service, accessibility. See `NEXT.md`. It is a data-handling
+problem before it is an Android one, and the `APP_TOKEN` split comes first.
 
 ---
 
