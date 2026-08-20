@@ -60,6 +60,8 @@ import type { AskUsage, AskWhere } from '../lib/ask';
 import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { loadKnown, nameFor } from '../lib/knownPlaces';
+import { loadCommute } from '../lib/commute';
+import { commutePayload } from '../lib/commuteSync';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { openChat } from '../navigation/RootNavigator';
 import { COLOR } from '../theme/tokens';
@@ -150,6 +152,15 @@ export type JarvisContextValue = {
   place: string | null;
   /** take a fresh fix — called when Home comes into focus */
   refreshPlace: () => Promise<void>;
+  /**
+   * Hand the gateway the commute schedule, so the briefing can be pushed.
+   *
+   * Called on every cloud connect and after every edit on the Places screen.
+   * Idempotent by design — it replaces what the gateway holds — because Render's
+   * free disk is wiped on redeploy and a "send it once" guard would leave the
+   * gateway briefing on a schedule the phone had already changed.
+   */
+  syncCommute: () => Promise<void>;
   /** stand-in desk, for showing the app with no machine to talk to */
   demo: boolean;
   setDemo: (on: boolean) => void;
@@ -692,6 +703,40 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    * does not serve the route yet answers 404, which is not something to put in
    * front of the user, and the next connect tries again.
    */
+  /**
+   * Send the gateway the schedule it needs to push a briefing.
+   *
+   * The phone resolves the coordinates before sending, because `KnownPlace` only
+   * exists here — see `commutePayload`, which also decides that a departure
+   * switched off travels as an absence rather than as a flag.
+   *
+   * Silent on failure and deliberately so: this is a best-effort mirror of a
+   * setting whose authority is the phone. A failed sync costs one stale schedule
+   * until the next connect, and there is no screen this could report to that is
+   * not already showing the setting itself.
+   */
+  const syncCommute = useCallback(async () => {
+    if (simulated) return;
+    try {
+      await api.syncCommute(commutePayload(await loadCommute(), await loadKnown()));
+    } catch {
+      // the next connect re-sends it
+    }
+  }, [api, simulated]);
+
+  /**
+   * Mirror the schedule on every cloud connect.
+   *
+   * Same reasoning as the push registration below, and the same recovery: the
+   * gateway loses its state on redeploy, and the phone is the authority. Sending
+   * on connect means a wiped gateway is repaired by the next time the app comes
+   * up rather than by remembering to press something.
+   */
+  useEffect(() => {
+    if (link.mode !== 'cloud' || link.status !== 'open') return;
+    void syncCommute();
+  }, [link.mode, link.status, syncCommute]);
+
   useEffect(() => {
     if (simulated || link.mode !== 'cloud' || link.status !== 'open') return;
     let alive = true;
@@ -1054,6 +1099,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       setShareLocation,
       place,
       refreshPlace,
+      syncCommute,
       demo,
       setDemo,
       simulated,
@@ -1086,6 +1132,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       setShareLocation,
       place,
       refreshPlace,
+      syncCommute,
       unread,
       alertsUnread,
       markAlertsRead,

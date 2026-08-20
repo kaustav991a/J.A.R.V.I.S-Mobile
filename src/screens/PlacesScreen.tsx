@@ -35,7 +35,7 @@ import { haptic } from '../lib/haptics';
  */
 export function PlacesScreen() {
   const { accent } = useAppearance();
-  const { shareLocation } = useJarvis();
+  const { shareLocation, syncCommute } = useJarvis();
   const toast = useToast();
 
   const [places, setPlaces] = useState<KnownPlace[]>([]);
@@ -79,6 +79,17 @@ export function PlacesScreen() {
     await saveCommute(next);
     // one registration serves both departures; the task decides which is due
     await setCommuteTask(next.departures.some((d) => d.on));
+    /**
+     * And tell the gateway, which is what will actually deliver it.
+     *
+     * The local task above is kept as a fallback, not as the mechanism: measured
+     * on 2026-08-20, it requires a connected network on every run and this uid
+     * has none in the background, so it only ever fires once the app is opened.
+     * Sending here rather than on the next connect is the difference between an
+     * edit that takes effect this evening and one that takes effect whenever the
+     * app is next launched.
+     */
+    void syncCommute();
   };
 
   const setDeparture = (placeId: string, patch: Partial<Departure>) =>

@@ -113,6 +113,23 @@ describe('gateway-only routes', () => {
     expect(calls[0].url).toBe(`${cloud}/app-push/register`);
   });
 
+  /**
+   * The gateway is the only thing that can deliver a briefing on time.
+   *
+   * The local WorkManager job cannot: it requires a connected network on every
+   * run and this uid has none in the background, so it only ever fires once the
+   * app is opened. Sending the schedule to the desk instead would repeat the
+   * mistake `registerPush` made — a 404 that reads as a broken feature rather
+   * than a wrong address.
+   */
+  it('sends the commute schedule to the gateway, not to the desk', async () => {
+    const { calls, fetchImpl } = recorder();
+    const api = createApi({ baseUrl: 'http://desk:8000', cloudUrl: cloud, token: 't', fetchImpl });
+    await api.syncCommute({ tz: 'Asia/Kolkata', days: [false, true, true, true, true, true, false], departures: [] });
+    expect(calls[0].url).toBe(`${cloud}/app-commute`);
+    expect(JSON.parse(String(calls[0].init!.body))).toMatchObject({ tz: 'Asia/Kolkata' });
+  });
+
   it('reports a missing gateway as its own failure rather than calling the desk', async () => {
     // not a network error to retry: the route does not exist, and the screen
     // should say so instead of showing a spinner

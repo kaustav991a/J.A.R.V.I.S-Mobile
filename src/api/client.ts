@@ -1,3 +1,5 @@
+import type { CommuteUpload } from '../lib/commuteSync';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -50,6 +52,23 @@ export type Api = {
    * that news arrives. Gateway-only — the desk serves no such route.
    */
   registerPush(pushToken: string, platform: string, channels?: Record<string, string>): Promise<void>;
+  /**
+   * Hand the gateway the commute schedule, so IT can send the briefing.
+   *
+   * The briefing used to be entirely local, and measured on the device on
+   * 2026-08-20 that cannot work: `expo-background-task` requires a connected
+   * network for every run, and this uid reads
+   * `Network: 108 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)` with
+   * `#netAvail=0` in a RARE standby bucket. The job was not late, it was
+   * stopped — logcat caught it running 200ms after a cold launch, which is
+   * exactly how the symptom was reported: the briefing arrives when you open
+   * the app. A high-priority push is exempt from all of that.
+   *
+   * Gateway-only, like the routes above it, and idempotent: it replaces the
+   * stored schedule rather than adding to it, so re-sending on every connect is
+   * the recovery from Render wiping its disk.
+   */
+  syncCommute(upload: CommuteUpload): Promise<void>;
   /**
    * What the cloud brain believes about him, and the two ways to change it.
    *
@@ -160,6 +179,12 @@ export function createApi(cfg: ApiConfig): Api {
       // every one of those renames silently broke replies until the gateway was
       // told, which nobody remembered to do.
       await postCloud('/app-push/register', { push_token: pushToken, platform, channels });
+    },
+    // The schedule replaces whatever the gateway held, so a departure switched
+    // off travels as an absence — see `commutePayload`, which is where the
+    // filtering happens and why an empty list is meaningful rather than empty.
+    syncCommute: async (upload) => {
+      await postCloud('/app-commute', upload);
     },
     facts: async () => readFacts(await postCloud('/app-fact', {})),
     remember: async (fact) => {

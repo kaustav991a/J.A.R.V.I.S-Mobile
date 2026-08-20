@@ -77,31 +77,86 @@ machinery as the learned version.
 
 ---
 
-## Tomorrow, first thing: did the briefing fire on its own?
+## MEASURED 2026-08-20: the briefing cannot fire on its own, and the reason is not quota
 
-**2026-08-19, 18:40** — the evening briefing arrived, but probably only after the
-app was opened. That is the expected symptom of a throttled job: Android defers
-it, and opening the app promotes the standby bucket enough for the pending work
-to run. So the feature works; the timing was Android's decision.
+The question this section used to ask is answered. It was the wrong question, and
+the hypothesis under it — a throttled job overrunning its time budget — is
+**wrong**. The 08-19 reordering fix worked; the quota was never what was left.
 
-The fix for the cause shipped the same evening — the briefing now runs BEFORE the
-journal in that task, so it stops blowing the time budget — but the quota was
-already spent for that window.
-
-**The test is a weekday evening, phone untouched, app not opened.** If the
-notification arrives near 19:00 by itself, this is closed. If it does not:
+Read from the device, uid `10495`, before the app was opened:
 
 ```
-adb shell dumpsys jobscheduler | grep -A 4 jarvis
+timeout-reg:   countLimit=3,  countInWindow=0
+timeout-total: countLimit=10, countInWindow=0
+UID: 10495; Network: 108 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)
+UidStats{uid=10495 #run=0 #netAvail=0 #reg=0}
+standby bucket: 40   (RARE)
 ```
 
-`timeout-reg` and `timeout-total` are the numbers that matter — they were at 13
-against limits of 3 and 10. If they are climbing again, something in the task is
-still overrunning.
+`countInWindow=0` on both quotas closes the throttle theory. `#netAvail=0` opens
+the real one: **network has never once been available to this task.**
 
-The **preview button on the Places screen** runs the real briefing and posts the
-real notification immediately, bypassing the scheduler. It is the way to separate
-"the feature is broken" from "Android did not run it".
+`expo-background-task` hardcodes the constraint that makes that fatal —
+`BackgroundTaskScheduler.kt:108`:
+
+```kotlin
+.setRequiredNetworkType(NetworkType.CONNECTED)
+```
+
+Not configurable, and applied to every run. So the work sits `ENQUEUED` on a
+constraint Android will not satisfy for a RARE-bucket app in the background. It
+is not deferred; it is stopped.
+
+### Caught in the act
+
+Logcat, launching the app cold at 10:20:45:
+
+```
+10:20:45.316  BackgroundTaskWork: doWork: Running worker
+10:20:45.339  runTasks: com.mypersonalintelligence.jarvis
+10:20:47.409  Finished task 'jarvis-commute-briefing'
+10:20:47.411  Enqueuing worker ... '15' minutes delay
+```
+
+The blocked job ran **200 ms after launch** — the moment the process came up and
+the network restriction lifted — then queued the next one for a window it will be
+blocked in again. The standby bucket read `40` before that launch and `10` after.
+
+**This is the whole symptom.** "The briefing arrives once the app is opened" is
+not Android being late. It is the app being the only thing that can unblock it.
+
+### So the local briefing is the wrong shape, and push is the right one
+
+Three things the briefing needs, and Android denies all three to a backgrounded
+app in this bucket: a timely wake, a network read, and the process alive to post.
+A high-priority FCM push is exempt from exactly those restrictions, and the
+gateway's push path is already proved on this phone — `priority: "high"` with a
+per-phone `channelId`, `cloud_gateway.py:1663`.
+
+**Move the briefing to the gateway.** It needs:
+
+1. An endpoint the phone posts its `CommuteSettings` to, with each departure's
+   coordinates already resolved and its timezone — the gateway currently knows
+   nothing about commutes, places or weather.
+2. A scheduler beside the existing startup tasks (`cloud_gateway.py:3158`).
+3. The Open-Meteo read moved server-side, then `_push_all(kind="general",
+   data={"kind": "commute", ...})`.
+4. `APP_PUSH_MIN_GAP_SECS` accounted for — the quiet gap in `_push_all` will
+   swallow a briefing that lands behind an unrelated push. It needs `force` or a
+   bucket of its own.
+
+Keep the local task as a fallback and keep `previewBriefing` exactly as it is.
+
+**Worth trying first, because it is free:** this is a Xiaomi/MIUI device
+(`com.miui.analytics` in the same dump). MIUI adds Autostart and its own per-app
+battery policy on top of AOSP. Autostart on, battery set to *No restrictions*,
+then leave it overnight. It may lift the bucket off RARE. It will not make the
+timing dependable, so it is a measurement, not the fix.
+
+Either way the rule this cost us stands: **every state must name itself.** The
+briefing that never ran and the briefing that ran and found nothing to say were
+indistinguishable from outside, and that is what let a wrong hypothesis stand for
+a day.
 
 ---
 
@@ -110,10 +165,10 @@ real notification immediately, bypassing the scheduler. It is the way to separat
 - **`run_harnesses.py` with the venv on the desk.** Expect **81**. Several
   gateway commits have never been run against it. If `/app-link` starts refusing
   connections, revert `7cf6bc1` first and ask questions after.
-- **Watch the job quota.** `adb shell dumpsys jobscheduler | grep -A4 jarvis` —
-  `timeout-reg` and `timeout-total` had reached 13 against limits of 3 and 10,
-  which throttles the briefing task entirely. The ordering fix (briefing before
-  journal) should hold it down; confirm it does.
+- **Job quota: confirmed clean, stop watching it.** Measured 2026-08-20 —
+  `countInWindow=0` on both `timeout-reg` and `timeout-total`. The ordering fix
+  (briefing before journal) held. What blocks the briefing is the network
+  constraint, not the quota; see the measured section above.
 - **Name the Office in Settings → Places**, or the evening briefing has no
   coordinates to work from. A headless task cannot take a GPS fix.
 - **The journal's denial path has never been run.** Settings → Journal → Usage

@@ -1,5 +1,44 @@
 # Resume point — jarvis-mobile
 
+## 🏠 PICK THIS UP — pushed 2026-08-20 from the laptop, UNVERIFIED
+
+Read this block, then the 2026-08-20 resume point below it. **Nothing here has
+been run against Python**, because the laptop has none.
+
+**Run first, in this order:**
+
+```bash
+npm test          # expect 622 tests, 50 suites
+npm run typecheck # clean on the laptop
+```
+
+Then in `jarvis-brain`, which is the half that has never been executed:
+
+```bash
+python run_harnesses.py   # expect 81 + 4 new /app-commute + 8 reasoning-leak
+```
+
+**What changed here, in one line each:**
+
+| Change | Why |
+| --- | --- |
+| `src/lib/commuteSync.ts` (new) | builds the commute upload; drops departures with no named place |
+| `src/api/client.ts` | `syncCommute()` → `POST /app-commute`, gateway-only |
+| `src/state/JarvisProvider.tsx` | `syncCommute` on the context, sent on every cloud connect |
+| `src/screens/PlacesScreen.tsx` | sends the schedule after every edit, not just on next launch |
+| `NEXT.md` | the throttled-job hypothesis was **wrong**; measured and replaced |
+| `ROADMAP.md` | new §4b — WhatsApp-like chat changes, photo preview + caption first |
+
+**The headline:** the morning briefing cannot fire on its own, and it is not the
+job quota. `expo-background-task` requires a connected network on every run and
+this uid has none in the background. The app is the only thing that can unblock
+its own briefing. Moving it to a gateway push is the fix, and this push is step 1
+of 4 — **nothing reads the schedule yet, so no briefing is delivered.**
+
+**Do not deploy expecting a briefing.** Step 2 (the scheduler) is the one that
+makes it work.
+
+
 Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 and
 2026-08-13.
 
@@ -71,6 +110,78 @@ is documented here because it has cost time twice.
 
 ---
 
+## ▶ RESUME POINT — 2026-08-20: the briefing is blocked, and it is not the quota
+
+**Diagnosed on the device, and the phone half of the fix is built.** Reported
+from the phone: the morning briefing arrived only after the app was opened, and
+no push ever came.
+
+**622 tests, 50 suites, `tsc --noEmit` clean.** Neither repo is pushed. The
+gateway harnesses have NOT been run — this machine still has no Python — so
+`run_harnesses.py` on the desk is owed before anything goes out.
+
+Both halves are true, and the second explains the first: **there is no push.** The
+briefing is device-local — `commuteTask.ts` fetches Open-Meteo and calls
+`postNow()`. The gateway is not involved in it at all.
+
+The 08-19 hypothesis — a throttled job overrunning its budget — is **wrong**.
+Measured before the app was opened, uid `10495`:
+
+```
+timeout-reg / timeout-total: countInWindow=0    (quota clean, ordering fix held)
+UID: 10495; Network: 108 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)
+UidStats{uid=10495 #run=0 #netAvail=0 #reg=0}
+standby bucket: 40 (RARE) before launch, 10 after
+```
+
+`expo-background-task` hardcodes `setRequiredNetworkType(NetworkType.CONNECTED)`
+(`BackgroundTaskScheduler.kt:108`), so the work waits on a constraint Android
+will not satisfy for a RARE-bucket app in the background. Then logcat caught it:
+the blocked worker ran **200 ms after a cold launch** and re-queued itself for a
+window it will be blocked in again.
+
+So the app is the only thing that can unblock its own briefing. **The fix is to
+move the briefing to the gateway and deliver it by high-priority push** — the one
+path exempt from these restrictions, and already proved on this phone. Four steps
+and the traps are written out in `NEXT.md`.
+
+This is a Xiaomi/MIUI phone. Autostart on and battery *No restrictions* is worth
+one overnight measurement before building anything, but it cannot make the timing
+dependable.
+
+### What shipped today, and what is still owed
+
+Built, tested, not deployed:
+
+- **`src/lib/commuteSync.ts`** — `commutePayload()` turns `CommuteSettings` plus
+  the named places into the upload. It decides the two things only the phone can:
+  which departures are live, and where they are. A departure whose place has never
+  been named is dropped, mirroring `coordsFor`.
+- **`api.syncCommute()`** — `POST /app-commute`, gateway-only for the same reason
+  `registerPush` is.
+- **`syncCommute` on the context**, sent on every cloud connect and after every
+  edit on the Places screen. Idempotent by replacement, so a wiped Render disk is
+  repaired by the next launch.
+- **Gateway `POST /app-commute`** — stores the schedule, reports it in `/health`
+  under `commute`, refuses one it cannot read rather than guessing.
+
+Still owed, in order:
+
+1. **Run `run_harnesses.py` on the desk.** Expect 81 plus the four new
+   `/app-commute` checks and the reasoning-leak harness. Nothing Python-side has
+   been executed.
+2. **The scheduler.** Nothing reads the stored schedule yet, so no briefing is
+   pushed — this is the step that makes the feature work. `cloud_gateway.py:3158`
+   has the startup-task pattern to copy.
+3. **The forecast, server-side.** Move the Open-Meteo read out of `commute.ts`,
+   then `_push_all(kind="general", data={"kind": "commute"})`.
+4. **`APP_PUSH_MIN_GAP_SECS`.** The quiet gap in `_push_all` will swallow a
+   briefing that lands behind an unrelated push. It needs `force` or its own
+   bucket.
+
+Keep the local task as a fallback and keep `previewBriefing` as it is.
+
+---
 ## ▶ RESUME POINT — 2026-08-19, end of day
 
 **614 tests, 49 suites, `tsc --noEmit` clean. Both repos clean and pushed.**
@@ -88,8 +199,9 @@ Read `NEXT.md` for the queue; this is the state of the world.
 - **The chat round-trips.** `reply with the single word ACORN` → `ACORN, Sir.`
 - **The link establishes in ~6s** and holds. It took three fixes to get there.
 - **The journal holds 17,500 events and 360 day-totals**, with real app names.
-- **The evening briefing fired** — though probably only once the app was opened,
-  which is the throttled-job symptom. See `NEXT.md`, first item.
+- **The evening briefing fired** — but only once the app was opened. Called the
+  throttled-job symptom here; measured on 2026-08-20 and it is not. See the
+  2026-08-20 resume point above.
 - **Push notifications arrive.** They had been addressed to `general`, a channel
   the app deleted eight renames ago, and Android was discarding every one.
 
