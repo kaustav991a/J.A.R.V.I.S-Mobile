@@ -32,11 +32,12 @@ python run_harnesses.py   # expect 81 + 4 new /app-commute + 8 reasoning-leak
 **The headline:** the morning briefing cannot fire on its own, and it is not the
 job quota. `expo-background-task` requires a connected network on every run and
 this uid has none in the background. The app is the only thing that can unblock
-its own briefing. Moving it to a gateway push is the fix, and this push is step 1
-of 4 — **nothing reads the schedule yet, so no briefing is delivered.**
+its own briefing. The fix is a gateway push, and **all four steps are now built**
+— endpoint, scheduler, server-side forecast, quiet gap.
 
-**Do not deploy expecting a briefing.** Step 2 (the scheduler) is the one that
-makes it work.
+**None of it has been run against Python.** The briefing is code, not a proved
+feature. The honest order from here: `run_harnesses.py` on the desk, deploy,
+then one evening with the phone untouched.
 
 
 Branch: `feat/mobile-hud`. Written 2026-08-10, extended 2026-08-11, 2026-08-12 and
@@ -165,19 +166,24 @@ Built, tested, not deployed:
 - **Gateway `POST /app-commute`** — stores the schedule, reports it in `/health`
   under `commute`, refuses one it cannot read rather than guessing.
 
+The gateway half, built the same session: `POST /app-commute` stores the
+schedule, `_commute_loop` ticks every 60s, `_forecast_blocking` reads Open-Meteo,
+`_briefing_text` writes it in this app's voice, and `_push_all(..., force=True)`
+sends it. `_briefed` holds the once-a-day mark.
+
 Still owed, in order:
 
-1. **Run `run_harnesses.py` on the desk.** Expect 81 plus the four new
-   `/app-commute` checks and the reasoning-leak harness. Nothing Python-side has
-   been executed.
-2. **The scheduler.** Nothing reads the stored schedule yet, so no briefing is
-   pushed — this is the step that makes the feature work. `cloud_gateway.py:3158`
-   has the startup-task pattern to copy.
-3. **The forecast, server-side.** Move the Open-Meteo read out of `commute.ts`,
-   then `_push_all(kind="general", data={"kind": "commute"})`.
-4. **`APP_PUSH_MIN_GAP_SECS`.** The quiet gap in `_push_all` will swallow a
-   briefing that lands behind an unrelated push. It needs `force` or its own
-   bucket.
+1. **Run `run_harnesses.py` on the desk.** Expect 81, plus the `/app-commute`,
+   reasoning-leak and briefing checks. **Nothing Python-side has ever run on the
+   laptop** — one SyntaxError already slipped through this session and was caught
+   by reading, not by running.
+2. **Deploy the gateway**, then confirm `/health` reports `commute.departures`
+   matching what the Places screen says.
+3. **One evening, phone untouched, app not opened.** The only test that closes
+   this. A notification near the departure time, by itself, and it is real.
+4. **Then decide what the local task is for.** It stays as a fallback today. If
+   the push proves reliable, leave it deliberately or strip it deliberately — but
+   do not leave two mechanisms nobody is sure about.
 
 Keep the local task as a fallback and keep `previewBriefing` as it is.
 

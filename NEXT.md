@@ -77,7 +77,13 @@ machinery as the learned version.
 
 ---
 
-## MEASURED 2026-08-20: the briefing cannot fire on its own, and the reason is not quota
+## ANSWERED 2026-08-20: the briefing cannot fire on its own — moved to a push
+
+> **Status:** diagnosed, and both halves built the same day. The phone sends the
+> schedule; the gateway sends the briefing. **Not run, not deployed** — no Python
+> on the laptop. The test that closes it is one evening with the phone untouched.
+> Everything below is the measurement that got us here. Keep it: it is the reason
+> the design changed.
 
 The question this section used to ask is answered. It was the wrong question, and
 the hypothesis under it — a throttled job overrunning its time budget — is

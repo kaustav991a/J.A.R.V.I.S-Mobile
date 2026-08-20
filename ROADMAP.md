@@ -202,12 +202,92 @@ the gateway; all of it is presentation the phone already has the data for.
 
 ---
 
+## 4c. The Iron Man overhaul — styling only
+
+*Asked for 2026-08-20.* A cosmetic pass to make the whole app read as the film's
+JARVIS rather than as a dark-themed utility. **Scope is styling. The logo does not
+change and no copy changes** — same words, same information, same screens, same
+navigation. If a change alters what a screen *says*, it is out of scope for this
+item and belongs in §4b or §4.
+
+The pieces are already here and under-used: `ArcReactor.tsx`, `Glass.tsx`,
+`glowText` / `glowBox` in `theme/tokens.ts`, the reanimated pulse in
+`GlassTabBar.tsx`, `TypeLine.tsx`, `LoadingBar.tsx`, `Meter.tsx`,
+`StatusStrip.tsx`. This is mostly about applying them consistently and adding
+motion where a state currently changes instantly and silently.
+
+### Where the effects earn their place
+
+1. **Boot and handoff.** A reactor spin-up on cold start, and `ReactorHandoff`
+   carried through every link transition rather than only the one it has now.
+   Sweep lines on panel mount, staggered so a screen assembles rather than
+   appears.
+2. **The HUD frame.** Corner brackets and hairline reticles on `Panel` and
+   `Card`; a scanline or grid at very low opacity behind content; edge glow that
+   tracks `hud.status` — idle, listening, thinking, degraded — so the frame itself
+   is the status indicator.
+3. **Text.** `TypeLine` on arriving replies and briefings (not on static labels —
+   a screen where everything types is a screen you wait for). A glitch/decode
+   in-flourish reserved for values that just changed, and a monospace tabular
+   treatment for anything numeric so figures stop reflowing as they update.
+4. **Voice and thinking.** A live waveform or concentric rings on `VoiceBar`
+   driven by amplitude rather than a fixed animation, and three bouncing dots in
+   the tab bar (already queued as §1 above — do them together, one worklet).
+5. **Data surfaces.** `Meter` and `VitalsPanel` with sweeping needles and
+   trailing decay rather than instant jumps; `LoadingBar` as a scanning bar; the
+   journal and vitals charts on the same grid-and-glow language.
+6. **Touch.** A ring pulse from the contact point on `Touchable`, paired with the
+   haptic that already fires. Every press should have a visible consequence.
+7. **Sound, only if it survives a week.** One soft interface tick. Easy to love in
+   a demo and hate on the fourth day, so it ships behind a setting, defaulting off.
+
+### Constraints that are not negotiable
+
+Collected because each one has already cost time, and a cosmetic pass is exactly
+the change most likely to trip over them:
+
+- **Do not mount `BlurTargetView`.** It segfaults the RenderThread — full
+  tombstone in `Glass.tsx`. Whatever the design wants, it cannot want that.
+- **`shadowColor` / `shadowRadius` are iOS-only.** Anything that must glow on
+  Android needs SVG opacity and stroke width, or `textShadowRadius`.
+  `elevation` is not a substitute — it draws a grey shadow and reorders siblings.
+  This is why the Appearance screen's glow slider felt inert on a phone.
+- **No default parameters inside a worklet.** The closure is built from
+  identifiers in the body, so a default compiles, passes jest, and throws once per
+  frame on the UI thread.
+- **Effects must not become the only signal.** Every state must still name itself
+  in words — the rule that came up five times on 2026-08-19. A glow that means
+  "degraded" and a label that says nothing is a regression however good it looks.
+- **Budget the frame.** A scanline, a grid, a glow and a sweep on the same screen
+  is a dropped-frame budget on a phone that also holds a socket and a journal.
+  Measure on the device, not in the simulator.
+- **Respect `prefers-reduced-motion`** and the existing Appearance controls, and
+  keep the glow slider meaningful rather than adding effects it cannot reach.
+
+### How to do it without a month of drift
+
+One screen first — Home, because it has the reactor, the status strip and the
+vitals panel, so it exercises most of the language. Land it, look at it on the
+phone for a day, then propagate. A shared `hud` styling layer rather than
+per-screen decoration, so the second screen costs a fraction of the first.
+
+Almost all of it is JavaScript, so it ships over the air. Anything wanting a new
+native module (real blur behind content, shaders) needs a build and should be
+argued for separately.
+
+---
+
 ## 5. Blocked on the desk or the gateway
 
 Collected so the backend work can be scoped once.
 
-- **The briefing schedule.** The gateway holding it is the real fix for §1.4; a
-  headless task on the phone cannot get the live fix it currently falls back to.
+- ~~**The briefing schedule.**~~ **Built 2026-08-20, not yet proved.** This was
+  right, and for a stronger reason than the one written here: the phone cannot get
+  a live fix in the background, and measured on the device it cannot get a network
+  at all — `expo-background-task` requires one on every run and this uid reads
+  `blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY`. The phone now uploads its
+  schedule (`POST /app-commute`) and the gateway sends the briefing by
+  high-priority push. Untested: no Python on the laptop. See `NEXT.md`.
 - **Script CRUD.** `/api/tasks` lists; there is no create, update, delete or
   run-by-id. Script Details' EDIT button is disabled for exactly this reason.
 - **Run history.** Outcomes and durations per run, so Reports stops inventing
@@ -283,3 +363,11 @@ fill a session where the desk is unavailable. §3.2 (OTA) pays for itself fastes
 since it removes an 11-minute cycle from every JS fix after it.
 
 §4 waits on §2 by design. §6 is filler for short sessions.
+
+§4b and §4c are both asked-for and both ship over the air, so either fits a
+session with no desk and no phone-in-hand. Do **§4b item 1** (the photo preview
+and caption) before §4c: it changes what the compose bar *is*, and restyling a
+component you are about to restructure is work done twice. §4c then wants one
+screen landed and looked at for a day before it propagates — it is the item most
+likely to sprawl, and the constraint list in it is there because every entry has
+already cost time.
