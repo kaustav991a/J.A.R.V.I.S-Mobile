@@ -1,5 +1,34 @@
 # Resume point — jarvis-mobile
 
+## 🏠 READ THIS FIRST — 2026-08-20, 5:30 PM. OTA applied; a gateway bug found.
+
+The OTA is on the device and the gateway can finally see it. `/health`:
+`memory.ready: true`, `facts_known: 16`, `apps_linked: 1`, `push_targets: 1`,
+`commute: {tz: Asia/Calcutta, departures: 1, days_on: 5}`.
+
+**The first push-delivered briefing is due tonight, 7:00–7:20 PM.** Office
+coordinates are confirmed — the place was named while standing in the office.
+UptimeRobot now pings `/health` every 5 minutes, which is what stops the free
+tier sleeping through the fire window.
+
+Nothing in this repo changed. Two things landed elsewhere:
+
+- **A gateway bug, fixed and unrun.** A photo replied with
+  `[[LOOKUP: Royal Enfield Hunter 350 mileage ARAI real world]]` — the marker
+  itself. `see()` never had `think()`'s post-processing. See `jarvis-brain`'s
+  RESUME for the whole of it; the desk owes
+  `run_harnesses.py` (81 + 4 + 8 + **17 new**).
+- **A spec, awaiting review:**
+  `docs/superpowers/specs/2026-08-20-declared-rules-design.md`. Declared rules —
+  "tell me if I haven't called mom by 7", and "when I open Swiggy tell me what I
+  can eat". Ships over the air, no native module. Read it before it becomes a
+  plan.
+
+`npm test` (684, 55 suites) and `npm run typecheck` were both run on the laptop
+this evening and are clean.
+
+---
+
 ## 🏠 START HERE — 2026-08-20, evening. He speaks first now.
 
 **Run before anything else:** `npm test` (684, 55 suites) and `npm run typecheck`.
