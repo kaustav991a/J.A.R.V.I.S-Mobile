@@ -151,6 +151,57 @@ Gated on §2. Ordered so that nothing is built on a silent failure.
 
 ---
 
+## 4b. WhatsApp-like chat changes
+
+The chat is the surface he actually uses, and it is the one place where the app
+still feels like a terminal rather than a messenger. Nothing here is blocked on
+the gateway; all of it is presentation the phone already has the data for.
+
+1. **Compose a photo before sending it — preview plus a caption box.** *(asked
+   for 2026-08-20)* Today the camera button sends immediately: press, and the
+   photo is gone with no caption and no chance to look at it. The gateway already
+   handles a caption — `see()` takes one and falls back to *"The operator sent
+   this photo without a caption — react to it helpfully"* when it is empty, which
+   is a worse prompt than anything he would have typed. So the missing half is
+   entirely on this side.
+
+   **This overrules a decision already written down.** `ChatScreen.tsx:237` says
+   *"There is no separate caption step. A photo is usually the question"* — and
+   `sendPhoto(result.shot, '')` on line 262 is that reasoning in code. It was
+   right about the common case and wrong about the cost of the uncommon one:
+   there is currently no way to ask *anything specific* about a picture, and no
+   way to notice you photographed the wrong thing. Keep the fast path — SEND
+   straight away with an empty box should still work — and add the step around
+   it rather than in front of it.
+
+   Wanted: after the shutter, the picture fills the compose area as a preview with
+   the text box under it, a way to back out, and send only on SEND. The caption
+   travels as the question rather than being invented.
+
+   Worth getting right while building it, because the current path hides them:
+   - **A photo in flight must say so.** A large base64 upload over a slow link is
+     the longest wait in this app and currently the least visible one.
+   - **A photo that failed to send must stay recoverable**, with the caption still
+     attached — losing a typed caption to a dropped socket would be worse than
+     the immediate send it replaced.
+   - **The chat should show the thumbnail he sent**, not the word "Photo". The
+     history already stores a text stand-in (`[sent a photo] <caption>`) for the
+     model's benefit; what the operator sees should be the picture.
+
+   *Touches:* `src/screens/ChatScreen.tsx`, the compose bar, and whatever holds
+   the pending attachment. No native change, so it ships over the air.
+
+2. **Sent / delivered / read ticks.** Already specified in `NEXT.md` §4 and the
+   largest thing on this list — it needs an id on each outgoing ask and two new
+   frames from the gateway. Listed here too because it is the other half of what
+   makes a chat feel like a chat.
+
+3. **Reply-to-a-message.** Quote the turn being answered. Cheap on screen,
+   and it needs the same per-message id that the ticks do — so do it after §2
+   rather than inventing a second identity for a message.
+
+---
+
 ## 5. Blocked on the desk or the gateway
 
 Collected so the backend work can be scoped once.
