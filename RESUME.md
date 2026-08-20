@@ -1,5 +1,48 @@
 # Resume point — jarvis-mobile
 
+## 🏠 START HERE — 2026-08-20, evening. He speaks first now.
+
+**Run before anything else:** `npm test` (684, 55 suites) and `npm run typecheck`.
+Then, on the desk, `python run_harnesses.py` — **nothing Python-side has run all
+day** and the gateway has gained five features. That is the largest outstanding
+risk in either repo.
+
+### What changed today, and why it matters
+
+| | |
+| --- | --- |
+| The briefing | moved off the phone entirely. `expo-background-task` needs a network on every run and this uid has none in the background — the job was stopped, not late. The gateway schedules and pushes it now |
+| One assistant | desk, phone and Telegram share one memory. `_memory_key` files the phone under the operator's own thread; only HIS surfaces merge |
+| He knows where you are speaking from | one line per turn, naming the surface and what it can reach |
+| **He speaks first** | at most one unprompted remark a day, only when a stored fact is true TODAY, never outside 09:00–21:00. This is what the 17 facts were for |
+| Photos | preview and caption box before sending, thumbnail in the bubble |
+| Markdown | rendered rather than shown as asterisks |
+| Replies | arrive word by word, at the pace of someone speaking |
+| The chat header | says something true about now instead of counting turns |
+| The reasoning leak | `<think>` monologues can never reach the screen again |
+
+### The two things to actually watch
+
+1. **Tonight's briefing.** The first one ever scheduled server-side. Office
+   departure is **7:00 PM** — not 6:30, whatever the earlier notes say; check
+   Settings → Places if that is wrong. Render logs will carry
+   `[CLOUD] briefing pushed for Office` if it worked.
+2. **The first unprompted remark.** It will only fire if a stored fact names
+   today. Look for `[CLOUD] spoke first:` in the logs, or
+   `nudge declined by the brain` if it decided against.
+
+### Owed, honestly
+
+- `run_harnesses.py` — never run today. Four gateway features and a SyntaxError
+  that was caught by reading rather than by running.
+- `LLM_PROVIDER_VISION=gemini` is dashboard-only, undeclared in `render.yaml`.
+  Vision is working through Gemini again as of this afternoon.
+- `surface="desk"` is unreachable: a linked desk answers with its own brain, so
+  `think()` is never called there. Harmless, and not doing work.
+
+---
+
+
 ## 🏠 PICK THIS UP — pushed 2026-08-20 from the laptop, UNVERIFIED
 
 Read this block, then the 2026-08-20 resume point below it. **Nothing here has
