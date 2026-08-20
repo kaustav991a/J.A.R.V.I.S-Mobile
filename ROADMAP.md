@@ -284,6 +284,108 @@ argued for separately.
 
 ---
 
+## 4d. Making it feel like J.A.R.V.I.S.
+
+*Asked 2026-08-20: "isn't the app missing something — Jarvis-wise?"* It is, and
+this is a different axis from §4b and §4c. Those are the chat and the costume.
+This is whether the thing has a character at all.
+
+**Three properties make the character**, and the app had none of them:
+
+1. **He is already there.** No launching, no waiting, no blank field.
+2. **He knows the situation without being asked.** Context, not queries.
+3. **He volunteers when it matters and is quiet when it does not.**
+
+Styling is the costume, and a beautifully styled app that waits to be tapped is
+still an app. Voice is deliberately last here — see §4d.7 and the note under it.
+
+### 1. He opens with the state of things — **DONE 2026-08-20, OTA**
+
+Chat opened on a stack of old turns and an empty field. It now opens with one
+true sentence about now, where the turn count used to be:
+
+> 11:52, sir. The desk is awake, you are at Home and Office briefing at 6:30 PM.
+
+`src/lib/situation.ts`, assembled **entirely on the device** — no model, no
+network, no await. That constraint is the design: a greeting that waits for a
+round trip is a loading state wearing a sentence, and the first cloud call of an
+evening here can take the better part of a minute.
+
+Rules it enforces, all tested: `sir` spent exactly once and the clock spends it,
+no exclamation marks, three clauses at most (past that it is a panel, and Home is
+where panels live), unknown things dropped rather than printed as "unknown", a
+dark link said plainly and first, and a briefing mentioned only while it is still
+ahead — announcing one already sent reads as a promise that was kept an hour ago.
+
+### 2. Replies arrive as if thought, not loaded — **OTA**
+
+Answers pop in complete. `TypeLine.tsx` already exists and is not used for this.
+Revealing the finished string at a human cadence stops a reply reading like a
+network response and starts it reading like someone answering — it is the closest
+thing to a voice **without** a voice, and it makes the real voice work drop in
+later rather than replace anything.
+
+Not a typewriter on everything: static labels that type are a screen you wait
+for. Replies and briefings only.
+
+### 3. He addresses the moment, not just the message — **NOT OTA (gateway)**
+
+The persona gets the date and time. It gets no place, no battery, no link state,
+no last-seen. So "should I take an umbrella" triggers a lookup for something he
+could already know, and every answer is written by someone who cannot see out of
+the window.
+
+One field on the outgoing ask, one block in the system prompt. The phone holds all
+of it and sends none of it. This is the item where he stops feeling like a chatbot
+with a good theme.
+
+### 4. Silence has to name itself
+
+Mostly learned already, and the rule is written in five places: **every state must
+name itself.** J.A.R.V.I.S. does not chatter, but "nothing to say" and "broken"
+must never look the same — which is the whole reason §4d.1 exists rather than an
+empty header.
+
+### 5. He remembers out loud, occasionally — **OTA + one prompt line**
+
+`/health` reports `facts_known: 17`. He has never volunteered one. Storage that
+never surfaces is indistinguishable from no memory.
+
+Once a day at most, and only when the day makes it relevant: *"you mentioned
+Mousumi starts at the gym today — that is this morning."* The facts pipe and the
+journal rollup already run; what is missing is anything that reads them and
+decides one is worth saying.
+
+The failure mode to design against is a machine that recites. One a day, tied to
+something happening, and never twice.
+
+### 6. One conversation, not three — **NOT OTA (gateway)**
+
+Desk, phone and Telegram are keyed separately, so the phone does not know what
+you told the desk an hour ago. Sharing the last few turns across them is what
+makes him one presence rather than three copies wearing the same name.
+
+### 7. Voice, and why it is last
+
+**He does not speak, and that is the largest single gap in this app.** Deferred
+by choice on 2026-08-20 — "talking we do at last" — and the ordering is defensible:
+`expo-speech` needs a native build, and 1, 2, 3 and 5 all make the voice better
+when it arrives rather than being made redundant by it. A voice reading a blank
+greeting is still a blank greeting.
+
+The rule already written in `NEXT.md` holds and should not be relitigated:
+**he speaks when you spoke, and stays quiet when you typed.**
+
+### Order
+
+**1 → 2 → 3**, then 5 and 6. One is done. Two is an afternoon. Three is the one
+that changes the character most per line of code, and it is the only one of the
+three needing the gateway.
+
+§4c can run alongside any of them; it touches different files.
+
+---
+
 ## 5. Blocked on the desk or the gateway
 
 Collected so the backend work can be scoped once.

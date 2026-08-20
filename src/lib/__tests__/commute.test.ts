@@ -6,6 +6,7 @@ import {
   commuteBriefing,
   dueDeparture,
   hourLabel,
+  dueToday,
   loadCommute,
   markBriefed,
   saveCommute,
@@ -137,6 +138,49 @@ describe('alreadyBriefed', () => {
     // at worst one extra briefing arrives on the day of the upgrade
     await AsyncStorage.setItem('jarvis_commute_sent', '2026-08-14');
     expect(await alreadyBriefed('home', '2026-08-14')).toBe(false);
+  });
+});
+
+describe('dueToday', () => {
+  const settings = (departures: unknown[], days = [true, true, true, true, true, true, true]) =>
+    AsyncStorage.setItem('jarvis_commute', JSON.stringify({ departures, days }));
+
+  // 2026-08-20 is a Thursday
+  const on = (hour: number, minute: number, label: string, placeId = label.toLowerCase()) => ({
+    placeId,
+    label,
+    on: true,
+    hour,
+    minute,
+  });
+
+  it('names the next one still to come', async () => {
+    await settings([on(8, 0, 'Home'), on(18, 30, 'Office')]);
+    expect(await dueToday(new Date(2026, 7, 20, 11, 0))).toEqual({ hour: 18, minute: 30, label: 'Office' });
+  });
+
+  it('takes the earliest of several rather than the first listed', async () => {
+    await settings([on(18, 30, 'Office'), on(8, 0, 'Home')]);
+    expect(await dueToday(new Date(2026, 7, 20, 6, 0))).toEqual({ hour: 8, minute: 0, label: 'Home' });
+  });
+
+  /**
+   * Announcing one already sent reads as a promise that was kept an hour ago,
+   * which is worse than saying nothing at all.
+   */
+  it('says nothing once the last one today is behind us', async () => {
+    await settings([on(8, 0, 'Home'), on(18, 30, 'Office')]);
+    expect(await dueToday(new Date(2026, 7, 20, 19, 0))).toBeNull();
+  });
+
+  it('ignores a departure that is switched off', async () => {
+    await settings([{ ...on(18, 30, 'Office'), on: false }]);
+    expect(await dueToday(new Date(2026, 7, 20, 11, 0))).toBeNull();
+  });
+
+  it('says nothing on a day that is switched off', async () => {
+    await settings([on(18, 30, 'Office')], [true, true, true, true, false, true, true]);
+    expect(await dueToday(new Date(2026, 7, 20, 11, 0))).toBeNull();
   });
 });
 

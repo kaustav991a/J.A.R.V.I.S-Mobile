@@ -241,6 +241,31 @@ export const DUE_WINDOW_MIN = 30;
  * are hours apart, so at most one can match; the first is returned regardless, and
  * a settings screen that let them overlap would be the bug to fix.
  */
+/**
+ * The next briefing owed today, or null.
+ *
+ * Distinct from `dueDeparture`, which answers "is one owed right NOW" for the
+ * task that has to decide whether to post. This answers "is one coming", which
+ * is what a line at the top of the chat wants: it looks forward rather than at a
+ * window, and it returns the earliest of several rather than the first match.
+ *
+ * Null when the day is off, when nothing is switched on, or when today's are all
+ * behind us — announcing a briefing already sent reads as a promise, and the
+ * promise was kept an hour ago.
+ */
+export async function dueToday(
+  now: Date = new Date()
+): Promise<{ hour: number; minute: number; label: string } | null> {
+  const s = await loadCommute();
+  if (!s.days[now.getDay()]) return null;
+  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  const ahead = s.departures
+    .filter((d) => d.on && d.hour * 60 + d.minute > minutesNow)
+    .sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
+  const next = ahead[0];
+  return next ? { hour: next.hour, minute: next.minute, label: next.label } : null;
+}
+
 export function dueDeparture(now: Date, s: CommuteSettings): Departure | null {
   if (!s.days[now.getDay()]) return null;
   const minutesNow = now.getHours() * 60 + now.getMinutes();

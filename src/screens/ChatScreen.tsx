@@ -9,6 +9,9 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommandBar } from '../components/CommandBar';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
+import { situationLine } from '../lib/situation';
+import { dueToday } from '../lib/commute';
+import { msToNextMinute } from '../theme/greeting';
 import { EmptyState } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
 import { Glass } from '../components/ui/Glass';
@@ -116,7 +119,8 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, sendVoice, sendPhoto, connected, markChatRead, setChatFocused } = useJarvis();
+  const { hud, sendCommand, sendVoice, sendPhoto, connected, markChatRead, setChatFocused, mode, place } =
+    useJarvis();
 
   /**
    * On screen means read, and means no notification.
@@ -127,6 +131,21 @@ export function ChatScreen() {
    * arrives while the chat is open has been seen, so leaving must not leave it
    * counted as unread.
    */
+  // Read on focus rather than on mount: the Places screen can change it while
+  // this screen stays alive behind the tab bar, and a line promising a briefing
+  // that was switched off an hour ago is worse than no line.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void dueToday(new Date()).then((d) => {
+        if (alive) setNextBriefing(d);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
+
   useFocusEffect(
     useCallback(() => {
       setChatFocused(true);
@@ -153,6 +172,24 @@ export function ChatScreen() {
    * clears it too, since its transcript comes back as a turn.
    */
   const [pending, setPending] = useState(false);
+  /**
+   * The clock behind the line at the top, ticking on the minute.
+   *
+   * On the minute rather than the second: the line prints minutes, and a timer
+   * running sixty times more often than the thing it updates is sixty times the
+   * wakeups for no visible difference.
+   */
+  const [minute, setMinute] = useState(() => new Date());
+  useEffect(() => {
+    const t = setTimeout(() => setMinute(new Date()), msToNextMinute());
+    return () => clearTimeout(t);
+    // re-armed by its own result: one timeout aimed at the next boundary keeps the
+    // clock honest, where a 60s interval drifts away from it
+  }, [minute]);
+
+  /** the next briefing owed today, so he can mention it before it happens */
+  const [nextBriefing, setNextBriefing] = useState<{ hour: number; minute: number; label: string } | null>(null);
+
   /** a photo taken and not yet sent. Null is the ordinary state of this screen. */
   const [draft, setDraft] = useState<{ base64: string; uri: string } | null>(null);
   /**
@@ -517,7 +554,28 @@ export function ChatScreen() {
         keyboardVerticalOffset={headerHeight ?? 0}
       >
         <View style={[styles.head, { paddingTop: Math.max(headerHeight ?? 0, insets.top) + SPACE.md }]}>
-          <ScreenTitle title="CHAT" caption={turns.length ? `${turns.length} turns` : undefined} />
+          {/*
+            The situation, where the turn count used to be.
+
+            A turn count is a statistic about the app; nobody has ever needed it.
+            This line is the app's only unprompted statement about *now*, and it
+            is assembled entirely on the device — no model, no network, no await.
+            A greeting that waits for a round trip is a loading state wearing a
+            sentence, and the first cloud call of an evening can take the better
+            part of a minute here.
+          */}
+          <ScreenTitle
+            title="CHAT"
+            caption={situationLine({
+              now: minute,
+              // `lan` is the desk. Mapped here rather than in `situation.ts`,
+              // which speaks about the world rather than about transports.
+              mode: !connected ? null : mode === 'lan' ? 'desk' : mode === 'cloud' ? 'cloud' : null,
+              connected,
+              place,
+              briefing: nextBriefing,
+            })}
+          />
         </View>
 
         {turns.length === 0 ? (
