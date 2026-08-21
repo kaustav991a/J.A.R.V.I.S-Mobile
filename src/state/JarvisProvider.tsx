@@ -63,6 +63,7 @@ import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { loadKnown, nameFor } from '../lib/knownPlaces';
 import { loadCommute, markCloudArmed } from '../lib/commute';
+import { forgetSeen, noteSeen } from '../lib/timeline';
 import { capabilityAnswer, isCapabilityQuestion } from '../lib/capabilities';
 import { asOpenAppCommand, matchApp } from '../lib/openApp';
 import { installed as installedApps, launch as launchApp } from '../../modules/app-launcher';
@@ -271,6 +272,16 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     const known = nameFor(fix, await loadKnown());
     setPlace(known || fix.place || `${fix.lat.toFixed(3)}, ${fix.lon.toFixed(3)}`);
     void rememberPlace(fix);
+    /**
+     * And a sighting, for the habit rather than for the trail.
+     *
+     * **Named places only.** A reverse-geocoded string drifted across four turns for
+     * the same desk, which is why `nameFor` exists — and a habit built on drifting
+     * labels would count one place as several. `lib/timeline.ts` explains what this
+     * can and cannot know: it is *last seen*, not *left*, because a sighting needs
+     * the app to be open.
+     */
+    if (known) void noteSeen(known);
   }, [shareLocation]);
 
   const setShareLocation = useCallback(async (on: boolean) => {
@@ -281,7 +292,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     await saveShareLocation(on);
     if (!on) {
       setPlace(null);
-      await forgetTrail();
+      // both, and for the same reason: turning sharing off is not "stop collecting",
+      // it is "you should not still have that"
+      await Promise.all([forgetTrail(), forgetSeen()]);
     }
     return true;
   }, []);

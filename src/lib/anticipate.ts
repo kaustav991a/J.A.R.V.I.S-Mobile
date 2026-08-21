@@ -42,6 +42,17 @@ export type Observations = {
   departure: { label: string; hour: number; minute: number } | null;
   /** where he is, when sharing is on and a fix is recent */
   place: string | null;
+  /**
+   * Whether he is at that place well past the hour he is usually gone from it.
+   *
+   * From `lib/timeline.ts`, which measures *last seen* rather than *left* — the app
+   * has to be opened for a sighting to happen. The margin and the median are what
+   * keep that honest; the remark quoting `goneBy` is what makes a wrong estimate
+   * arguable instead of authoritative.
+   */
+  stillHereLate: boolean;
+  /** the minute of the day he is usually gone by, for the figure in the remark */
+  goneBy: number | null;
   /** what was said unprompted last time, and on which day */
   spokenBefore: { day: string; about: string } | null;
 };
@@ -80,6 +91,13 @@ const spell = (mins: number): string => {
   return h ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
 };
 
+/** `6:40 PM` from a minute of the day — the meridiem always, as everywhere here */
+const clock = (minutes: number): string => {
+  const h24 = Math.floor(minutes / 60) % 24;
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h}:${String(minutes % 60).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
+};
+
 export function anticipate(o: Observations): Remark | null {
   const hour = o.now.getHours();
   // the quiet hours are not negotiable, whatever it thinks it has noticed
@@ -89,7 +107,7 @@ export function anticipate(o: Observations): Remark | null {
   // muted, and a muted assistant cannot say the one thing that mattered
   if (o.spokenBefore?.day === dayKey(o.now)) return null;
 
-  const candidate = usageRemark(o);
+  const candidate = placeRemark(o) ?? usageRemark(o);
   if (!candidate) return null;
 
   // never the same subject twice running — one a day is not enough on its own, and
@@ -97,6 +115,24 @@ export function anticipate(o: Observations): Remark | null {
   if (o.spokenBefore?.about === candidate.about) return null;
 
   return candidate;
+}
+
+/**
+ * Still somewhere he is usually gone from, with the hour quoted.
+ *
+ * Ranked above the screen-time remark because it is about right now — it can be
+ * acted on, where a day's total can only be noted.
+ *
+ * Refuses to speak without `goneBy`. `stillHereLate` cannot be true without a
+ * baseline, so this is belt and braces — but a remark that cannot name its own
+ * basis is the exact thing this file exists to refuse.
+ */
+function placeRemark(o: Observations): Remark | null {
+  if (!o.place || !o.stillHereLate || o.goneBy === null) return null;
+  return {
+    about: 'place',
+    line: `Still at ${o.place}, sir. You are usually gone by ${clock(o.goneBy)}.`,
+  };
 }
 
 /**

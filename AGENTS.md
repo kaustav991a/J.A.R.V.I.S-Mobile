@@ -26,7 +26,7 @@ guessing here has cost real time.
 ## Before you claim anything works
 
 ```bash
-npm test          # 852 tests, and this number goes stale — trust the run, not the comment
+npm test          # 866 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
 ```
 

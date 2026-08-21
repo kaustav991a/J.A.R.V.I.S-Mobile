@@ -31,7 +31,7 @@ that bear on unbuilt work are cross-referenced where they bite.
 
 ## 0. Where the app actually stands — 2026-08-21
 
-21 screens, **852 tests**, `tsc --noEmit` clean. (`AGENTS.md` said 461 and the old
+21 screens, **866 tests**, `tsc --noEmit` clean. (`AGENTS.md` said 461 and the old
 roadmap said 426. Both were stale. This number will be too — run `npm test`.)
 
 Live gateway, read this morning:
@@ -78,7 +78,8 @@ Live gateway, read this morning:
 | Photos settle instead of saying `SENDING` forever | done — the states were wired into `sendCommand` only |
 | The chat log is flushed when the app leaves the foreground | done — two turns were lost to a force-stop on a 400ms debounce |
 | The briefing fires BEFORE the time, never after | phone done; **gateway owed** — addendum in the mailbox spec |
-| Full anticipation | spec written, awaiting approval — `docs/superpowers/specs/2026-08-21-anticipation-design.md` |
+| Full anticipation | spec written — `docs/superpowers/specs/2026-08-21-anticipation-design.md` |
+| The remark the timeline unlocks | done — *"Still at Office, sir. You are usually gone by 6:40 PM."* Ranked above the screen-time remark, being about right now |
 | **A local release build silently breaks OTA** | found and worked around — `expo_runtime_version` stayed `file:fingerprint`; see `AGENTS.md` |
 | Microphone verified | **not done** — needs hands on the phone, not adb |
 
@@ -261,7 +262,7 @@ time, and two files used to answer it differently.
 | Journal denial path | proved | adb 08-21: reads `NO ACCESS` and *"I cannot see your usage, sir — the permission is off."* Collected history stays visible under `HELD ON THIS DEVICE`, which is the honest distinction |
 | Any background work running unattended | — | **cannot**, measured again 08-21 12:21 — see §7 |
 | The commute task body exercised by a test | proved | 10 tests, `lib/__tests__/commuteTask.test.ts` — built 08-21; the gate ones were checked by removing the gate and watching them go red |
-| Location timeline | — | prerequisite for anything place-aware |
+| Location timeline | untested | `lib/timeline.ts`, built 08-21 — sightings at named places, median last-seen per day, its own 28-day store. **Silent for its first four days**, by design |
 | Call log, archive import | — | native build; Play-fatal |
 
 ### Knowing and acting

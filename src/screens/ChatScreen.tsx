@@ -14,6 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import { turnMark } from '../lib/turnMark';
 import { anticipate } from '../lib/anticipate';
 import { loadSpoken, saveSpoken } from '../lib/spokenStore';
+import { loadSeen, stillHereLate, usuallyGoneBy } from '../lib/timeline';
 import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { dayKey, dueToday } from '../lib/commute';
@@ -203,10 +204,11 @@ export function ChatScreen() {
       void (async () => {
         try {
           const now = new Date();
-          const [spokenBefore, departure, usage] = await Promise.all([
+          const [spokenBefore, departure, usage, seen] = await Promise.all([
             loadSpoken(),
             dueToday(now),
             usageForAsk(await openJournal(), now.getTime()).catch(() => null),
+            loadSeen(),
           ]);
           if (!alive) return;
           const said = anticipate({
@@ -219,6 +221,16 @@ export function ChatScreen() {
                 : null,
             departure: departure ? { label: departure.label, hour: departure.hour, minute: departure.minute } : null,
             place,
+            /**
+             * Whether he is somewhere he is usually gone from by now.
+             *
+             * Both come from the same history, and both are needed: the boolean
+             * decides whether to speak and the figure is what makes the remark
+             * arguable. A remark that cannot name its own basis is the thing this
+             * whole feature refuses to make.
+             */
+            stillHereLate: place ? stillHereLate(seen, place, now) : false,
+            goneBy: place ? usuallyGoneBy(seen, place, now) : null,
             spokenBefore,
           });
           if (!said) return;

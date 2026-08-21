@@ -20,6 +20,8 @@ const seen = (over: Partial<Observations> = {}): Observations => ({
   usage: null,
   departure: null,
   place: null,
+  stillHereLate: false,
+  goneBy: null,
   spokenBefore: null,
   ...over,
 });
@@ -94,6 +96,49 @@ describe('a departure that is nearly here', () => {
       })
     );
     expect(said?.about).toBe('usage');
+  });
+});
+
+/**
+ * Still somewhere you are usually gone from.
+ *
+ * The one remark worth making, and the reason: it is not a setting you typed, it is
+ * not printed on any screen, and it carries a figure you can disagree with. The
+ * withdrawn leaving-time countdown failed all three.
+ */
+describe('still at a place you are usually gone from', () => {
+  const late = seen({
+    now: at(19, 40),
+    place: 'Office',
+    stillHereLate: true,
+    goneBy: 18 * 60 + 40,
+  });
+
+  it('is named, with the hour you are usually gone by', () => {
+    const said = anticipate(late);
+    expect(said?.about).toBe('place');
+    expect(said?.line).toContain('Office');
+    // the figure, so a wrong estimate is arguable rather than authoritative
+    expect(said?.line).toMatch(/6:40|18:40/);
+  });
+
+  it('outranks the screen-time remark, being about right now', () => {
+    const said = anticipate({ ...late, usage: { today: 400, usual: 100, days: 9 } });
+    expect(said?.about).toBe('place');
+  });
+
+  it('says nothing when you are not late', () => {
+    expect(anticipate({ ...late, stillHereLate: false })).toBeNull();
+  });
+
+  it('says nothing without a figure to quote', () => {
+    // `stillHereLate` cannot be true without a baseline, but a remark that cannot
+    // name its own basis is exactly what this whole feature refuses to make
+    expect(anticipate({ ...late, goneBy: null })).toBeNull();
+  });
+
+  it('says nothing when it does not know where you are', () => {
+    expect(anticipate({ ...late, place: null })).toBeNull();
   });
 });
 describe('a day well past his own usual', () => {

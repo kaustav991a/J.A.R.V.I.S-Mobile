@@ -12,7 +12,7 @@
 
 ## 🏠 HANDOFF — 2026-08-21, end of day. Read this first.
 
-**852 tests, `tsc --noEmit` clean.** Both repos committed and pushed. The phone is
+**866 tests, `tsc --noEmit` clean.** Both repos committed and pushed. The phone is
 running everything below.
 
 ### The state of the two repos
@@ -32,6 +32,40 @@ channel against that fingerprint — last publish `168e1f66`.
 cost an hour today and it fails completely silently.
 
 ---
+
+### Late addition, 18:10 — the location timeline
+
+`lib/timeline.ts`, and it is the observation that makes anticipation worth having.
+
+**What it does.** Records a sighting whenever the app is opened and a fix resolves to a
+*named* place. Derives, per place, the minute of the day you are usually last seen
+there — the last sighting of each day, then the **median across days**, today excluded.
+When you are at that place more than 45 minutes past it, `anticipate` says:
+
+> Still at Office, sir. You are usually gone by 6:40 PM.
+
+**Why it passes the test the withdrawn trigger failed.** Not a setting you typed, not
+printed on any screen, and it quotes a figure you can disagree with.
+
+**What it cannot know, and this is written at the top of the file.** It measures *last
+seen*, not *left* — a sighting needs the app to be open, and nothing on this phone runs
+in the background (§7). If you never open it on the way out, the estimate runs early.
+Three brakes: median not mean, four distinct days required, and a 45-minute margin.
+
+**Its own store, deliberately.** The trail in `place.ts` keeps twelve steps for three
+days and only records *changes* of place — it exists so a question can carry "where was
+I this morning". Habit needs weeks, so it gets `jarvis_place_seen`: 28-day TTL, 400
+rows, and two sightings of the same place inside 20 minutes count as one.
+
+**Turning location sharing off forgets it**, along with the trail. Off is not "stop
+collecting", it is "you should not still have that".
+
+**It will say nothing for four days.** The store is new and empty. That is not a fault
+to chase — it is the baseline requirement doing its job, and it is the first thing to
+check on the home machine next week rather than tonight.
+
+`anticipate` now has two triggers, the place one ranked first because it is about right
+now and can be acted on, where a day's total can only be noted.
 
 ## DONE — and proved on the device
 
