@@ -1,482 +1,1034 @@
-# jarvis-mobile — upgrades and roadmap
+# jarvis-mobile — the arc, the queue, and the superpowers
 
-Rewritten 2026-08-17. Companion to `RESUME.md`, which records what has been built
-and why. This file records what has **not**, in the order it is worth doing.
+Rewritten 2026-08-21. **This file merges the old `ROADMAP.md` (the long arc) and
+`NEXT.md` (the queue), which had begun to disagree.** Neither is kept: two files
+answering "is this built?" differently is how the two most expensive bugs in this
+project survived — a stale claim recorded as settled (`RESUME.md`, 08-17) and a
+queue that had stopped matching the code (`NEXT.md`, 08-20).
 
-**This supersedes the 2026-08-11 roadmap, which is not kept.** That version's
-inventory had gone actively wrong — it claimed pairing was "never wired", Scripts
-and Reports were fixture-only, and phases one through three unstarted. All of that
-shipped between 08-11 and 08-14. A doc that records a stale claim as settled has
-already cost this project two sessions once (the mute-channel phantom, `RESUME.md`
-08-17), so the old text is gone rather than archived.
+### Single source of truth — the division of labour
 
-Every item names the files it touches. Anything needing a surface the desk or the
-gateway does not expose is collected in §5, so that work can be scoped in one pass
-rather than discovered item by item.
+Four files, and each answers exactly one question. **Nothing else in this repo may
+carry a plan, a queue, or a status claim.** If you find one, it is stale by
+definition — fold it in here and delete it, which is what happened to `NEXT.md`.
 
----
+| File | The one question it answers | Shape |
+| --- | --- | --- |
+| **`ROADMAP.md`** (this) | **What is built, what is not, and what to do next** | rewritten in place; always current |
+| `RESUME.md` | **How something was proved, and what it cost to find out** | append-only record; never a plan |
+| `AGENTS.md` | **How to work in this codebase** | rules and traps; never a status |
+| `TESTING.md` | **What a human taps, and what should happen** | per-feature checks; never a status |
 
-## 0. Where the app actually stands
+So: a status claim anywhere outside §0b is a bug. A queue anywhere outside §10 is a
+bug. `RESUME.md` keeps the archaeology — the measurements, the wrong hypotheses and
+the sessions they cost — because deleting that is how a project relearns the same
+lesson; but it stops being consulted for *what is true now*.
 
-17 screens, 426 tests, `tsc --noEmit` clean. A standalone release APK is installed
-on the device as of 2026-08-17 14:46 and runs — JS bundled, no Metro.
-
-**Real, end to end, and proved on hardware**
-- Transport: LAN probe → cloud fallback → WebSocket with reconnect (`src/link/`),
-  one reducer (`src/state/hudReducer.ts`) shared by every tab.
-- Pairing with a token, stored in SecureStore. Rotation verified: the new token is
-  accepted, the old refused 403.
-- Push to a sleeping phone, which buzzed. Desk-watch alert reaching a closed app,
-  and tapping it opening the alert screen.
-- Chat surviving a force-stop. One socket per launch.
-- Persisted appearance, biometric lock (`LockScreen`, `src/security/`), haptics,
-  location and named places, the Memory screen, camera and photos.
-
-**Built but never once exercised by a human** — the whole of §1.
-- The microphone. `brains.usage.audio` is `0`.
-- The morning briefing. `jarvis_commute_sent` has never been written.
-- The desk-key handshake. `has_desk_key: false`.
-
-**Known-lossy right now**
-- Every sealed cloud turn is discarded for want of the desk's public key — 39 at
-  last count, and the counter only goes up.
-- Gateway rolling memory lives in process RAM under a shared `chat_id 0`. Every
-  Render restart wipes it and every device shares the slot.
-
-**Cost of a one-line JS fix today:** an 11-minute Gradle release build plus an
-install, because there is no OTA channel. That number is why §3 exists.
+Read `AGENTS.md` first if you have not. Its rules are not repeated here; the ones
+that bear on unbuilt work are cross-referenced where they bite.
 
 ---
 
-## 1. Phase zero — prove what is already built
+## 0. Where the app actually stands — 2026-08-21
 
-**No new features until this section is empty.** Three features have sat "built,
-untested" for four days or more, and one of them is dropping data while it waits.
-Ordered by cost of delay, not by effort.
+21 screens, **852 tests**, `tsc --noEmit` clean. (`AGENTS.md` said 461 and the old
+roadmap said 426. Both were stale. This number will be too — run `npm test`.)
 
-1. **The desk-key handshake.** `has_desk_key: false`, and sealed turns are being
-   dropped, not queued. The machinery is complete on both sides; it needs the desk
-   brought up once so the keys can meet. Do this first because it is the only item
-   here whose cost grows while it is deferred.
-   *Touches:* nothing in this repo — `jarvis-brain` and the desk.
-2. **Rotate `BRIDGE_SECRET`.** The old value passed through Render's access log
-   before redaction landed, and it still opens `/desk-link` — a fake desk was
-   connected with it repeatedly during testing. Both ends change together (Render
-   env and `jarvis-backend/.env`), so it needs the desk on: **do it in the same
-   sitting as item 1** rather than waiting for the desk twice.
-3. **Speak into the microphone.** The oldest unverified thing in the project.
-   Chat → hold the mic → speak → release, then read `brains.usage.audio`. The
-   gesture, timer, meter and cancel/lock slides are all covered by tests; whether a
-   clip transcribes is unknown. If the result is `fell_back` with
-   `last_error_was_quota: false`, the mime type is wrong — the phone records m4a and
-   Google documents `audio/aac`, not `audio/mp4`. That is a one-line fix, and it is
-   the original complaint that started this feature.
-4. **Fire a real briefing.** Settings → Places → set Home while standing in it, set
-   a leaving time, then PREVIEW — do not wait for tomorrow to find out.
-   **Read the 08-17 finding before trusting the result:** PREVIEW is the only path
-   that can run `installHandler`, because it can only be pressed with the app open.
-   It makes noise now solely because `preview: true` opts in. A real 20:00 briefing
-   never touches that handler, so PREVIEW proves the content and the schedule,
-   never the alerting. Home still reads `Not set`, and the briefing falls back to a
-   live fix that a headless task cannot get — the gateway holding the schedule is
-   the real fix, and it is in §5.
-   *Touches:* `src/lib/notify.ts`, `syncCommuteTask`, `src/screens/PlacesScreen.tsx`.
-5. **Re-test the located answers.** Both have been unverified since the fix landed
-   on 08-13. Ask "is it raining here?" with sharing on — it should quote measured
-   figures, and "could not fetch" means the phone's own lookup failed, so check
-   sharing is on first, since without it no `where` is sent at all. Then "how far to
-   the office" with Office named; it resolves against the label with no geocoder
-   call, while unnamed destinations still go through Nominatim.
+Live gateway, read this morning:
 
-**The lock-screen trap that blocked the last attempt at 3–5:** `adb` can wake the
-display but cannot unlock it, so the app launches behind the keyguard and never
-reaches the foreground. `apps_linked: 0` in that state means nothing. Unlock the
-phone by hand before testing any of this.
+```json
+"desk_linked": false, "apps_linked": 1, "push_targets": 1,
+"commute": {"tz": "Asia/Calcutta", "departures": 2, "days_on": 5},
+"memory": {"configured": true, "ready": true, "facts_known": 14},
+"fact_outbox": {"has_desk_key": false, "dropped_no_key": 18}
+```
 
----
+### Landed 2026-08-21
 
-## 2. Phase one — stop losing what it learns
+| | State |
+| --- | --- |
+| Departure briefings reach the Activity panel at all | done — they were filtered out by `kind !== 'reply'` |
+| Timeline built once, shared by panel and bell | done — `state/activity.ts` |
+| Full message on tap, in-tree overlay | done |
+| Read/unread per entry, surviving restart | done — `state/readStore.ts` |
+| Days segregated as the chat does | done — `lib/day.ts`, shared |
+| Paged list with a counted SEE MORE | done — replaces a silent `slice(0, 40)` |
+| Header counts Jarvis-with-text only | done — `countable()` |
+| Local briefing task gated behind `cloudArmed` | **built and covered, not yet seen on a phone** — §2.1 |
+| A test harness that runs the commute task body | done — 10 cases; it had never been run by any test |
+| He can say what he can do, asked or browsed | done — `lib/capabilities.ts`, chat intercept, Capabilities screen |
+| `TESTING.md` — what to tap and what should happen | done — 8 sections, every check with a failure column |
+| The Home status panel — what is connected, what is not | done — `lib/status.ts`, `components/StatusPanel.tsx`, 29 tests |
+| OTA channel confirmed live | done — channel `production`, branch pointed at it, last publish 23h ago |
+| Motion defaulted from the OS, overridable | done — `theme/appearance.tsx`, 4 tests |
+| The dead theme picker removed | done — Dark and System behaved identically |
+| Contrast audit, kept as a test | done — `theme/__tests__/contrast.test.ts`, alpha composited |
+| Both new panels read as one stop each | done — screen-reader labels, 3 tests |
+| The provider stamp test that was owed | done — `state/__tests__/commuteStamp.test.tsx` |
+| Appearance persisted across launches | **not done, and the ledger claimed otherwise** — see the correction below |
+| The act fault in `jarvisProvider.test.tsx` | **partly** — five violations to four, teardowns flush; a late render still blanks |
+| `ROADMAP.md` + `NEXT.md` merged to one source of truth | done — `NEXT.md` deleted |
+| The nudge's weekday substring bug | **not fixed** — `cloud_gateway.py`, and `jarvis-brain` is closed to me. §2.2 |
+| Anything from today shipped to the phone | done — APK built, installed 16:42, and three OTA publishes since |
+| Opening an app on the phone by name | done and **proved** — `open swiggy` brought Swiggy to the front 16:56 |
+| Message states in the chat: `SENDING` / `NOT SENT` + `SEND AGAIN` / `NO ANSWER` | done, unseen |
+| Anticipation v1 — he notices when you open the app | done — one trigger, screen time against your own baseline |
+| The leaving-time countdown | **withdrawn the same day** — it recited a setting you typed, and the situation line already printed it |
+| Long-press your own message: copy, remove | done, unseen — his cannot be removed |
+| Photos settle instead of saying `SENDING` forever | done — the states were wired into `sendCommand` only |
+| The chat log is flushed when the app leaves the foreground | done — two turns were lost to a force-stop on a 400ms debounce |
+| The briefing fires BEFORE the time, never after | phone done; **gateway owed** — addendum in the mailbox spec |
+| Full anticipation | spec written, awaiting approval — `docs/superpowers/specs/2026-08-21-anticipation-design.md` |
+| **A local release build silently breaks OTA** | found and worked around — `expo_runtime_version` stayed `file:fingerprint`; see `AGENTS.md` |
+| Microphone verified | **not done** — needs hands on the phone, not adb |
 
-Both items are named in `RESUME.md` as the enabling conditions for forced tool-use,
-so §4 is gated on this section.
+### Confirmed by adb, 2026-08-21 12:5x
 
-1. **Gateway memory out of process RAM.** Rolling memory under `chat_id 0` in RAM
-   means a Render restart wipes it and every device shares one slot. Supabase is
-   already carrying the 12 stored facts and survives restarts; this belongs there.
-   *Touches:* `jarvis-brain`, not this repo.
-2. **Send the chat history.** The log is local-only (`src/state/chatStore.ts`) and
-   the envelope carries exactly one turn, so the brain is reasoning from a memory
-   the phone could have given it.
-   *Touches:* `src/state/chatStore.ts`, `JarvisProvider.sendCommand`.
+Read off the phone rather than reasoned about. All four are on the **installed
+build, 1.0.0, last updated 2026-08-19 17:47** — see the caveat below.
 
----
+| Fact | Evidence |
+| --- | --- |
+| Both channels the gateway is told about exist | `mId='general-v8' mDeleted=false`, `mId='desk-watch-v2' mDeleted=false` |
+| The desk alert can interrupt | `desk-watch-v2` at `mImportance=5`; `general-v8` at 3 |
+| Old channel versions are cleaned up, not accumulated | `general-v2` … `general-v7` all `mDeleted=true` |
+| Usage access is granted and being used | `appops get … GET_USAGE_STATS` → `allow; time=+1m51s ago` |
 
-## 3. Phase two — stop debugging blind
+The first three close the trap that has cost this project the most sessions —
+**Android discards a notification sent to a channel that does not exist, silently.**
+It is not live right now, and that is now a measurement rather than an assumption.
 
-1. **Crash and error reporting.** Owed before any external tester sees this, and
-   more urgently than that: a native crash here is silent — no red box, nothing an
-   `ErrorBoundary` sees — so today the only diagnosis is `adb logcat` on the one
-   machine that built the APK.
-2. **OTA updates (`expo-updates`).** A JS-only fix currently costs an 11-minute
-   release build plus an install. Most fixes in this project are JS-only.
-   *Touches:* `app.json`, `eas.json`.
-3. **A real release keystore.** Release is signed with Expo's generated debug
-   keystore, which is why the local APK and an EAS-signed one cannot be installed
-   over each other. Fine while it is one phone; not fine at the first second
-   device. See `android/app/build.gradle:112`.
-4. **Render keep-warm, or accept the wait.** The free tier spins down after 15
-   minutes and the first message pays ~50s of cold start. Nothing on the phone can
-   fix this; a ping or a paid instance is the whole of the choice. The cloud probe
-   timeout was already raised 4s → 8s, so the first probe after idle will miss and
-   the next tick catches it — that is by design, not a bug to chase.
+**The caveat, and it governs everything below.** The installed APK is from 08-19 and
+**no `eas update` has been published today**, so none of 2026-08-21's work is on the
+phone: not the Activity panel, not the capability answer, not the status panel, not
+the briefing gate. Every one of those reads `untested` in §0b for that reason and no
+other. One publish changes all of them at once.
 
----
+### Two bugs the phone found within minutes of publishing — both fixed and shipped
 
-## 4. Phase three — make the answers trustworthy
+Neither was reachable by any test in this repo, and that is the point worth keeping:
+**jest does not lay anything out.** Both were found by taking a screenshot.
 
-Gated on §2. Ordered so that nothing is built on a silent failure.
+1. **The detail box collapsed to one clipped line.** `box` carried
+   `maxHeight: '80%'` while its parent `boxWrap` had auto height, so the percentage
+   had nothing to resolve against. The box that exists to show a whole message was
+   showing less of it than the row it was opened from. Fixed by dropping the wrapper
+   so the absolutely-positioned shade — which has a definite height — is the
+   measuring parent, plus `flexShrink: 1` on the scroll view so the actions cannot be
+   pushed off the bottom.
 
-1. **Verify Tavily first.** It is suspected of not working and cannot be checked
-   from this repo — it lives in `jarvis-backend`. If search is silently failing,
-   every question needing a lookup falls back to the model's weights, which looks
-   exactly like the hallucination being reported. A failed search must surface as
-   "I could not look that up", never as a fluent answer. Check this before building
-   anything else on the gateway.
-2. **Force tool-use over prose.** Weather, distance, time and telemetry become
-   function calls; no tool answer means "I don't know". `RESUME.md` calls this the
-   actual cure for hallucination.
-3. **Provenance in the chat UI** — measured / from the desk / from memory. Makes
-   guessing visible instead of anecdotal.
-   *Touches:* `src/screens/ChatScreen.tsx`, `src/ws/frames.ts`.
+2. **Your own messages arrived marked unread.** The header count already excluded
+   them via `countable`; the dot was driven by the read set alone. Two definitions of
+   one word on one screen. Both now read the same rule, and three tests pin it.
 
----
+**The lesson for the ledger:** `untested` on a UI row means untested, and a green
+`npm test` says nothing about layout. Anything visual moves to `proved` only after a
+screenshot, not after a publish.
 
-## 4b. WhatsApp-like chat changes
+### Waiting on adb — check one by one when it is back
 
-The chat is the surface he actually uses, and it is the one place where the app
-still feels like a terminal rather than a messenger. Nothing here is blocked on
-the gateway; all of it is presentation the phone already has the data for.
+In this order. Everything except the first two is blocked behind one `eas update`,
+and the channel is confirmed live so that publish will land.
 
-1. **Compose a photo before sending it — preview plus a caption box.** *(asked
-   for 2026-08-20)* Today the camera button sends immediately: press, and the
-   photo is gone with no caption and no chance to look at it. The gateway already
-   handles a caption — `see()` takes one and falls back to *"The operator sent
-   this photo without a caption — react to it helpfully"* when it is empty, which
-   is a worse prompt than anything he would have typed. So the missing half is
-   entirely on this side.
+| # | Check | How |
+| --- | --- | --- |
+| 1 | The journal names its own denial | Unlock, open Settings → Journal, then `appops set … GET_USAGE_STATS deny` → read the copy → `allow`. Must say *"I cannot see your usage"*, never *"Nothing recorded"* |
+| 2 | The briefing arrives twice, tagged | At a departure window, leave both unswiped: `dumpsys notification --noredact`, grep `tag=`. The push carries `FCM-Notification:*`, a local post does not |
+| 3 | *(after publishing)* The gate holds | Next window shows exactly one notification |
+| 4 | *(after publishing)* Briefings in the Activity panel, at their own arrival time | Open Activity after a briefing |
+| 5 | *(after publishing)* The status panel reads correctly with the desk off | Compare its rows against `/health` |
+| 6 | *(after publishing)* "What can you do" answers instantly with wifi off | Aeroplane mode, then ask |
+| 7 | *(after publishing)* Read/unread survives a force-stop | Read one entry, force-stop, reopen |
+| 8 | The microphone | Hold, speak, release, then read `brains.usage.audio`. Needs hands, not adb |
 
-   **This overrules a decision already written down.** `ChatScreen.tsx:237` says
-   *"There is no separate caption step. A photo is usually the question"* — and
-   `sendPhoto(result.shot, '')` on line 262 is that reasoning in code. It was
-   right about the common case and wrong about the cost of the uncommon one:
-   there is currently no way to ask *anything specific* about a picture, and no
-   way to notice you photographed the wrong thing. Keep the fast path — SEND
-   straight away with an empty box should still work — and add the step around
-   it rather than in front of it.
+### Proved on hardware, and two of them only today
 
-   Wanted: after the shutter, the picture fills the compose area as a preview with
-   the text box under it, a way to back out, and send only on SEND. The caption
-   travels as the question rather than being invented.
+- **The pushed briefing arrives unprompted.** 8 AM, phone asleep, app closed. This
+  was the item the old `NEXT.md` marked *"delivery unproved until tonight"* — it is
+  proved. It is also the item that revealed the duplicate in §2.
+- **He speaks first.** `_nudge_tick` fired for the first time, unprompted, and was
+  read on the lock screen. Marked *"not yet observed"* until 2026-08-21.
+- Transport: LAN probe → cloud fallback → WebSocket with reconnect, one reducer
+  shared by every tab. Pairing with token rotation (new accepted, old 403).
+- Desk-watch alert reaching a closed app; tapping it opening the alert screen.
+- Chat surviving a force-stop. One socket per launch. Biometric lock, haptics,
+  named places, camera and photos.
+- **Correction, 2026-08-21:** this list said "persisted appearance" for days and it
+  is not true — there is no store, no key, and `theme/appearance.tsx` says so in its
+  own header ("deliberately in-memory for now"). Accent, glow and the motion switch
+  reset on every launch. Carried in from the 08-17 roadmap and repeated here without
+  checking, which is the exact failure this file exists to stop.
+- Read/unread, day rules, full-message box and paging in the Activity panel
+  (2026-08-21 — see §2.1, it exists because the briefings were invisible there).
 
-   Worth getting right while building it, because the current path hides them:
-   - **A photo in flight must say so.** A large base64 upload over a slow link is
-     the longest wait in this app and currently the least visible one.
-   - **A photo that failed to send must stay recoverable**, with the caption still
-     attached — losing a typed caption to a dropped socket would be worse than
-     the immediate send it replaced.
-   - **The chat should show the thumbnail he sent**, not the word "Photo". The
-     history already stores a text stand-in (`[sent a photo] <caption>`) for the
-     model's benefit; what the operator sees should be the picture.
+### Built and still never once exercised by a human
 
-     Asked for directly on 2026-08-20, with a better reason than the aesthetic
-     one: **a reply about a photo cannot be judged without the photo.** Verifying
-     the `<think>` fix that day meant screenshotting the chat, and the bubble
-     said only "Photo" — so the answer could be read but not checked against what
-     had been sent. The word "Photo" is not a record of anything. This is the
-     part of §4b that pays for itself outside the moment of sending.
+- **The microphone.** `brains.usage.audio` is `0`. The oldest unverified thing here.
+- **The desk-key handshake.** `has_desk_key: false`, and `dropped_no_key` is 18 and
+  only ever rises. Every sealed cloud turn is discarded rather than queued.
 
-   *Touches:* `src/screens/ChatScreen.tsx`, the compose bar, and whatever holds
-   the pending attachment. No native change, so it ships over the air.
+### Known-lossy right now
 
-2. **Sent / delivered / read ticks.** Already specified in `NEXT.md` §4 and the
-   largest thing on this list — it needs an id on each outgoing ask and two new
-   frames from the gateway. Listed here too because it is the other half of what
-   makes a chat feel like a chat.
-
-3. **Reply-to-a-message.** Quote the turn being answered. Cheap on screen,
-   and it needs the same per-message id that the ticks do — so do it after §2
-   rather than inventing a second identity for a message.
+- Those 18 dropped turns.
+- **Correction, 2026-08-21 (second one today).** This list said gateway rolling memory
+  "lives in process RAM under a shared `chat_id 0`, wiped on every restart". Read the
+  file: there is a `chat_turns` table in Postgres with `chat_id, role, content` and an
+  index, loaded and appended by `_db_load_blocking` / `_db_append_blocking`. The claim
+  was carried forward from the 08-17 roadmap and repeated for days without checking —
+  the same failure as the "persisted appearance" line above. What IS true: shared
+  memory is gated on `APP_MEMORY_SHARED` and `TELEGRAM_USER_ID`, and neither can be
+  read from this machine, so whether the deployed gateway has it on is unverified.
+- `fix/durable-state` is **two commits ahead of `feat/cloud-gateway` and not
+  deployed**. `/health` carries no `memory.state_durable`, which is how you can
+  tell from outside. It was held back deliberately: deploying wipes Render's disk,
+  and the first briefing was 25 minutes away.
 
 ---
 
-## 4c. The Iron Man overhaul — styling only
+## 0b. The ledger — everything, and whether it is done
 
-*Asked for 2026-08-20.* A cosmetic pass to make the whole app read as the film's
-JARVIS rather than as a dark-themed utility. **Scope is styling. The logo does not
-change and no copy changes** — same words, same information, same screens, same
-navigation. If a change alters what a screen *says*, it is out of scope for this
-item and belongs in §4b or §4.
+The one place that answers "is this built?". It was costing a codebase read each
+time, and two files used to answer it differently.
 
-The pieces are already here and under-used: `ArcReactor.tsx`, `Glass.tsx`,
-`glowText` / `glowBox` in `theme/tokens.ts`, the reanimated pulse in
-`GlassTabBar.tsx`, `TypeLine.tsx`, `LoadingBar.tsx`, `Meter.tsx`,
-`StatusStrip.tsx`. This is mostly about applying them consistently and adding
-motion where a state currently changes instantly and silently.
+**Status means exactly this:** `proved` — a human has seen it work on the phone;
+`untested` — the code and its tests are in, no human has ever exercised it;
+`partial` — works, with a named gap; `broken` — works badly, defect logged in §2;
+`—` — not built.
 
-### Where the effects earn their place
+### Transport, pairing, security
 
-1. **Boot and handoff.** A reactor spin-up on cold start, and `ReactorHandoff`
-   carried through every link transition rather than only the one it has now.
-   Sweep lines on panel mount, staggered so a screen assembles rather than
-   appears.
-2. **The HUD frame.** Corner brackets and hairline reticles on `Panel` and
-   `Card`; a scanline or grid at very low opacity behind content; edge glow that
-   tracks `hud.status` — idle, listening, thinking, degraded — so the frame itself
-   is the status indicator.
-3. **Text.** `TypeLine` on arriving replies and briefings (not on static labels —
-   a screen where everything types is a screen you wait for). A glitch/decode
-   in-flourish reserved for values that just changed, and a monospace tabular
-   treatment for anything numeric so figures stop reflowing as they update.
-4. **Voice and thinking.** A live waveform or concentric rings on `VoiceBar`
-   driven by amplitude rather than a fixed animation, and three bouncing dots in
-   the tab bar (already queued as §1 above — do them together, one worklet).
-5. **Data surfaces.** `Meter` and `VitalsPanel` with sweeping needles and
-   trailing decay rather than instant jumps; `LoadingBar` as a scanning bar; the
-   journal and vitals charts on the same grid-and-glow language.
-6. **Touch.** A ring pulse from the contact point on `Touchable`, paired with the
-   haptic that already fires. Every press should have a visible consequence.
-7. **Sound, only if it survives a week.** One soft interface tick. Easy to love in
-   a demo and hate on the fourth day, so it ships behind a setting, defaulting off.
+| | Status | Note |
+| --- | --- | --- |
+| LAN probe → cloud fallback → WebSocket, reconnect | proved | `src/link/`, one reducer for every tab |
+| One socket per launch; chat survives force-stop | proved | |
+| Pairing token in SecureStore, rotation | proved | new accepted, old refused 403 |
+| Biometric lock, re-lock on background | proved | `strong` only; Android rejects `BIOMETRIC_WEAK \| DEVICE_CREDENTIAL` |
+| Desk-key handshake (sealed turns) | untested | `has_desk_key: false`, 18 turns dropped and rising |
+| `BRIDGE_SECRET` rotation | — | old value went through a log and still opens `/desk-link` |
+| Capability-split tokens | — | one string gates socket, push, `/app-commute`, `/app-state` |
+| Token expiry | — | nothing expires |
 
-### Constraints that are not negotiable
+### Talking to him
 
-Collected because each one has already cost time, and a cosmetic pass is exactly
-the change most likely to trip over them:
+| | Status | Note |
+| --- | --- | --- |
+| Text chat, both directions | proved | |
+| Replies arrive word by word | proved | `TypeLine` |
+| Markdown rendered, not shown as asterisks | proved | `lib/rich.ts`, `<RichText>` |
+| `<think>` monologues can never reach the screen | partial | `_strip_reasoning()`; proved in harness, not on device |
+| Opening line is the real situation | proved | `lib/situation.ts`, on-device, no model, no await |
+| "What can you do", answered without a round trip | proved | `lib/capabilities.ts` + intercept in `sendCommand`; on-device, so it answers with everything offline |
+| A Capabilities screen listing the same thing | proved | on device 08-21 15:3x, read back over adb. | Settings → What he can do; one list, two surfaces |
+| A status panel naming every seam | proved | on device 08-21; the briefing row was watched going red then green as the stamp landed. | Home, under the quick actions. 8 rows, four states, on-device |
+| Whether the gateway holds a push address | proved | `push` on the context — nothing exposed this before, and it is the most diagnostic fact in the app |
+| Photo preview + caption before sending | proved | |
+| Photo answering with its own `[[LOOKUP:]]` marker | proved | `_resolve_markers`, shared by `think()` and `see()` |
+| Thumbnail in the chat instead of the word "Photo" | — | a reply about a photo cannot be judged without the photo |
+| Photo-in-flight indicator; recoverable failed send | — | longest wait in the app, least visible |
+| Sent / delivered / read ticks | — | §5.1.1, needs both sides |
+| Reply-to-a-message | — | needs the same per-message id |
+| Microphone in | untested | `brains.usage.audio` is `0`. Oldest unverified thing here |
+| Voice out | — | largest single gap. §3.6 |
 
-- **Do not mount `BlurTargetView`.** It segfaults the RenderThread — full
-  tombstone in `Glass.tsx`. Whatever the design wants, it cannot want that.
-- **`shadowColor` / `shadowRadius` are iOS-only.** Anything that must glow on
-  Android needs SVG opacity and stroke width, or `textShadowRadius`.
-  `elevation` is not a substitute — it draws a grey shadow and reorders siblings.
-  This is why the Appearance screen's glow slider felt inert on a phone.
-- **No default parameters inside a worklet.** The closure is built from
-  identifiers in the body, so a default compiles, passes jest, and throws once per
-  frame on the UI thread.
-- **Effects must not become the only signal.** Every state must still name itself
-  in words — the rule that came up five times on 2026-08-19. A glow that means
-  "degraded" and a label that says nothing is a regression however good it looks.
-- **Budget the frame.** A scanline, a grid, a glow and a sweep on the same screen
-  is a dropped-frame budget on a phone that also holds a socket and a journal.
-  Measure on the device, not in the simulator.
-- **Respect `prefers-reduced-motion`** and the existing Appearance controls, and
-  keep the glow slider meaningful rather than adding effects it cannot reach.
+### Notifications and being spoken to
 
-### How to do it without a month of drift
+| | Status | Note |
+| --- | --- | --- |
+| Push to a sleeping phone | proved | it buzzed |
+| Both notification channels exist on the device | proved | adb 08-21: `general-v8` and `desk-watch-v2`, neither deleted |
+| The desk alert outranks an everyday one | proved | adb 08-21: importance 5 against 3 |
+| Renamed channels are deleted rather than left behind | proved | adb 08-21: `general-v2`–`v7` all `mDeleted=true` |
+| Notification tap opens Chat | proved | `navigationRef` |
+| Desk-watch alert reaching a closed app | proved | tapping it opens the alert screen |
+| Pushed departure briefing, unprompted | proved | it arrives. It arrived twice — gate built 08-21, unseen on the phone. §2.1 |
+| Briefing content, thresholds, quiet-day announcement | proved | figures, never the model |
+| He speaks first, once a day | **broken** | fired for the first time 08-21 and was wrong. §2.2 |
+| Briefings visible in the Activity panel | proved | 08-21: they were being filtered out entirely |
+| Read / unread per entry, surviving restart | proved | 08-21, `state/readStore.ts` |
+| Local task gated so it cannot double-post | partial | shipped and the stamp works; the duplicate itself cannot be checked until a departure window. | `cloudArmed` built 08-21, 6 tests on the decision and 3 on the wiring. `untested` because no phone has run it yet, not for want of cover |
+| Full message on tap, day rules, paged list | partial | shipped, and the box was collapsing to one line on the phone. Fixed and republished 08-21; awaiting a second look |
 
-One screen first — Home, because it has the reactor, the status strip and the
-vitals panel, so it exercises most of the language. Land it, look at it on the
-phone for a day, then propagate. A shared `hud` styling layer rather than
-per-screen decoration, so the second screen costs a fraction of the first.
+### Memory and the journal
 
-Almost all of it is JavaScript, so it ships over the air. Anything wanting a new
-native module (real blur behind content, shaders) needs a build and should be
-argued for separately.
+| | Status | Note |
+| --- | --- | --- |
+| Facts stored and recalled | partial | `facts_known: 14`; volunteered exactly once, wrongly |
+| One assistant across desk, phone, Telegram | partial | `_memory_key` files app turns under the operator's Telegram chat, so app+Telegram share one history. **A desk answering with its own brain bypasses it** — `think()` is never called there, so those turns never join the shared history |
+| Rolling memory durable across restarts | partial | `chat_turns` in Postgres, not RAM — the "RAM" claim was stale. Unverified: whether `APP_MEMORY_SHARED` is on in Render's env |
+| Deploy-durable gateway state | untested | `fix/durable-state`, 2 commits ahead, undeployed |
+| Chat history sent with the ask | — | envelope carries one turn |
+| Journal: usage source, rollup, fact sharing | proved | derived facts only, never rows. adb 08-21: `GET_USAGE_STATS: allow`, last read 1m51s before checking |
+| Journal denial path | proved | adb 08-21: reads `NO ACCESS` and *"I cannot see your usage, sir — the permission is off."* Collected history stays visible under `HELD ON THIS DEVICE`, which is the honest distinction |
+| Any background work running unattended | — | **cannot**, measured again 08-21 12:21 — see §7 |
+| The commute task body exercised by a test | proved | 10 tests, `lib/__tests__/commuteTask.test.ts` — built 08-21; the gate ones were checked by removing the gate and watching them go red |
+| Location timeline | — | prerequisite for anything place-aware |
+| Call log, archive import | — | native build; Play-fatal |
 
----
+### Knowing and acting
 
-## 4d. Making it feel like J.A.R.V.I.S.
+| | Status | Note |
+| --- | --- | --- |
+| Named places, location sharing, located answers | partial | unverified since the 08-13 fix |
+| Weather / distance from measured figures | partial | Tavily unverified; a silent search failure looks like hallucination |
+| Situation sent to the persona (place, battery, link) | — | §3.2.1, highest character-per-line change available |
+| Opening an app on the phone by name | proved | `open swiggy` on the device 16:56 — Swiggy came to the front, confirmed by `topResumedActivity` and by Swiggy's own `app-launch` event. `modules/app-launcher`, needed a native build |
+| Governance: parked actions, approve / deny | proved | desk actions only |
+| Desk-watch countdown, silence locks | proved | desk owns the clock. Do not move it |
+| Scripts: list | proved | |
+| Scripts: create, update, delete, run-by-id | — | why EDIT is disabled |
+| Run history | — | Reports invents "Last run: 2h ago" from a fixture |
+| Presence (awake but idle) | — | inferred from socket state today |
+| Declared rules ("tell me if I haven't…") | — | spec written; its presence half rests on a measurement that no longer holds — §3.4, §7 |
+| Anticipation, v1 — noticed when you open the app | untested | `lib/anticipate.ts`. Decided in code from the journal against its own baseline and the next departure. At most one a day, never the same subject twice running, silent by default |
+| Anticipation that finds you in your pocket | — | needs the gateway push or a foreground service. §7 measured why the phone cannot: `#netAvail=0`, `#readyWithConn=0`, RARE bucket |
+| Anticipation from learned habit rather than a written rule | — | needs the senses in §3.2 and weeks of baseline. Not shortenable by code |
 
-*Asked 2026-08-20: "isn't the app missing something — Jarvis-wise?"* It is, and
-this is a different axis from §4b and §4c. Those are the chat and the costume.
-This is whether the thing has a character at all.
+### Platform
 
-**Three properties make the character**, and the app had none of them:
-
-1. **He is already there.** No launching, no waiting, no blank field.
-2. **He knows the situation without being asked.** Context, not queries.
-3. **He volunteers when it matters and is quiet when it does not.**
-
-Styling is the costume, and a beautifully styled app that waits to be tapped is
-still an app. Voice is deliberately last here — see §4d.7 and the note under it.
-
-### 1. He opens with the state of things — **DONE 2026-08-20, OTA**
-
-Chat opened on a stack of old turns and an empty field. It now opens with one
-true sentence about now, where the turn count used to be:
-
-> 11:52, sir. The desk is awake, you are at Home and Office briefing at 6:30 PM.
-
-`src/lib/situation.ts`, assembled **entirely on the device** — no model, no
-network, no await. That constraint is the design: a greeting that waits for a
-round trip is a loading state wearing a sentence, and the first cloud call of an
-evening here can take the better part of a minute.
-
-Rules it enforces, all tested: `sir` spent exactly once and the clock spends it,
-no exclamation marks, three clauses at most (past that it is a panel, and Home is
-where panels live), unknown things dropped rather than printed as "unknown", a
-dark link said plainly and first, and a briefing mentioned only while it is still
-ahead — announcing one already sent reads as a promise that was kept an hour ago.
-
-### 2. Replies arrive as if thought, not loaded — **OTA**
-
-Answers pop in complete. `TypeLine.tsx` already exists and is not used for this.
-Revealing the finished string at a human cadence stops a reply reading like a
-network response and starts it reading like someone answering — it is the closest
-thing to a voice **without** a voice, and it makes the real voice work drop in
-later rather than replace anything.
-
-Not a typewriter on everything: static labels that type are a screen you wait
-for. Replies and briefings only.
-
-### 3. He addresses the moment, not just the message — **NOT OTA (gateway)**
-
-The persona gets the date and time. It gets no place, no battery, no link state,
-no last-seen. So "should I take an umbrella" triggers a lookup for something he
-could already know, and every answer is written by someone who cannot see out of
-the window.
-
-One field on the outgoing ask, one block in the system prompt. The phone holds all
-of it and sends none of it. This is the item where he stops feeling like a chatbot
-with a good theme.
-
-### 4. Silence has to name itself
-
-Mostly learned already, and the rule is written in five places: **every state must
-name itself.** J.A.R.V.I.S. does not chatter, but "nothing to say" and "broken"
-must never look the same — which is the whole reason §4d.1 exists rather than an
-empty header.
-
-### 5. He remembers out loud, occasionally — **OTA + one prompt line**
-
-`/health` reports `facts_known: 17`. He has never volunteered one. Storage that
-never surfaces is indistinguishable from no memory.
-
-Once a day at most, and only when the day makes it relevant: *"you mentioned
-Mousumi starts at the gym today — that is this morning."* The facts pipe and the
-journal rollup already run; what is missing is anything that reads them and
-decides one is worth saying.
-
-The failure mode to design against is a machine that recites. One a day, tied to
-something happening, and never twice.
-
-### 6. One conversation, not three — **NOT OTA (gateway)**
-
-Desk, phone and Telegram are keyed separately, so the phone does not know what
-you told the desk an hour ago. Sharing the last few turns across them is what
-makes him one presence rather than three copies wearing the same name.
-
-### 7. Voice, and why it is last
-
-**He does not speak, and that is the largest single gap in this app.** Deferred
-by choice on 2026-08-20 — "talking we do at last" — and the ordering is defensible:
-`expo-speech` needs a native build, and 1, 2, 3 and 5 all make the voice better
-when it arrives rather than being made redundant by it. A voice reading a blank
-greeting is still a blank greeting.
-
-The rule already written in `NEXT.md` holds and should not be relitigated:
-**he speaks when you spoke, and stays quiet when you typed.**
-
-### Order
-
-**1 → 2 → 3**, then 5 and 6. One is done. Two is an afternoon. Three is the one
-that changes the character most per line of code, and it is the only one of the
-three needing the gateway.
-
-§4c can run alongside any of them; it touches different files.
+| | Status | Note |
+| --- | --- | --- |
+| 19 screens, 723 tests, `tsc --noEmit` clean | proved | |
+| Standalone release APK, no Metro | proved | |
+| Haptics, and an animation switch that works | proved | |
+| Motion defaulted from the OS | untested | `AccessibilityInfo.isReduceMotionEnabled`, followed live; a deliberate toggle outranks it permanently |
+| Appearance surviving a launch | — | in-memory only. Accent, glow and motion all reset. The ledger claimed this for days |
+| Contrast checked against WCAG AA | proved | `dim` on panel measures 4.78 over the floor and 4.68 over the navy crown, against a bar of 4.5 |
+| A theme choice that does nothing | removed | Dark and System were identical; the note under it admitted as much |
+| OTA updates | partial | **local builds do not receive them** — `expo_runtime_version` stays `file:fingerprint` unless EAS builds it or the hash is baked by hand. Found 2026-08-21 when a published update never arrived. | `expo-updates ~57.0.15`, `updates` block in `app.json`, channel `production`, fingerprint runtime version. Built and configured — `eas channel:list` has never been checked from here, and an unlinked channel fails silently |
+| Crash / error reporting | — | a native crash is silent; `adb logcat` on one machine is the only diagnosis |
+| Real release keystore | — | signed with Expo's debug keystore |
+| Light theme | broken-by-design | "System" behaves identically to Dark |
+| Screen-reader pass, contrast audit | — | targets and roles are set; nothing checked |
+| Tablet / landscape | — | locked to portrait |
+| arm64-only build | — | universal APK is 100.7 MB; arm64 is ~35 MB |
 
 ---
 
-## 5. Blocked on the desk or the gateway
+## 0c. What would make it a complete app
 
-Collected so the backend work can be scoped once.
+Not a wish list — the shortest set of things whose absence makes it incomplete
+rather than unfinished. Everything here is already somewhere below; this is the
+subset that has to be true before "complete" is an honest word.
 
-- ~~**The briefing schedule.**~~ **Built 2026-08-20, not yet proved.** This was
-  right, and for a stronger reason than the one written here: the phone cannot get
-  a live fix in the background, and measured on the device it cannot get a network
-  at all — `expo-background-task` requires one on every run and this uid reads
-  `blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY`. The phone now uploads its
-  schedule (`POST /app-commute`) and the gateway sends the briefing by
-  high-priority push. Untested: no Python on the laptop. See `NEXT.md`.
+**Nothing may be `untested`.** Four features have sat built-and-unexercised for
+days, and one of them drops data while it waits. A feature nobody has ever used is
+a claim, not a capability.
+
+1. **Every state names itself** — §4.3. Already the rule; the briefing duplicate
+   and the false Saturday remark are both what happens when it slips.
+2. **No feature arrives twice or lies once.** §2, both items.
+3. **He can be reached, and he can reach back, without the app being opened.**
+   Push proved this morning; `BOOT_COMPLETED` and the notification listener are what
+   make it continuous.
+4. **He speaks and he listens.** The microphone verified, `expo-speech` in. Until
+   then it is a beautifully themed text box.
+5. **He knows where and when he is.** §3.2.1 — the situation block. One field.
+6. **Memory survives a deploy.** Merge `fix/durable-state`; get rolling memory out
+   of RAM.
+7. **A compromised token does not expose a life.** §4.1 — the split, derived-only,
+   never logged, OTP dropped at capture. This is a gate on §3, not a follow-up.
+8. **A crash is visible.** Crash reporting. Shipping the fix within the hour is
+   already solved — OTA is in and configured; only the channel link is unverified.
+9. **A second device is possible.** A real keystore.
+10. **It is usable by someone who cannot see it well.** Screen reader, contrast,
+    reduced motion from the OS.
+
+Ten items. Six are hours, three are a build, one (7) is a spec of its own.
+
+---
+
+## 1. Owed before anything new
+
+Unchanged from `NEXT.md`, because neither has been done.
+
+1. **`run_harnesses.py` on the desk.** Never run. Expect **81 + 4 `/app-commute`
+   + 8 reasoning-leak + 17 vision-marker + 17 durable-state**. Five days of gateway
+   work has never been executed by a Python interpreter with the real imports —
+   this laptop has no Python (`python` opens the Microsoft Store), and the
+   standalone checks cover logic, not imports. A `_load_commute()_load_commute()`
+   SyntaxError already slipped through once and was caught by reading.
+2. **Merge `fix/durable-state`** into `feat/cloud-gateway`, then deploy. Until then
+   every deploy silently disarms the briefing, which has already happened twice.
+3. **The desk-key handshake, and rotate `BRIDGE_SECRET` in the same sitting.** The
+   handshake is the only item whose cost grows while deferred. The old secret went
+   through Render's access log before redaction landed and still opens `/desk-link`;
+   a fake desk was connected with it repeatedly during testing. Both need the desk
+   on, so do them together rather than waiting for the desk twice.
+4. **Speak into the microphone.** Chat → hold → speak → release, then read
+   `brains.usage.audio`. If it reads `fell_back` with `last_error_was_quota: false`,
+   the mime type is wrong: the phone records m4a and Google documents `audio/aac`,
+   not `audio/mp4`. One line, and it is the complaint that started the feature.
+
+**The trap that blocked the last attempt:** `adb` can wake the display but cannot
+unlock it, so the app launches behind the keyguard and never foregrounds.
+`apps_linked: 0` in that state means nothing. Unlock the phone by hand first.
+
+---
+
+## 2. Open, diagnosed, not yet fixed — 2026-08-21
+
+### 2.1 The briefing arrives twice
+
+Two senders build the same string and neither knows about the other:
+
+| | Posts | Marker | Window |
+| --- | --- | --- | --- |
+| Phone | `commuteTask.ts:161` `postNow` | `jarvis_commute_sent` (AsyncStorage) | ±30 min (`DUE_WINDOW_MIN`) |
+| Gateway | `cloud_gateway.py:2386` `_push_all(force=True)` | `_briefed` (json + Postgres) | target → +20 (`COMMUTE_FIRE_WINDOW_MIN`) |
+
+`cloud_gateway.py:2352` emits `f"Before you leave {label}, sir"` — byte-identical
+to `commute.ts:390`, deliberately, so the shade cannot tell them apart.
+`push_targets: 1`, so it is not a double registration.
+
+Why it appeared on 08-21 and never before: **Home was named the night before.**
+Before that both senders refused it — `coordsFor` found no `KnownPlace` and
+returned `Failed`; `commutePayload` dropped the row (`if (!at) continue`). Naming it
+armed both at once, and `/health` went from `departures: 1` to `2`.
+
+The old roadmap's §5 said *"keep the local task as a fallback"*. It was never gated,
+so it was a second sender rather than a fallback.
+
+**Built and shipped 2026-08-21, seen on the phone.** `cloudArmed` / `markCloudArmed` in
+`lib/commute.ts`: a successful `syncCommute` stamps the clock, and the task declines
+to post while that stamp is under `CLOUD_TTL_HOURS` (48). Gateway armed → phone
+silent; gateway stale, unreachable or never uploaded → phone posts, because a
+duplicate is an annoyance and a silent morning is the feature not existing.
+`previewBriefing` untouched. Checked before the forecast, so a run that cannot post
+does not spend a headless task's network budget.
+
+*Covered since 08-21:* the task body now runs in tests — `defineTask`'s callback is
+captured at import and invoked, with the real `commute.ts` and only `fetch` stood in
+for. Ten cases, including the gate standing the task down, the gate being checked
+*before* the forecast, the stale-stamp handover, and the `unavailable` path not
+consuming the day. The two gate cases were confirmed to fail with the gate removed.
+
+*Still owed:* the provider calling `markCloudArmed` on a successful upload. Two
+attempts failed for reasons that look like state left by earlier tests in
+`jarvisProvider.test.tsx` that never unmount — noted at the foot of that file.
+
+**A limitation the panel made visible within minutes of shipping.** `markCloudArmed`
+is written only on a successful `syncCommute`, and that runs on a **cloud** connect
+only — `api.syncCommute` is a gateway route and the effect returns early on LAN. So a
+run of LAN-only sessions ages the stamp past `CLOUD_TTL_HOURS` and the phone takes the
+briefing back, even though the gateway may still hold the schedule perfectly well. The
+stamp is honest about what the *phone* knows, not about what the gateway holds. Worth
+either stamping on any successful upload regardless of transport, or naming that row
+`unknown` rather than `off` once the stamp is merely stale.
+
+*Confirmation still owed on the phone:* leave both unswiped at a window and read the
+tags — the pushed one carries `tag=FCM-Notification:*`, a local post does not.
+
+### 2.2 He asserted a Saturday shift on a Friday
+
+`_nudge_subject` (`cloud_gateway.py:2474`) decides whether to speak with
+
+```python
+named_day = weekday in low
+```
+
+a bare substring test for today's weekday name anywhere in a stored fact. A fact
+mentioning Friday only as a boundary — a Mon–Fri work pattern — matched, and the
+prompt then asserts it: *"Something you were told about him is true TODAY."* The
+model obeyed and invented tomorrow's shift to make a remark out of it. On the
+device:
+
+> **J.A.R.V.I.S.** — It's Friday, Sir, so hopefully you won't have to head in for
+> a Saturday shift tomorrow.
+
+The comment above that function claims *"the judgement of WHETHER to speak is made
+here, in code"*. A substring is not that judgement. **Fix:** require recurrence
+wording (`every friday`, `fridays`, `on friday`), and refuse a fact that names a
+weekday other than today unless today's is the one being asserted. `dated` has the
+same class of false positive.
+
+Also: that body says `Sir`, capitalised. The voice rule — `sir` is punctuation,
+lowercase, spent once — is enforced in `commute.ts` and `_briefing_text` and was
+never applied to the nudge path.
+
+---
+
+## 3. The superpowers — what it takes to be J.A.R.V.I.S.
+
+*Asked for 2026-08-21: what superpowers the app should have, security-wise and
+autonomy-wise, so that it is the thing from the film rather than a themed chat app.*
+
+The film's JARVIS is not a better chatbot. Strip the cinema and he has **six**
+properties, and they are separable — which matters, because this app already has
+two of them and can be built toward the rest one at a time.
+
+| | Property | Where this app is |
+| --- | --- | --- |
+| 1 | **Always there.** No launching, no waiting, no blank field | Partly. He greets with the real situation; he still has to be opened |
+| 2 | **Knows the situation** without being asked | Thin. Time, place, link state. Nothing about the day |
+| 3 | **Remembers**, as one presence across every surface | Built, barely surfaced. 14 facts, `_memory_key` shared |
+| 4 | **Volunteers** — and is quiet when there is nothing | Just started. One nudge a day, and its first one was wrong |
+| 5 | **Acts** on the world, with judgement about what needs asking | Real but narrow. Desk control, scripts, governance |
+| 6 | **Speaks and listens** | Neither. The mic is untested; there is no voice at all |
+
+The rest of this section is those six, in the order that makes each one cheaper
+than it would have been alone.
+
+### 3.1 Presence — being there without being opened
+
+The measurement that governs all of this is in §7: **this app cannot run work in
+the background on this phone.** `expo-background-task` hardcodes
+`setRequiredNetworkType(NetworkType.CONNECTED)` and the uid reads
+`blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY` with `#netAvail=0` in a RARE
+bucket. Not deferred — stopped. Everything below is chosen around that fact.
+
+| Mechanism | What it gives | Battery | Real cost |
+| --- | --- | --- | --- |
+| High-priority push | reaches a dead app, exempt from the above | free | needs the gateway to know *when* |
+| `NotificationListenerService` | every notification from every app, live | ~free, event-driven | Play-fatal, one build |
+| `BOOT_COMPLETED` | survives reboot | free | none |
+| SMS receiver | wakes the app **from dead** | ~free | Play-fatal |
+| Foreground service | process always alive | real, measurable | permanent notification |
+| `ACCESS_BACKGROUND_LOCATION` | continuous place awareness | significant | needs the service |
+| `AccessibilityService` | every window, every string on screen | low | maximum invasiveness |
+
+**The best value is not the obvious one.** `NotificationListenerService` is
+event-driven, costs nearly no battery, and delivers more context than any amount of
+polling: the message, the offer, the debit, the missed call. It is ahead of the
+foreground service and well ahead of accessibility. Sideloading removes the only
+real gate, and this app is already sideloaded.
+
+Sequence: push (done) → `BOOT_COMPLETED` (free, do it with the next build) →
+notification listener (the step change) → foreground service only if real use
+proves the listener is not enough → accessibility, probably never.
+
+### 3.2 Senses — knowing the situation
+
+Ordered by what each unlocks, not by effort.
+
+1. **Send what the phone already knows.** The persona gets the date and the time.
+   It gets no place, no battery, no link state, no last-seen — so "should I take an
+   umbrella" triggers a lookup for something the phone is holding, and every answer
+   is written by someone who cannot see out of the window. One field on the outgoing
+   ask, one block in the system prompt. **This is the highest character-per-line
+   change available** and it needs the gateway.
+2. **Location timeline** — arrival and departure at named places, into the journal.
+   The prerequisite for anything that reacts to *where he is*.
+3. **Notification stream** — see 3.1. Turns "what is happening today" from a guess
+   into a fact, and it is the sense the film's JARVIS most obviously has.
+4. **Call log** (`READ_CALL_LOG`) — the literal rule that was asked for. Native, one
+   build, and it bars the app from Play permanently. Fine while sideloading.
+5. **Archive import** — Google Takeout, Meta DYI. Years of history in one file.
+6. **Screen content** (`AccessibilityService`) — listed for completeness and
+   deliberately last. It reads banking screens. The data-handling cost is not worth
+   what it adds over 3.
+
+### 3.3 Memory — one presence, not three copies
+
+`_memory_key` already makes desk, phone and Telegram one conversation. What is
+missing is that memory being **durable** and **spoken**:
+
+- Rolling memory out of process RAM (§1.2 covers the mechanism; Supabase already
+  carries the facts and survives restarts).
+- **Send the chat history.** The log is local-only (`chatStore.ts`) and the envelope
+  carries exactly one turn, so the brain reasons from a memory the phone could have
+  handed it.
+- **He remembers out loud, occasionally.** `facts_known: 14`, volunteered once —
+  wrongly (§2.2). Storage that never surfaces is indistinguishable from no memory;
+  storage that surfaces carelessly is worse than both. The judgement stays in code.
+
+### 3.4 Volunteering — the autonomy ladder
+
+Autonomy is not a switch, and the film's JARVIS sits on different rungs for
+different things: he *reports* a suit diagnostic, he *asks* before a protocol, he
+*acts* alone on a countdown. The same ladder, and this codebase already has
+machinery for four of the five rungs:
+
+| Rung | He… | Machinery | Where it stands |
+| --- | --- | --- | --- |
+| 0 | answers when asked | `sendCommand` | done |
+| 1 | reports what changed | briefing, `_nudge_tick` | done, and §2.2 is what rung 1 gets wrong |
+| 2 | **asks** rather than asserts | declared rules | spec written, `docs/superpowers/specs/2026-08-20-declared-rules-design.md` |
+| 3 | acts, then reports, reversibly | `governance.json`, `hud.parked` | built for desk actions only |
+| 4 | acts on a deadline, silence consents | desk-watch countdown | built, and the only rung 4 thing here |
+
+**Rung 2 is the next one to build, and the spec is written.** Two shapes that do
+not share an evaluator: *absence* ("tell me if I haven't called mom by 7") is a
+clock question and the gateway owns it, because the phone cannot be trusted to
+wake; *presence* ("when I open Swiggy, tell me what I can eat") is a phone question
+carried by the background task.
+
+**The presence half is on weaker ground than the spec assumes, measured
+2026-08-21 12:21.** Its argument was that a blocked job unblocks while the phone is
+in a hand — bucket at `10`, network up. Two hours after the app was opened and used,
+the bucket reads `40` again and `WITHIN_QUOTA` has joined `CONNECTIVITY` as an
+unsatisfied constraint. §7 has the dump. So "0–15 minutes and sometimes missed" is
+optimistic; the honest version is **sometimes, and never on a schedule you can
+promise a user.**
+
+That does not sink rung 2, it moves the line: state a presence rule as best-effort
+in the UI, or carry it on the foreground service rather than the periodic job.
+Deciding which belongs in the spec review, not here — but the spec should not be
+approved on the old measurement.
+
+He **asks rather than asserts**, and §2.2 is the proof of why: the phone's
+information can be stale, a question is true either way, a redundant question costs
+a shrug, and a confident false accusation is what teaches someone to mute an
+assistant. *"Did you get a chance to call your mother?"* — never *"you did not
+call."*
+
+Rung 3 is where the interesting work is after that: today governance covers desk
+actions and nothing the phone does on its own. Anything the phone learns to act on
+needs the same parked-approval path, not a new one.
+
+**Anticipation** — the thing actually asked for at the start — is rung 3 with the
+rule learned instead of written. It needs 3.2's senses beneath it and two to four
+weeks of baseline before "unusual" means anything. Declared rules first, because
+they are the same trigger machinery with the rule written by hand.
+
+### 3.5 Acting — and the weekly portrait
+
 - **Script CRUD.** `/api/tasks` lists; there is no create, update, delete or
-  run-by-id. Script Details' EDIT button is disabled for exactly this reason.
-- **Run history.** Outcomes and durations per run, so Reports stops inventing
-  "Last run: 2h ago" from a fixture.
+  run-by-id, which is why Script Details' EDIT is disabled.
+- **Run history** — outcomes and durations, so Reports stops inventing "Last run:
+  2h ago" from a fixture.
+- **The weekly portrait.** Batch analysis over the journal, no new permission.
+  **Wait for data** — the facts pipe starts speaking after 7 completed days and
+  this wants more.
+
+### 3.6 Voice — and why it stays last
+
+**He does not speak, and it is the largest single gap in the app.** Deferred by
+choice on 2026-08-20 ("talking we do at last"), and the ordering holds:
+`expo-speech` needs a native build, and 3.1–3.4 all make the voice better when it
+arrives rather than being made redundant by it. A voice reading a blank greeting is
+still a blank greeting.
+
+The rule is settled and should not be relitigated: **he speaks when you spoke, and
+stays quiet when you typed.**
+
+---
+
+## 4. Security — the part that is actually the work
+
+The Android side of §3 is a weekend. **The part where a compromised token does not
+expose someone's entire life is the work**, and it has to land *before* the senses,
+not after. A notification listener sees OTPs, balances and private messages; an
+accessibility service can read a banking app's screen. Once that data has been
+collected badly, no later fix un-collects it.
+
+### 4.1 Do these before any new sense ships
+
+1. **Split `APP_TOKEN`.** One string currently gates the socket, push registration,
+   `/app-commute` and `/app-state` alike. A token that can register a push and a
+   token that can read your day must not be the same secret. Split by capability,
+   and give the read-your-day half a shorter life.
+2. **Raw never leaves the phone.** Not notification text, not screen content, not
+   SMS bodies, not call rows. Only derived facts: booleans, counts, aliases. The
+   journal already works this way (`shareFacts` sends a rollup, not rows) — that is
+   the pattern to copy rather than reinvent.
+3. **Never logged, not even truncated.** A log line is a permanent copy in someone
+   else's system. Render's access log already cost this project a secret rotation.
+4. **OTP and financial content dropped at the point of capture**, not filtered
+   later. A filter downstream of storage is a filter that has already failed once.
+5. **Finish the desk-key handshake.** 18 sealed turns dropped so far. Sealed-and-
+   dropped is the correct failure and it is still a failure: it means the encrypted
+   path has never once worked end to end, so nothing is known about it.
+
+### 4.2 The threat model this app actually has
+
+Written down because it is small, and the small ones are the ones that get skipped:
+
+- **A stolen phone.** Answered: biometric lock, re-locking on every background,
+  `strong` biometrics only (`BIOMETRIC_WEAK | DEVICE_CREDENTIAL` is rejected
+  outright by Android — always request `strong` or no sheet appears and the promise
+  never settles).
+- **A stolen token.** Partly answered: rotation works and is verified. Not
+  answered: one token does everything (4.1.1), and nothing expires.
+- **A fake desk.** Currently open to anyone holding `BRIDGE_SECRET`, and that value
+  has been through a log. §1.3.
+- **The gateway being read.** Facts live on Render and Supabase. Derived-only (4.1.2)
+  is what limits the blast radius, so it is a security control and not a design
+  preference.
+- **Someone at the desk while you are not.** Answered, and it is the one rung-4
+  autonomy in the app: the desk owns the countdown and **silence locks**. The
+  phone's countdown is a readout, never a decision timer. Do not move that clock.
+
+### 4.3 Rules that are already load-bearing
+
+- **Every state must name itself.** It came up five times on 2026-08-19 and it is a
+  security property as much as a UX one: the briefing that never ran and the
+  briefing that ran and found nothing to say were indistinguishable from outside,
+  which let a wrong hypothesis stand for a day. A silent failure in a security path
+  is a security failure.
+- **A recovery gated on a WebSocket is not a recovery.** The phone re-uploads its
+  schedule on `link.status === 'open'`, but a photo answers over plain HTTP — so the
+  app can look connected while the gateway can reach nobody by push.
+- **`unavailable` stays silent.** Announcing "all clear" when a lookup failed is the
+  one genuinely dishonest message this app could send.
+
+---
+
+## 5. Making it feel like him — chat and costume
+
+Both ship over the air. Neither adds capability, and that is why they are here
+rather than in §3.
+
+### 5.1 The chat, as a chat
+
+1. **Sent / delivered / read ticks.** The phone knows *sent*. Only the gateway can
+   say *delivered* and *read*, and it says neither: an id on each outgoing ask
+   echoed back, a frame when the answer is written to a socket, another when the app
+   reports the chat on screen. `ChatEntry` grows a state. **Not OTA** — protocol
+   both sides. The largest fully-specified thing left.
+2. **Reply-to-a-message.** Quote the turn being answered. Cheap on screen, and it
+   needs the same per-message id the ticks do — so do it after 1 rather than
+   inventing a second identity for a message.
+3. **A photo in flight must say so**, and a photo that failed must stay recoverable
+   with its caption attached. The preview and caption shipped; these two did not.
+
+4. **A status box on Home, beside Reports.** — **BUILT 2026-08-21.** `lib/status.ts`
+   holds the pure logic (20 tests), `components/StatusPanel.tsx` renders it (6), and
+   Home gathers the facts. Eight rows: the desk, the link, the pairing token, whether
+   he can reach you by push, where the briefing schedule lives, location sharing,
+   usage access, the app lock.
+
+   Four states rather than two — `on`, `off`, `waiting`, `unknown` — and the last one
+   is the point: push registration refused and push registration never attempted are
+   different facts, and one red dot for both sends someone hunting a fault that does
+   not exist. What is wrong sorts to the top; the caption counts only what is
+   genuinely off.
+
+   Two things it cost to learn, both now written at the site: a synchronous
+   `setState` inside `useFocusEffect` loops forever under this repo's screen-test
+   mock, which calls the callback during render; and these source files are **CRLF**,
+   so a patch matching on `
+` fails silently.
+
+   *Was:* one row per thing
+   the app depends on — the desk, the cloud gateway, push registration, the commute
+   schedule the gateway holds, location sharing, usage access, the app lock — each
+   with a pulsing dot: green when it is there, red when it is not.
+
+   **Why it is worth more than it looks.** Today "what is actually connected" is
+   spread across the Connection screen, the transport pill, `/health` and nothing at
+   all, and the answer a user can give a developer is "it did not work". This turns
+   that into a screenshot naming the thing that is off. It is the same instinct as
+   the rule this codebase keeps relearning — every state names itself — applied to
+   the seams rather than to a feature.
+
+   Getting it right while building it:
+   - **A dot must never be the only signal.** Red/green is the one distinction a
+     colour-blind reader cannot make, so the row needs a word — `OFF`, `WAITING`,
+     `ON` — and the dot is the glance. `CapabilitiesScreen` uses a filled/hollow
+     glyph for the same reason; reuse that rather than inventing a second language.
+   - **Unknown is not the same as off.** Push registration with no answer yet, and
+     push registration refused, are different facts. A third state, or a plain
+     "not asked yet", rather than a red dot that means either.
+   - **A pulsing dot on every row is a frame budget**, on a screen that already
+     holds the reactor and the vitals panel. One worklet driving all of them, and it
+     must respect the Appearance animation toggle.
+   - **It must be readable with nothing connected at all**, which is exactly when it
+     will be looked at. So it is assembled on the device like `lib/situation.ts`,
+     never fetched.
+
+   *Touches:* `src/screens/HomeScreen.tsx`, a new panel component, and whatever the
+   provider already exposes — most of these facts are on the context today. Ships
+   over the air.
+
+### 5.2 The Iron Man styling pass
+
+*Asked for 2026-08-20. Scope is styling. The logo does not change and no copy
+changes.* If a change alters what a screen *says*, it belongs in §3 or §5.1.
+
+The pieces are here and under-used: `ArcReactor.tsx`, `Glass.tsx`, `glowText` /
+`glowBox`, the reanimated pulse in `GlassTabBar.tsx`, `TypeLine.tsx`,
+`LoadingBar.tsx`, `Meter.tsx`, `StatusStrip.tsx`. Mostly this is applying them
+consistently and adding motion where a state currently changes instantly and
+silently.
+
+Where the effects earn their place: a reactor spin-up on cold start and
+`ReactorHandoff` on every link transition, not just the one it has; corner brackets
+and hairline reticles on `Panel` and `Card`, with edge glow tracking `hud.status` so
+the frame *is* the status indicator; `TypeLine` on arriving replies and briefings
+only; a live amplitude waveform on `VoiceBar`; sweeping needles with trailing decay
+on `Meter` and `VitalsPanel`; a ring pulse from the contact point on `Touchable`,
+paired with the haptic that already fires. Sound, if at all, behind a setting
+defaulting off — easy to love in a demo and hate on the fourth day.
+
+**Constraints, every one of which has already cost time:**
+
+- **Do not mount `BlurTargetView`** — it segfaults the RenderThread. Full tombstone
+  in `Glass.tsx`. Whatever the design wants, it cannot want that.
+- **`shadowColor` / `shadowRadius` are iOS-only.** Android glow needs SVG opacity
+  and stroke width, or `textShadowRadius`. `elevation` draws a grey shadow and
+  reorders siblings. This is why the Appearance glow slider felt inert.
+- **No default parameters inside a worklet.** The closure is built from identifiers
+  in the body, so a default compiles, passes jest, and throws once per frame on the
+  UI thread.
+- **Effects must not become the only signal** — §4.3, first bullet.
+- **Budget the frame.** A scanline, a grid, a glow and a sweep on one screen is a
+  dropped-frame budget on a phone also holding a socket and a journal. Measure on
+  the device.
+- **Respect the Appearance controls and reduced motion.**
+
+How to do it without a month of drift: Home first, because it has the reactor, the
+status strip and the vitals panel. Land it, look at it on the phone for a day, then
+propagate through a shared `hud` styling layer rather than per-screen decoration.
+
+#### Liquid glass on the Android tab bar — the last thing on this list
+
+*Asked 2026-08-21.* Real backdrop blur behind the rounded tab bar, rather than the
+heavy tint standing in for it.
+
+**The arrangement is the whole thing, and it is already written.** `BlurBehind`
+in `Glass.tsx` takes `content` and `surface` as separate slots: the target wraps
+only the content, and the blurring surface is its **sibling**. A tab bar is that
+shape for free — react-navigation renders `tabBar` outside the screen content —
+and `GlassTabBar.tsx:329` already mounts the `Glass` that would sample it. The
+missing half is wrapping the screen area in the target and flipping
+`TRY_SCOPED_ANDROID_BLUR`.
+
+**Do not reintroduce the whole-app `BlurTargetView`.** That is the shape that
+segfaults the RenderThread: the target contains a view whose content is the
+target, and HWUI's transform walk never terminates. Tombstone in `Glass.tsx`.
+
+*Cost:* no new package — `expo-blur ~57.0.2` is already a dependency — so it
+ships over the air. *But it cannot be verified by a test run:* the failure mode is
+a segfault with no JS error, so flipping that const needs a phone and
+`adb logcat` watching for `F DEBUG` frames in `libhwui.so`. Budget the frame too;
+a blur behind a bar that also pulses is measured on the device, not assumed.
+
+Ordered last deliberately, and asked to be
+(2026-08-21). It is the one item here whose downside is the process dying rather
+than a screen looking wrong, it changes nothing about what the app can do, and every
+other item in §5.2 is reversible by reading a diff. It goes after the styling pass
+has landed and been lived with.
+
+---
+
+## 6. Platform debt and blocked work
+
+### Blocked on the desk or the gateway
+
+Collected so the backend can be scoped in one pass. Script CRUD and run history are
+in §3.5; the rest:
+
 - **Presence**, so the app can say the desk is awake but idle rather than inferring
   it from socket state.
 - **A paid routing key.** Routing is OSRM's public server, which knows the road
   graph and not the road, so durations are free-flowing and the context says so.
-  `_route_blocking` / `_route_to_blocking` are the only functions that change when
-  a Mapbox or TomTom key exists.
-- **Desk-watch, desk side.** The phone half is done; `docs/desk-watch.md` holds what
-  is owed. The desk owns the countdown and silence locks — the phone's countdown is
-  a readout, never a decision timer.
+  `_route_blocking` / `_route_to_blocking` are the only functions that change.
+- **Desk-watch, desk side.** Phone half done; `docs/desk-watch.md` holds what is
+  owed.
+- **`LLM_PROVIDER_VISION=gemini` is dashboard-only**, undeclared in `render.yaml` —
+  the trap that file's own comments warn about. Declare it or set vision to `groq`.
 
----
+### Cheap now, expensive to discover later
 
-## 6. Phase four — platform debt
-
-None of this blocks daily use. All of it is cheap and gets more expensive to
-discover later.
-
-- **Light theme: decide or remove.** "System" on the Appearance screen behaves
-  identically to Dark. A setting that does nothing is worse than an absent one.
-- **Accessibility pass.** Touch targets are floored at 44–64px and roles are set,
-  but nothing has been checked with a screen reader, and `COLOR.dim` on
-  `COLOR.panel` needs a contrast audit.
-- **Reduced motion from the OS.** The Appearance toggle already gates every
-  animation; default it to `AccessibilityInfo.isReduceMotionEnabled` rather than
-  making the user find it.
+- **Crash and error reporting.** Owed before any external tester, and more urgently
+  than that: a native crash here is silent, so the only diagnosis is `adb logcat` on
+  the one machine that built the APK.
+- **Confirm the OTA channel.** OTA itself is **built**, not owed: JS-only work
+  ships with `eas update --branch production --environment production --platform
+  android`. What has never been verified from this laptop is that the channel exists
+  and is linked to its branch — `eas channel:list` must not be empty, or the app
+  asks and gets nothing, silently. One command.
+- **A real release keystore.** Release is signed with Expo's generated debug
+  keystore, which is why a local APK and an EAS-signed one cannot replace each
+  other. Fine for one phone, not for the second. `android/app/build.gradle:112`.
+- **Render keep-warm, or accept the wait.** Free tier spins down after 15 minutes
+  and the first message pays ~50s. The cloud probe timeout is already 8s, so the
+  first probe after idle misses and the next tick catches it — by design.
+- **The journal's denial path has never been run.** Settings → Journal → usage
+  access off → return. It must say *"I cannot see your usage"*, never *"Nothing
+  recorded"*.
+- **Light theme: decide or remove.** "System" behaves identically to Dark. A setting
+  that does nothing is worse than an absent one.
+- **Accessibility pass.** Targets are floored at 44–64px and roles are set, but
+  nothing has been checked with a screen reader, and `COLOR.dim` on `COLOR.panel`
+  needs a contrast audit. Default reduced motion from
+  `AccessibilityInfo.isReduceMotionEnabled` rather than making the user find it.
 - **Default the local build to arm64.** The universal APK is 100.7 MB across four
   ABIs with `minifyEnabled false`; arm64-only is ~35 MB and the phone is arm64.
-  `-PreactNativeArchitectures=arm64-v8a`. Consider moving this and the 6144m
-  jvmargs into `expo-build-properties` so both survive `prebuild --clean` — that
-  reset has cost time twice.
-- **Tablet and landscape.** `orientation` is locked to portrait and the layout
-  assumes a phone; the reactor and the 2×2 quick-action grid both need a breakpoint
-  before iPad is claimed.
-- **Error surfaces.** `lastError` shows only on the Connection screen, and a failed
-  command still reports success-shaped toast copy.
-- **`AGENTS.md` says 287 tests.** It is 426, and it was stale before 08-14 too.
-- **Widgets / quick actions.** A home-screen shortcut straight to the command bar —
-  iOS App Intents and Android app shortcuts.
+  Consider moving this and the 6144m jvmargs into `expo-build-properties` so both
+  survive `prebuild --clean` — that reset has cost time twice.
+- **Tablet and landscape.** Locked to portrait; the reactor and the 2×2 grid need a
+  breakpoint before iPad is claimed.
+- **The window label prints whole hours**, so a 6:30 PM departure reads
+  `(6 PM–9 PM)`. `hourLabel(d.hour)` ignores minutes. Matched on both sides rather
+  than fixed on one.
+- **`surface="desk"` is unreachable.** A linked desk answers with its own brain, so
+  `think()` is never called there. Harmless.
 
 ---
 
-## 7. Deliberately not doing
+## 7. The measurement everything is built around
 
-- **A light theme for the HUD's own sake.** The instrument look is the product; a
-  light variant is only worth building if a real user asks. §6 is about removing the
-  dead option, not building the theme.
-- **Offline command queue.** The toast says "queued" today, which is a lie of
-  convenience — either build a real queue with retry and expiry, or change the copy
-  to say the command was dropped. Change the copy first.
+Kept in full. It is the reason the briefing moved to a push, and it is what tells
+§3.4's presence rules what they can expect.
+
+The hypothesis this once carried — a throttled job overrunning its budget — is
+**wrong**. The 08-19 reordering fix worked; the quota was never what was left.
+
+Read from the device, uid `10495`, before the app was opened:
+
+```
+timeout-reg:   countLimit=3,  countInWindow=0
+timeout-total: countLimit=10, countInWindow=0
+UID: 10495; Network: 108 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)
+UidStats{uid=10495 #run=0 #netAvail=0 #reg=0}
+standby bucket: 40   (RARE)
+```
+
+`countInWindow=0` closes the throttle theory. `#netAvail=0` opens the real one:
+**network has never once been available to this task.** `expo-background-task`
+hardcodes the constraint that makes that fatal —
+`BackgroundTaskScheduler.kt:108`:
+
+```kotlin
+.setRequiredNetworkType(NetworkType.CONNECTED)
+```
+
+Not configurable, applied to every run. The work sits `ENQUEUED` on a constraint
+Android will not satisfy for a RARE-bucket app in the background.
+
+Caught in the act, launching cold at 10:20:45:
+
+```
+10:20:45.316  BackgroundTaskWork: doWork: Running worker
+10:20:45.339  runTasks: com.mypersonalintelligence.jarvis
+10:20:47.409  Finished task 'jarvis-commute-briefing'
+10:20:47.411  Enqueuing worker ... '15' minutes delay
+```
+
+It ran **200 ms after launch** — the moment the network restriction lifted — then
+queued the next one for a window it will be blocked in again. The bucket read `40`
+before that launch and `10` after.
+
+**Why this inverts for presence triggers.** The briefing failed because it had to
+run while the phone sat idle in a pocket. A presence trigger happens while the
+phone is in a hand: screen on, network up, bucket at `10`. Those are exactly the
+conditions under which that blocked job unblocks. Plausible, not dependable —
+WorkManager's floor is 15 minutes, so a four-minute browse can fall between runs.
+That is the trade §3.4 accepts for v1.
+
+### Read again 2026-08-21, 12:21 — and it has got worse
+
+Two hours after the app was opened and used:
+
+```
+Required constraints:    CONNECTIVITY FLEXIBILITY
+Satisfied constraints:   FLEXIBILITY DEVICE_NOT_DOZING BACKGROUND_NOT_RESTRICTED SSRU
+Unsatisfied constraints: CONNECTIVITY WITHIN_QUOTA
+UID: 10495; Network: 138 (blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY)
+UidStats{uid=10495 #run=0 #readyWithConn=0 #netAvail=0 #reg=1}
+am get-standby-bucket → 40   (RARE)
+```
+
+Three things this adds to the 08-20 reading:
+
+1. **`#readyWithConn=0`.** Not "rarely ready with a connection" — never, not once.
+2. **`WITHIN_QUOTA` is now unsatisfied too.** The 08-20 reading closed the throttle
+   theory on `countInWindow=0`, and that is still the right conclusion about
+   *timeouts* — they read `countInWindow=1` against limits of 3 and 10. This is the
+   RARE bucket's own job quota, a second independent block on top of connectivity.
+3. **The bucket returned to 40** despite the app being opened and used this morning.
+   The 08-20 note recorded it dropping to `10` right after a launch; it does not
+   stay there.
+
+There is also **one timeout recorded in the last 24 hours** (`timeout-reg`
+`countInWindow=1`), so something did run long enough to be killed at the 10-minute
+limit. Not chased — noted, because `#run=0` in the same dump says the opposite about
+the current window and only one of those can be describing the task.
+
+**The conclusion is unchanged and now overdetermined: nothing this app schedules
+will run unattended on this phone.** Push is not one option among several, it is the
+only one.
+
+**Worth trying, because it is free:** this is a Xiaomi/MIUI device. Autostart on,
+battery *No restrictions*, then leave it overnight. It may lift the bucket off
+RARE. It will not make the timing dependable, so it is a measurement, not the fix.
+
+---
+
+## 8. Traps that have already cost time
+
+- **Render's disk is wiped on every DEPLOY, not every restart.** Which is why file
+  persistence read as working for a week. Anything the gateway must not lose goes in
+  Postgres — see `gateway_state`.
+- **`.gitignore` is a fingerprint input.** Editing it changes the runtime version
+  and orphans every installed build — updates publish fine and can never arrive.
+  Rebuild after touching it.
+- **EAS environments are separate from `.env.local`.** A variable added to one needs
+  adding to the other, or the published bundle is missing it.
+- **A channel must exist and be linked to its branch**, or the app asks and gets
+  nothing, silently. `eas channel:list` should not be empty.
+- **`expo prebuild --clean` wipes `android/`**, including any APK waiting to be
+  installed. Finished APKs are parked in `builds/`.
+- **`console.log` goes to Metro, not logcat**, on bridgeless React Native.
+- **The app lock re-locks on every background**, so UI automation cannot get back in
+  — the biometric prompt needs a finger.
+- **Android drops a notification sent to a channel that does not exist.** The
+  gateway asks the phone for its channel names rather than assuming them.
+- **Do not rebuild a notification channel to explain a silence.** Two sessions went
+  to this and the channel was never the problem. Read
+  `adb shell dumpsys notification --noredact` and check which code path actually
+  ran. Force-stop before renaming a channel, or Fast Refresh spends the id on the
+  old settings.
+- **A shared persona teaches markers to every leg that uses it.** `see()` used the
+  persona documenting `[[LOOKUP:]]` without the code that acts on it, and printed
+  the marker. A new call to a model using `_PERSONA` needs `_resolve_markers` too.
+- **`RN 0.86`'s `Modal` is not exported under this jest setup.**
+  `require('react-native').Modal` is `undefined`, so a test renders the screen with
+  the modal's contents silently absent — it reads exactly like a component that
+  failed to open. The Activity detail box is an in-tree overlay for this reason.
+- **RNTL 14 renders asynchronously.** `render()` returns a promise and a state
+  change from `fireEvent.press` needs awaiting — a synchronous `getByTestId` after a
+  press finds nothing and looks like a handler that never fired.
+- **No Python on the laptop.** Every gateway change made here is unrun.
+
+---
+
+## 9. Deliberately not doing
+
+- **A light theme for the HUD's own sake.** The instrument look is the product. §6
+  is about removing the dead option, not building the theme.
+- **Offline command queue.** The toast says "queued", which is a lie of convenience.
+  Either build a real queue with retry and expiry, or change the copy to say the
+  command was dropped. Change the copy first.
 - **Animation for its own sake.** The bounce was removed on purpose. New motion
   needs a reason beyond decoration.
-- **Rebuilding a notification channel to explain a silence.** Two sessions went to
-  this and the channel was never the problem. Read the dump
-  (`adb shell dumpsys notification`) and check which code path the test actually
-  ran through before touching a channel id. Related: force-stop the app before
-  renaming a channel, or Fast Refresh can spend the id on the old settings.
+- **`AccessibilityService`.** In §3.2 for completeness and not on the plan. It reads
+  banking screens for less than the notification listener gives.
 
 ---
 
-## Suggested order
+## 10. Order
 
-§1 is one sitting with the desk on for items 1–2, then one sitting with the phone
-in hand and unlocked for 3–5. Nothing else should start until it is empty — three
-of these have been "nearly verified" for four days, and the project's two most
-expensive bugs were both a stale assumption treated as proved.
+**§1 empties first.** Two sittings: one with the desk on (harnesses, durable-state
+merge, desk key, `BRIDGE_SECRET`), one with the phone in hand and unlocked (the
+microphone). Nothing in §3 should start until it is empty — three items sat "nearly
+verified" for four days, and this project's two most expensive bugs were both a
+stale assumption treated as proved.
 
-§2 and §3 are independent of each other and neither needs the desk, so either can
-fill a session where the desk is unavailable. §3.2 (OTA) pays for itself fastest,
-since it removes an 11-minute cycle from every JS fix after it.
+**§2 next**, both of them. They are live defects in the two features that were
+proved this morning, and a feature that just started working badly is the one people
+stop trusting fastest.
 
-§4 waits on §2 by design. §6 is filler for short sessions.
+**Then §3, in this order, and the order matters:**
 
-§4b and §4c are both asked-for and both ship over the air, so either fits a
-session with no desk and no phone-in-hand. Do **§4b item 1** (the photo preview
-and caption) before §4c: it changes what the compose bar *is*, and restyling a
-component you are about to restructure is work done twice. §4c then wants one
-screen landed and looked at for a day before it propagates — it is the item most
-likely to sprawl, and the constraint list in it is there because every entry has
-already cost time.
+1. **§3.2.1 — send what the phone already knows.** Most character per line of code
+   in the whole document. Needs the gateway.
+2. **§4.1.1 — split the token.** Before any new sense, not after.
+3. **§3.4 rung 2 — declared rules.** Spec written, awaiting review, ships over the
+   air.
+4. **§3.1 — `BOOT_COMPLETED`, then the notification listener.** The step change in
+   presence, and the point at which §4 stops being advice and becomes the gate.
+5. **§3.3 — durable memory and chat history**, which the rules above will want.
+6. **§3.6 — voice.** Last, and better for having waited.
+
+**§5 fills any session with no desk and no phone in hand** — both halves ship over
+the air. Do §5.1.1 (the ticks) before §5.2, and land §5.2 on one screen and live
+with it for a day before propagating; it is the item most likely to sprawl.
+
+**§6 is filler for short sessions**, except the OTA channel check, which is one
+command and gates every JS-only fix after it.
+
+**The Android glass blur is last, after everything above.** Asked for on 2026-08-21
+and deliberately parked at the end: it adds no capability, and its failure mode is a
+segfault that takes the process rather than a screen that looks wrong.

@@ -1,6 +1,360 @@
 # Resume point — jarvis-mobile
 
-## 🏠 READ THIS FIRST — 2026-08-20, 6:35 PM
+> **`NEXT.md` no longer exists.** It was merged into `ROADMAP.md` on 2026-08-21,
+> because two files answering "is this built?" had started answering differently.
+> Any mention of `NEXT.md` in a dated entry below means `ROADMAP.md` now; the dated
+> entries are left as written rather than rewritten, since falsifying the record is
+> how a project relearns a lesson it already paid for.
+>
+> **This file is the archaeology: how something was proved and what it cost to find
+> out.** It is not the status and not the queue — both live in `ROADMAP.md`, §0b and
+> §10. See the division of labour at the top of that file.
+
+## 🏠 HANDOFF — 2026-08-21, end of day. Read this first.
+
+**852 tests, `tsc --noEmit` clean.** Both repos committed and pushed. The phone is
+running everything below.
+
+### The state of the two repos
+
+| | Branch | Note |
+| --- | --- | --- |
+| `jarvis-mobile` | `feat/mobile-hud` | 56 files changed today. All pushed |
+| `jarvis-brain` | `fix/durable-state` | one function + one harness. **Still two commits ahead of `feat/cloud-gateway` and NOT deployed** |
+
+### The phone
+
+Installed: **local release APK, 1.0.0, `builds/jarvis-app-launcher-ota.apk`**, runtime
+fingerprint `31c64113d7d13a400eb1c56ef81c4d0d4be3fa17`. OTA is live on the `production`
+channel against that fingerprint — last publish `168e1f66`.
+
+**Do not rebuild locally without re-baking the fingerprint.** See the trap below; it
+cost an hour today and it fails completely silently.
+
+---
+
+## DONE — and proved on the device
+
+| | Evidence |
+| --- | --- |
+| The pushed briefing arrives unprompted | 8 AM, phone asleep, app closed |
+| He speaks first, once a day | fired for the first time — and got it wrong, see §2.2 |
+| `open swiggy` opens Swiggy | `topResumedActivity=in.swiggy.android/.HomeIcon` |
+| "What can you do" answers offline | full list with radios off, plus *"No link — I am answering from memory alone"* |
+| The status panel | 8 rows, all matching `/health`, `1 OFF` for the sleeping desk |
+| The journal names its own denial | `NO ACCESS` / *"I cannot see your usage, sir"* |
+| The Activity detail box | shows a whole message (it was collapsing to one line) |
+| OTA delivery | `dev.expo.updates: NEW_UPDATE_LOADED` |
+| Notification channels both exist | `general-v8`, `desk-watch-v2`, neither deleted |
+| Usage access granted and collecting | 22,762 moments |
+
+## DONE — shipped, not yet seen working
+
+Everything here is on the phone and untested by a human. `TESTING.md` has the checks.
+
+- Message states on your own turns: `SENDING`, `NOT SENT` + `SEND AGAIN`
+- `SEND AGAIN` withdraws the failed attempt (one message in the log, not two)
+- Long-press your own message: copy, or remove. **His cannot be removed**
+- Anticipation v1: screen time against your own baseline, one remark a day
+- The briefing gate — the phone stands down when the gateway holds the schedule
+- Photos settle instead of reading `SENDING` forever
+- The chat log is flushed when the app leaves the foreground
+- Motion follows the OS reduced-motion setting
+- Read/unread per Activity entry, surviving a restart
+
+## NOT DONE — and why
+
+| | Blocked on |
+| --- | --- |
+| **The duplicate briefing, confirmed** | a departure window with both notifications left unswiped |
+| **The microphone** | your hands. `brains.usage.audio` is still `0` — oldest unverified thing in the project |
+| **The desk key** | the desk being on. `dropped_no_key` went **18 → 24 today**; every cloud turn that should be sealed is discarded, and the counter only rises |
+| **`BRIDGE_SECRET` rotation** | same sitting as the desk key |
+| **`run_harnesses.py`** | **no Python on the laptop.** Five days of gateway work has never been run by an interpreter with the real imports |
+| **Merging `fix/durable-state`** | your call. `/health` still shows no `memory.state_durable`, so every deploy wipes gateway state |
+| **The mailbox (dropped replies)** | spec written, awaiting approval — `docs/superpowers/specs/2026-08-21-mailbox-delivery-design.md` |
+| **The briefing firing BEFORE the time** | phone side done; the gateway still fires `target … target+20`. Addendum in that same spec |
+| **Full anticipation** | needs the location timeline first — `docs/superpowers/specs/2026-08-21-anticipation-design.md` |
+| **The token split** | gates the notification listener and any route carrying your day. §4.1.1 |
+| **`/app-anticipate`** | deliberately NOT built — it would be a courier with nothing to carry until the location timeline exists |
+| **Ordering from Flipkart/Zomato** | no consumer API exists. Deep links are the honest version; placing orders would mean synthesising taps in someone else's payment flow |
+
+## THE TRAP THAT WILL BITE THE HOME MACHINE
+
+**A local release build silently breaks OTA.** `runtimeVersion` is
+`{ policy: "fingerprint" }` and `expo prebuild` writes the placeholder
+`file:fingerprint` into `android/app/src/main/res/values/strings.xml`. **EAS
+substitutes the real hash; `./gradlew assembleRelease` does not.** The APK then asks
+for updates matching `file:fingerprint`, gets none, and runs its embedded bundle
+forever with nothing logged.
+
+After any local build:
+
+```bash
+aapt2 dump resources <apk> | grep -A 1 expo_runtime_version   # must be a hash
+```
+
+`android/` is gitignored and generated, so **a `prebuild` on the home machine will
+restore the placeholder without saying so.** Build through EAS for anything that must
+receive updates.
+
+Also: the updates log tag is **`dev.expo.updates`**, not `expo-updates`. Grepping for
+the wrong one cost an hour and produced a confidently wrong conclusion.
+
+## WHAT I WOULD DO NEXT, IN ORDER
+
+1. **One sitting with the desk on** — harnesses, merge `fix/durable-state`, desk key,
+   `BRIDGE_SECRET`. Clears three ledger rows and stops the sealed-turn bleed.
+2. **Python on the laptop** — everything gateway-side is unrun without it.
+3. **The location timeline** (phone, no new permission) — the one observation that
+   makes anticipation worth having: *"you are still at Office and you have usually
+   left by now."*
+4. **The token split**, before any new sense.
+5. **Deep-linked intents** — `order biryani from zomato` opens Zomato on biryani. The
+   rung above what is proved today.
+
+## THE RULE THAT CAME OUT OF TODAY
+
+**Anything in the inherited prose that has not been verified today is a claim, not a
+fact.** Two documented "facts" were false and both were repeated to the operator
+before being checked: appearance is *not* persisted, and gateway rolling memory is
+*not* in RAM (there is a `chat_turns` table in Postgres). And `untested` on a UI row
+means untested — a green `npm test` says nothing about layout. Four bugs today were
+found by screenshot, none by the suite.
+
+## 🏠 READ THIS FIRST — 2026-08-21, midday
+
+**852 tests, `tsc --noEmit` clean.** Two features that had never been
+seen working were seen working, and both turned out to be defective in the same
+morning.
+
+### The push briefing arrives — twice
+
+The 8 AM briefing landed unprompted, phone asleep, app closed. That is the delivery
+that had been unproved for a day, and it is proved.
+
+It arrived **twice**, identically. Both senders are real: the phone's WorkManager
+task (`commuteTask.ts:161`) and the gateway push (`cloud_gateway.py:2386`), each
+with its own once-a-day marker and neither aware of the other. The gateway's text is
+a deliberate byte-for-byte port, so the shade cannot tell them apart.
+
+**Why it appeared today and not before:** Home was named the night before. Until
+then both senders refused it — `coordsFor` found no `KnownPlace`, and
+`commutePayload` dropped the row. Naming it armed both at once, and `/health` went
+from `departures: 1` to `2`. Diagnosis and fix in `ROADMAP.md` §2.1; held at the
+user's request pending a tagged pair in the shade (the pushed one carries
+`tag=FCM-Notification:*`).
+
+### He spoke first, and got it wrong
+
+`_nudge_tick` fired for the first time ever. Read off the shade with
+`adb shell dumpsys notification --noredact`:
+
+```
+android.title=String (J.A.R.V.I.S.)
+android.text=String (It's Friday, Sir, so hopefully you won't have to head in for a Saturday shift tomorrow.)
+```
+
+`_nudge_subject` decides whether to speak with `named_day = weekday in low` — a bare
+substring test. A Mon–Fri fact matched "friday", the prompt asserted it as true
+today, and the model invented tomorrow's shift to make a remark out of it. The
+comment there claims the judgement is made "in code"; a substring is not that
+judgement. `ROADMAP.md` §2.2.
+
+### The Activity panel, rebuilt around what was missing from it
+
+The briefings were not in the panel at all. `replyFromData` opened with
+`if (d.kind !== 'reply') return null`, so `kind: 'commute'` pushes were never
+consumed — they appeared in the shade and nowhere else. The nudge showed only
+because it is pushed as `kind: "reply"`.
+
+Fixed, plus what the same report asked for:
+
+| | Where |
+| --- | --- |
+| Commute pushes taken in, title kept, arrival time kept | `lib/notify.ts`, `JarvisProvider` `take()` |
+| Timeline built once, read by panel and bell alike | `state/activity.ts` — they used to disagree |
+| Full message on tap, in an in-tree overlay | `ActivityScreen` `DetailBox` |
+| Read/unread per entry, surviving restart | `state/readStore.ts` |
+| Day rules, shared with the chat | `lib/day.ts`, re-exported by `ChatScreen` |
+| Paged list with a counted SEE MORE | replaces a silent `slice(0, 40)` |
+| Header counts Jarvis-with-text only | `countable()` |
+
+Two testing traps found and written into `ROADMAP.md` §8: **RN 0.86's `Modal` is not
+exported under this jest setup** (`require('react-native').Modal` is `undefined`, so
+a modal's contents are silently absent from the tree — which is why the box is an
+in-tree overlay), and **RNTL 14 renders asynchronously**, so a state change from
+`fireEvent.press` must be awaited or a synchronous query finds nothing and looks
+like a handler that never fired.
+
+### The afternoon: an APK, a broken OTA, and a phone that can open apps
+
+**852 tests, `tsc --noEmit` clean.** Everything below is on the phone.
+
+#### The build, and the trap that cost the most time
+
+A native module (`modules/app-launcher`) meant the first local release build of this
+project. It installed fine and **OTA silently stopped working.**
+
+`runtimeVersion` is `{ policy: "fingerprint" }`, and `expo prebuild` writes the literal
+placeholder `file:fingerprint` into `android/app/src/main/res/values/strings.xml`.
+**EAS substitutes the real hash; a local `./gradlew assembleRelease` does not** —
+`:app:createReleaseUpdatesResources` runs and leaves it alone, and no generated
+resource overrides it. The APK then asks the server for updates matching
+`file:fingerprint`, gets none, and runs its embedded bundle forever. Nothing logs a
+word about it.
+
+Two compounding mistakes of mine: I searched logcat for `expo-updates` and `EXUpdates`
+when the tag is **`dev.expo.updates`**, and concluded "no update activity at all" from
+my own bad grep. Then I told the user the republish "will land". It could not have.
+
+Worked around by baking the hash in by hand and rebuilding. Proved fixed:
+
+```
+string/expo_runtime_version  "31c64113d7d13a400eb1c56ef81c4d0d4be3fa17"
+dev.expo.updates: remote load status changed: NEW_UPDATE_LOADED
+metadata: { updateGroup: "0a27e53b-...", branchName: "production" }
+```
+
+**`android/` is gitignored and generated, so the next `expo prebuild` restores the
+placeholder without saying so.** Build through EAS for anything that must receive
+updates; keep local builds for proving Kotlin. Check after any local build:
+
+```bash
+aapt2 dump resources <apk> | grep -A 1 expo_runtime_version   # must be a hash
+```
+
+#### Rung one of the phone-control ladder, proved
+
+`open swiggy` typed into the chat over adb, nothing else touched:
+
+```
+topResumedActivity = in.swiggy.android/.HomeIcon
+Swiggy's own log: sn:"app-launch"  sc:"direct"
+```
+
+Every launchable app, not a hardcoded list — `installed()` queries MAIN/LAUNCHER at
+runtime and matches spoken words against real labels. No new permission: the
+`<queries>` block already existed for the journal's app names. A name that fits two
+apps declines rather than guessing.
+
+#### Anticipation, and the trigger withdrawn the same day
+
+`lib/anticipate.ts`. One trigger: today's screen time against your own baseline, both
+figures named. Decided in code, never by a model. One remark a day, never the same
+subject twice running, quiet outside 8 AM to 9 PM, silent under three days of baseline.
+
+A leaving-time countdown was the second trigger and lasted about an hour. Reported as
+*"why this?"* and the report was right: **the time is one the user typed into the
+Places screen, so counting down to it recites their own setting**, and the situation
+line directly above already prints it. That is now the design rule — a remark must
+tell you something you do not already have. Full spec:
+`docs/superpowers/specs/2026-08-21-anticipation-design.md`.
+
+#### Four bugs the phone found that no test could
+
+Every one caught by a screenshot. **jest does not lay anything out, and it does not
+run your afternoon.**
+
+1. **The Activity detail box collapsed to one clipped line.** `maxHeight: '80%'`
+   against a parent with auto height resolves to nothing, so the box built to show a
+   whole message showed less of it than the row it was opened from.
+2. **Your own messages arrived marked unread.** The header count excluded them; the dot
+   did not. Two definitions of one word on one screen.
+3. **A photo sat at `SENDING` forever.** The delivery states were wired into
+   `sendCommand` and not `sendPhoto`. Any path that writes a turn owes it a resolution.
+4. **`NO ANSWER` in red on "you are awesome".** Reported as a bug and the report was
+   right: most unanswered turns are remarks nobody owed a reply to, and nothing on the
+   phone can tell a lost answer from one that was never owed. Withdrawn — that
+   distinction belongs to the mailbox.
+
+#### Two turns lost, and the defect it exposed
+
+The app was force-stopped twice to apply an update while the user was mid-conversation.
+The chat log saves on a 400 ms debounce, so anything typed in the moment before a kill
+dies with the process. **Two messages were lost.** The debounce is still right — a
+status frame can arrive three times a second — but it is now flushed on any `AppState`
+change away from `active`, `inactive` included, since a power-button press goes
+`active -> inactive -> background` and Android may kill before the second arrives.
+
+#### The briefing window was backwards
+
+Asked for: *"if time is 8am i should get notification by 7:30-8:00"*. The gateway fires
+`target ... target + 20`, deliberately never early, on the reasoning that an early
+warning is worth less. **That is backwards** — a briefing arriving as you reach the
+door is too late to change what you pick up. The phone now fires `target - 30 ...
+target`; the gateway change is an addendum in the mailbox spec, awaiting approval.
+
+#### Also shipped this afternoon
+
+| | |
+| --- | --- |
+| Message delivery states on your own turns | `SENDING`, `NOT SENT` + `SEND AGAIN`; nothing at all on a settled turn |
+| `SEND AGAIN` withdraws the failed attempt | one message in the log, not two — `turn_drop`, failed turns only |
+| Long-press your own message | copy, or remove. **His cannot be removed** — a log either side can edit is not a record |
+| Motion follows the OS reduced-motion setting | a deliberate toggle outranks it permanently |
+| The dead theme picker | removed. Dark and System were identical, and the screen said so in a note |
+| Contrast audited as a test | `dim` on panel measures 4.68 over the navy crown, against a WCAG AA floor of 4.5 |
+| The commute task body | now runs in tests — `defineTask` was mocked as a bare `jest.fn()` and its callback had never once been invoked |
+
+#### Two claims in the docs that were false
+
+Both had been repeated for days, both were in the file just declared the single source
+of truth, and both were repeated to the user before being checked:
+
+- **"Persisted appearance."** It is not persisted at all — no store, no key, and
+  `theme/appearance.tsx` says "deliberately in-memory for now" in its own header.
+  Accent, glow and the motion switch reset on every launch.
+- **"Gateway rolling memory lives in process RAM under a shared `chat_id 0`."** There
+  is a `chat_turns` table in Postgres with an index, loaded and appended by
+  `_db_load_blocking` / `_db_append_blocking`. Shared memory across app, Telegram and
+  desk is real and DB-backed — gated on `APP_MEMORY_SHARED` and `TELEGRAM_USER_ID`,
+  neither of which is readable from this machine.
+
+The lesson, and it is now a working rule: **anything in the inherited prose that has
+not been verified today is a claim, not a fact.**
+
+### Read off the phone at 12:5x, and one long-standing trap closed
+
+The installed build is **1.0.0, `lastUpdateTime=2026-08-19 17:47`**, flags
+`HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP` — **no `DEBUGGABLE`**, which is why the
+`run-as` recipe for reading AsyncStorage returned nothing this morning. That recipe
+needs the debug APK back; it is not a broken command.
+
+```
+mId='general-v8'     mImportance=3  mDeleted=false
+mId='desk-watch-v2'  mImportance=5  mDeleted=false
+mId='general-v2'..'general-v7'      mDeleted=true
+appops GET_USAGE_STATS: allow; time=+1m51s ago
+```
+
+Four things follow, and the first three settle the trap that has cost this project
+more sessions than any other — **Android discards a notification sent to a channel
+that does not exist, without a word.**
+
+1. Both channels the gateway is told about **exist and are not deleted.** So the
+   silent-drop failure is not live, and that is now measured rather than assumed.
+2. `desk-watch-v2` sits at importance 5 against `general-v8`'s 3. The security alert
+   outranks an everyday notification, which is what it is for.
+3. Seven superseded `general-v*` channels are all `mDeleted=true`. The rename cleanup
+   works; nothing is accumulating in the user's notification settings.
+4. Usage access is granted and was read 1m51s before I asked, so the journal is
+   actively collecting.
+
+**None of today's work is on the phone.** The APK predates it and no `eas update` has
+been published, so the Activity panel, the capability answer, the status panel and
+the briefing gate are all `untested` in `ROADMAP.md` §0b for that reason alone.
+
+### Still true, still owed
+
+`has_desk_key: false` and `dropped_no_key: 18`. `fix/durable-state` is two commits
+ahead of `feat/cloud-gateway` and undeployed — `/health` carries no
+`memory.state_durable`, which is how to tell from outside. `run_harnesses.py` has
+still never run: this laptop has no Python.
+
+---
+
+## 🏠 2026-08-20, 6:35 PM
 
 `npm test` (684, 55 suites) and `npm run typecheck` both clean on the laptop this
 evening. **No app code changed today** — the day's work was two gateway fixes and
@@ -33,7 +387,7 @@ through the window. It arrives as a notification; the Render log carries
 Both are `jarvis-brain`; read its RESUME for the detail. The desk owes
 `run_harnesses.py` — **81 + 4 + 8 + 17 + 17**, and none of it has ever run.
 
-### Next, and the queue is in `NEXT.md`
+### Next, and the queue is in `ROADMAP.md` §10
 
 **Declared rules** — spec at
 `docs/superpowers/specs/2026-08-20-declared-rules-design.md`, awaiting review.
@@ -43,7 +397,7 @@ background task that already runs). He asks rather than asserts, and stale state
 produces silence. Ships over the air, no native module.
 
 **Omnipresence** was asked for and is its own track — notification listener, SMS
-receiver, foreground service, accessibility. See `NEXT.md`. It is a data-handling
+receiver, foreground service, accessibility. See `ROADMAP.md` §3.1. It is a data-handling
 problem before it is an Android one, and the `APP_TOKEN` split comes first.
 
 ---

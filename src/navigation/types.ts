@@ -38,6 +38,13 @@ export type SettingsStackParams = {
   Connection: undefined;
   Appearance: undefined;
   Security: undefined;
+  /**
+   * What he can do today, and what is not built yet.
+   *
+   * The chat answers the same question without a round trip; this is the version
+   * you find by browsing rather than by suspecting there is an answer.
+   */
+  Capabilities: undefined;
   Places: undefined;
   /** what the cloud brain holds as true about him, and the way to correct it */
   Memory: undefined;

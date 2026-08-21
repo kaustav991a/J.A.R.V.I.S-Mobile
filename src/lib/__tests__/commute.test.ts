@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   DEFAULT_COMMUTE,
+  CLOUD_TTL_HOURS,
   alreadyBriefed,
+  cloudArmed,
   clockLabel,
   commuteBriefing,
   dueDeparture,
@@ -9,6 +11,7 @@ import {
   dueToday,
   loadCommute,
   markBriefed,
+  markCloudArmed,
   saveCommute,
 } from '../commute';
 import type { CommuteSettings, Departure } from '../commute';
@@ -93,12 +96,22 @@ describe('dueDeparture', () => {
     expect(dueDeparture(friday(14), both)).toBeNull();
   });
 
-  it('opens half an hour early and closes half an hour late', () => {
+  it('opens half an hour early and closes at the time itself', () => {
+    /**
+     * Before the time, never after. Asked for on 2026-08-21: a 7 PM departure should
+     * be briefed somewhere in 6:30–7:00.
+     *
+     * It used to run to +30, and the gateway went further — at the time or up to
+     * twenty minutes after, on the reasoning that an early warning is worth less.
+     * That was backwards: **a briefing that arrives as you reach the door is too late
+     * to change what you pick up.** An umbrella is decided before the shoes are on.
+     */
     const s = at('office', 19);
     expect(dueDeparture(friday(18, 30), s)).not.toBeNull();
-    expect(dueDeparture(friday(19, 30), s)).not.toBeNull();
+    expect(dueDeparture(friday(19, 0), s)).not.toBeNull();
     expect(dueDeparture(friday(18, 29), s)).toBeNull();
-    expect(dueDeparture(friday(19, 31), s)).toBeNull();
+    // past the time the advice is about a walk already underway
+    expect(dueDeparture(friday(19, 1), s)).toBeNull();
   });
 
   it('says nothing on a Saturday by default', () => {
@@ -412,5 +425,54 @@ describe('commuteBriefing outcomes', () => {
       expect(out.briefing.title).not.toContain('!');
       expect(out.briefing.body).not.toContain('!');
     }
+  });
+});
+
+/**
+ * Whether the gateway is arming the briefing, so the phone does not post it too.
+ *
+ * Both senders fired on 2026-08-21 and the same briefing arrived twice — the
+ * gateway push and the phone's own WorkManager task, each with its own once-a-day
+ * marker and neither aware of the other. The phone was meant to be a fallback and
+ * had never been gated, so it was a second sender.
+ *
+ * The direction of the failure is chosen deliberately: an unreadable or missing
+ * stamp reads as "not armed", so the phone posts. A duplicate is an annoyance; a
+ * morning with no briefing at all is the feature not existing.
+ */
+describe('whether the gateway holds the schedule', () => {
+  const now = new Date(2026, 7, 21, 8, 5);
+  const hoursAgo = (h: number) => now.getTime() - h * 3_600_000;
+
+  it('is not armed before a schedule has ever been uploaded', async () => {
+    expect(await cloudArmed(now)).toBe(false);
+  });
+
+  it('is armed just after an upload succeeded', async () => {
+    await markCloudArmed(hoursAgo(0));
+    expect(await cloudArmed(now)).toBe(true);
+  });
+
+  it('is still armed the next morning, because the gateway keeps the schedule', async () => {
+    // the app is not opened every day, and the gateway does not need it to be
+    await markCloudArmed(hoursAgo(20));
+    expect(await cloudArmed(now)).toBe(true);
+  });
+
+  it('stops trusting an upload older than the window', async () => {
+    // a gateway that has not been reachable for two days may have been redeployed
+    // and wiped — the phone takes the briefing back rather than assuming
+    await markCloudArmed(hoursAgo(CLOUD_TTL_HOURS + 1));
+    expect(await cloudArmed(now)).toBe(false);
+  });
+
+  it('is not armed when the stamp is unreadable, so the phone still posts', async () => {
+    await AsyncStorage.setItem('jarvis_commute_cloud', 'not a number');
+    expect(await cloudArmed(now)).toBe(false);
+  });
+
+  it('is not armed by a stamp from the future, which is a clock that moved', async () => {
+    await markCloudArmed(now.getTime() + 86_400_000);
+    expect(await cloudArmed(now)).toBe(false);
   });
 });

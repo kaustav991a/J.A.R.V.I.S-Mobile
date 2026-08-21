@@ -140,3 +140,18 @@ jest.mock('expo-updates', () => ({
   useUpdates: jest.fn(() => ({ isUpdateAvailable: false, isUpdatePending: false })),
   isEnabled: false,
 }));
+
+
+/**
+ * The app-launcher native module, which by definition cannot exist under jest.
+ *
+ * Same reasoning as `usage-stats` above: `requireNativeModule` throws at import time
+ * off-device, so without this the open-an-app path takes the suite down before a test
+ * runs. Nothing above `modules/app-launcher` uses this mock — the callers take an
+ * injected lister and launcher — so it only has to be importable.
+ */
+jest.mock('./modules/app-launcher', () => ({
+  ping: () => 'app-launcher native alive',
+  installed: async () => [],
+  launch: async () => false,
+}));

@@ -50,6 +50,13 @@ export function SettingsScreen() {
           onPress={() => nav.navigate('Security')}
         />
         <SettingsRow
+          testID="settings-capabilities"
+          icon="sparkles-outline"
+          title="What he can do"
+          subtitle="Everything working today, and what is not built yet"
+          onPress={() => nav.navigate('Capabilities')}
+        />
+        <SettingsRow
           testID="settings-about"
           icon="information-circle-outline"
           title="About"

@@ -14,8 +14,9 @@ guessing here has cost real time.
 | Read | For |
 | --- | --- |
 | `README.md` | Setting up a machine. Prerequisites, exact SDK/NDK versions, dev builds, adb debugging, and the traps |
-| `RESUME.md` | **Where the work stands and what is owed next.** Start at "Start here"; "Still owed" is the prioritised list |
-| `ROADMAP.md` | The longer arc |
+| `ROADMAP.md` | **The single source of truth for status and plan.** §0b is the ledger of what is built and what is not; §10 is the order to do things in. Nothing else in this repo may carry a queue or a status claim |
+| `RESUME.md` | **How something was proved, and what it cost to find out.** Append-only archaeology — the measurements, the wrong hypotheses, the sessions they cost. Not the status, not the queue |
+| `TESTING.md` | **What to tap and what should happen**, feature by feature. For a human with the phone in hand. Never says whether something is built |
 | `docs/desk-watch.md` | What the desk owes for the intruder watch. Phone side done, desk side unbuilt |
 | `docs/cloud-app-link.md` | What the Render gateway owes for cloud failover |
 | `docs/superpowers/specs/` | The original design |
@@ -25,7 +26,7 @@ guessing here has cost real time.
 ## Before you claim anything works
 
 ```bash
-npm test          # 461 tests
+npm test          # 852 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
 ```
 
@@ -63,6 +64,40 @@ of rediscovering them is high.
   `adb logcat` and read the `F DEBUG` tombstone frames; the loop is in `README.md`.
 - **The desk owns the desk-watch countdown, and silence locks.** The phone's
   countdown is a readout, never a decision timer. Do not move that clock.
+- **`Modal` is not exported under this jest setup.**
+  `require('react-native').Modal` is `undefined` on RN 0.86 here, so a test renders
+  the screen with the modal's contents silently absent — no throw, no warning, and
+  it reads exactly like a component that failed to open. Overlays that need testing
+  are in-tree absolute views; see `DetailBox` in `src/screens/ActivityScreen.tsx`.
+  An absolute child of `Screen` scrolls away with the content, so such an overlay
+  goes beside `Screen`, not inside it.
+- **A local release build silently breaks OTA.** `runtimeVersion` is
+  `{ policy: "fingerprint" }`, and `expo prebuild` writes the literal placeholder
+  `file:fingerprint` into `android/app/src/main/res/values/strings.xml`. **EAS builds
+  substitute the real hash; a local `./gradlew assembleRelease` does not** — the task
+  `:app:createReleaseUpdatesResources` runs and leaves it alone, and no generated
+  resource overrides it. The APK then asks the update server for updates matching
+  `file:fingerprint`, gets none, and runs its embedded bundle forever. Nothing logs a
+  word about it. Check it after any local build:
+
+  ```bash
+  aapt2 dump resources <apk> | grep -A 1 expo_runtime_version   # must be a hash
+  ```
+
+  Either build through EAS for anything that must receive updates, or bake the hash by
+  hand (`npx expo-updates fingerprint:generate --platform android`) before building —
+  remembering that `android/` is gitignored and generated, so a later `prebuild` puts
+  the placeholder back without saying so.
+- **The tab bar cannot be driven by `adb shell input`.** Every tab node reports
+  `clickable=false` — `GlassTabBar` handles touch through gesture-handler, not Android
+  click semantics — so neither `input tap` nor a held `input swipe` at the right
+  coordinates switches tabs. A `Pressable`/`SettingsRow` accepts `input tap` normally,
+  so in-screen automation works and **tab switching needs a human finger.** Plan device
+  checks to start on the tab you need, or ask for the one tap.
+- **RNTL 14 renders asynchronously.** `render()` returns a promise — every suite
+  here awaits it — and a state change caused by `fireEvent.press` needs awaiting
+  too. A synchronous `getByTestId` straight after a press finds nothing and looks
+  like a handler that never fired.
 
 ## House style
 

@@ -12,6 +12,8 @@ import {
 import { AppState, Platform } from 'react-native';
 import { hudReducer, initialHudState, HudState } from './hudReducer';
 import { clearChat, loadChat, saveChat } from './chatStore';
+import { loadRead, saveRead } from './readStore';
+import { countable, itemId, timeline } from './activity';
 import { demoFrames, demoReply } from './demoFeed';
 import { useLink } from '../link/useLink';
 import {
@@ -60,7 +62,10 @@ import type { AskUsage, AskWhere } from '../lib/ask';
 import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { loadKnown, nameFor } from '../lib/knownPlaces';
-import { loadCommute } from '../lib/commute';
+import { loadCommute, markCloudArmed } from '../lib/commute';
+import { capabilityAnswer, isCapabilityQuestion } from '../lib/capabilities';
+import { asOpenAppCommand, matchApp } from '../lib/openApp';
+import { installed as installedApps, launch as launchApp } from '../../modules/app-launcher';
 import { commutePayload } from '../lib/commuteSync';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { openChat } from '../navigation/RootNavigator';
@@ -111,8 +116,22 @@ export type JarvisContextValue = {
    * clear something that still needs a decision.
    */
   alertsUnread: number;
-  /** the activity sheet was read: everything up to now has been seen */
+  /** the activity sheet was read: everything currently in it has been seen */
   markAlertsRead: () => void;
+  /** one entry was opened, and only that one is read */
+  markRead: (id: string) => void;
+  /** which entries have been seen, so the panel can mark the rest */
+  readIds: ReadonlySet<string>;
+  /** withdraw a failed turn, because it is being sent again rather than repeated */
+  dropTurn: (at: number) => void;
+  /** remove one of your own turns, because you asked. His are the record and stay */
+  removeTurn: (at: number) => void;
+  /**
+   * Whether the gateway holds a push address for this phone.
+   *
+   * `unasked` until a cloud connect has happened, which is not the same as refused.
+   */
+  push: 'registered' | 'no-token' | 'unasked';
   /** the Chat screen came into focus: everything up to now has been seen */
   markChatRead: () => void;
   /**
@@ -401,8 +420,41 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      dispatch({ type: 'local_command', text: trimmed, at: Date.now() });
+      // one stamp, reused: it is the turn's identity for the rest of this function,
+      // and a second `Date.now()` would mark a turn that does not exist
+      const sentAt = Date.now();
+      dispatch({ type: 'local_command', text: trimmed, at: sentAt });
       setRecent((r) => [trimmed, ...r.filter((c) => c !== trimmed)].slice(0, RECENT_CAP));
+
+      /**
+       * "What can you do" is answered here, on the phone, and never sent.
+       *
+       * A model asked to list its own features always finds one — and a capability
+       * offered confidently that does not exist is the most expensive wrong answer
+       * this app can give: someone goes looking for it, does not find it, and
+       * reports a bug against something that was never built. `lib/capabilities.ts`
+       * holds the list in code, so it can only be wrong deliberately.
+       *
+       * It also answers with the desk asleep, the gateway cold and no network at
+       * all, which is when someone is most likely to be asking what this is for —
+       * the same reasoning as the opening line in `lib/situation.ts`.
+       *
+       * After the local echo, so the question is in the log above its answer, and
+       * before anything touches the transport. `isCapabilityQuestion` is deliberately
+       * narrow; the exclusions are pinned by tests.
+       */
+      if (isCapabilityQuestion(trimmed)) {
+        // carried by the phone itself, and answered in the same breath — so it
+        // settles rather than sitting at `sending` forever, which would have it
+        // looking like the one class of turn that genuinely cannot be dropped
+        dispatch({ type: 'turn_sent', at: sentAt });
+        dispatch({
+          type: 'frame',
+          frame: { kind: 'status', status: 'speaking', message: capabilityAnswer(), user: null },
+          at: Date.now(),
+        });
+        return;
+      }
 
       /**
        * A question asked from a known place is answered from measurements.
@@ -470,9 +522,61 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         // no journal, no usage block, same question
       }
 
+      /**
+       * Every exit from here settles the turn, and that is new as of 2026-08-21.
+       *
+       * The echo used to be the only record: four different outcomes — carried by the
+       * socket, carried by REST, answered by the stand-in, carried by nothing — all
+       * left the same entry on screen. So "I sent a message then closed the app and
+       * never got a reply" had no evidence behind it either way.
+       *
+       * `turn_sent` means carried, NOT answered. The wait it starts is the thing
+       * worth showing, because that is the state a dropped answer leaves behind.
+       */
+      /**
+       * "Open Swiggy" is done here, by the phone, and never sent.
+       *
+       * A model cannot launch anything — it can only say that it did, which is the
+       * worst outcome available. So the phone recognises the instruction, checks it
+       * against what is actually installed, and acts. Nothing is asked of the
+       * gateway, which is why it works with the desk asleep and no network.
+       *
+       * Falls through to the transport whenever the name matches nothing or matches
+       * two things equally. `matchApp` declines on a tie rather than guessing, and
+       * the model then answers "open the door" as the question it is. Refusing to
+       * open something costs a shrug; opening the wrong app takes over the screen.
+       */
+      const wanted = asOpenAppCommand(trimmed);
+      if (wanted) {
+        const app = matchApp(wanted, await installedApps());
+        if (app) {
+          const opened = await launchApp(app.pkg);
+          dispatch({ type: 'turn_sent', at: sentAt });
+          dispatch({
+            type: 'frame',
+            frame: {
+              kind: 'status',
+              status: 'speaking',
+              message: opened
+                ? `${app.label}, sir.`
+                : // flat, and with no remark on it: a line whose job is admitting
+                  // something did not happen reads as though it did once wit is added
+                  `I could not open ${app.label}, sir.`,
+              user: null,
+            },
+            at: Date.now(),
+          });
+          return;
+        }
+      }
+
       // the socket is the fast path; REST is what works when it is not open
-      if (link.send(buildAsk({ text: trimmed, known, where, usage }))) return;
+      if (link.send(buildAsk({ text: trimmed, known, where, usage }))) {
+        dispatch({ type: 'turn_sent', at: sentAt });
+        return;
+      }
       if (demo && !connected) {
+        dispatch({ type: 'turn_sent', at: sentAt });
         dispatch({ type: 'frame', frame: demoReply(trimmed), at: Date.now() });
         return;
       }
@@ -492,7 +596,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
        */
       try {
         await api.backdoor(trimmed);
+        dispatch({ type: 'turn_sent', at: sentAt });
       } catch {
+        dispatch({ type: 'turn_failed', at: sentAt });
         dispatch({
           type: 'frame',
           frame: {
@@ -570,15 +676,26 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       // The uri travels with it so the bubble can show the picture rather than the
       // word "Photo". It was already in hand — `takeShot` returns both halves and
       // only the base64 was ever used.
+      const sentAt = Date.now();
       dispatch({
         type: 'local_command',
         text: said ? `📷 ${said}` : '📷 Photo',
-        at: Date.now(),
+        at: sentAt,
         image: shot.uri,
       });
       // waits for the socket: the camera it just came back from is exactly what
       // takes the socket away
-      return sendWhenOpen(JSON.stringify({ type: 'photo', image: shot.base64, text: said }));
+      const carried = await sendWhenOpen(JSON.stringify({ type: 'photo', image: shot.base64, text: said }));
+      /**
+       * And settle it, which `sendCommand` did from the start and this did not.
+       *
+       * Caught on the phone within minutes of the marks shipping: a photo sat at
+       * `SENDING` twenty minutes after it had plainly arrived and been answered,
+       * because nothing here ever moved it off the state `local_command` gives every
+       * new turn. Any path that writes a turn owes it a resolution.
+       */
+      dispatch({ type: carried ? 'turn_sent' : 'turn_failed', at: sentAt });
+      return carried;
     },
     [sendWhenOpen]
   );
@@ -700,21 +817,87 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    * (`thinking`, `speaking`, `online`) and each one would otherwise be a disk
    * write of the entire log.
    */
+  /**
+   * Which timeline entries have been seen. Declared here because `hydrate` below
+   * seeds it, and a const cannot be referenced above its own declaration.
+   *
+   * Union, never replace, and persist whatever comes out. The stored set arrives
+   * asynchronously and `hydrate` seeds its own ids, so the two land in an order
+   * nothing here controls — replacing would let whichever resolved second erase the
+   * other's marks.
+   */
+  const [readIds, setReadIds] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const remember = useCallback((ids: string[]) => {
+    if (!ids.length) return;
+    setReadIds((prev) => {
+      if (ids.every((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      void saveRead([...next]);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     let alive = true;
-    void loadChat().then((chat) => {
-      if (alive && chat.length) dispatch({ type: 'hydrate', chat });
+    void loadRead().then((ids) => {
+      if (alive) setReadIds((prev) => new Set([...prev, ...ids]));
     });
     return () => {
       alive = false;
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    void loadChat().then((chat) => {
+      if (!alive || !chat.length) return;
+      dispatch({ type: 'hydrate', chat });
+      /**
+       * A restored log has already been seen, so it arrives read.
+       *
+       * Without this the first launch after the read set shipped would open the
+       * bell at the entire history, which is the number you learn to ignore — the
+       * same reason the old count was baselined at mount. Anything that arrives
+       * AFTER launch comes in unread, including a briefing swept out of the tray:
+       * that one was delivered while the app was dead and has genuinely not been
+       * looked at.
+       */
+      remember(chat.map(itemId));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [remember]);
+
   const chat = hud.chat;
+  /**
+   * Debounced, and flushed the moment the app stops being looked at.
+   *
+   * The debounce is right and the reason is in `chatStore`: a status frame can arrive
+   * three times a second and each one would otherwise be a disk write of the whole
+   * log. But 400ms of unwritten conversation is 400ms of conversation that dies with
+   * the process — and a process here does not always get to finish. **Two turns were
+   * lost this way on 2026-08-21**, when the app was force-stopped to apply an update
+   * moments after they were sent.
+   *
+   * So: still debounced while the app is in front, and written immediately on the way
+   * out. `background` and `inactive` both count — a power-button press goes
+   * `active → inactive → background`, and Android is entitled to kill the process
+   * before the second one arrives.
+   */
+  const latest = useRef(chat);
+  latest.current = chat;
   useEffect(() => {
     const timer = setTimeout(() => void saveChat(chat), 400);
     return () => clearTimeout(timer);
   }, [chat]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') void saveChat(latest.current);
+    });
+    return () => sub.remove();
+  }, []);
 
   /**
    * Hand the gateway this install's push address, once, per cloud link.
@@ -740,8 +923,18 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     if (simulated) return;
     try {
       await api.syncCommute(commutePayload(await loadCommute(), await loadKnown()));
+      /**
+       * The gateway now holds the schedule, so the phone's own task stands down.
+       *
+       * Stamped only on success, and only here: this is the one place that knows
+       * the upload was accepted rather than attempted. Without it the local task
+       * posts as well and the briefing arrives twice, which is what happened on
+       * 2026-08-21. `cloudArmed` in `lib/commute.ts` carries the reasoning.
+       */
+      await markCloudArmed();
     } catch {
-      // the next connect re-sends it
+      // the next connect re-sends it, and the stamp is left alone — an upload that
+      // failed must not silence the phone's fallback
     }
   }, [api, simulated]);
 
@@ -758,11 +951,29 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     void syncCommute();
   }, [link.mode, link.status, syncCommute]);
 
+  /**
+   * Whether the gateway has an address for this phone.
+   *
+   * Kept because it is the single most diagnostic fact in the app and nothing used
+   * to expose it: with no token there is no briefing, no desk-watch alert and
+   * nothing unprompted, and the app looked identical either way. The Home status
+   * panel reads it.
+   *
+   * `unasked` is a third state on purpose. Registration only runs on a cloud
+   * connect, so before one there is nothing to report — and `no-token` shown then
+   * would send someone hunting a fault that does not exist. `no-token` rather than
+   * `refused` because `registerForPush` returns null for a denied permission and
+   * for any other failure alike, and this must not claim to know which.
+   */
+  const [push, setPush] = useState<'registered' | 'no-token' | 'unasked'>('unasked');
+
   useEffect(() => {
     if (simulated || link.mode !== 'cloud' || link.status !== 'open') return;
     let alive = true;
     void registerForPush().then((push) => {
-      if (!alive || !push) return;
+      if (!alive) return;
+      setPush(push ? 'registered' : 'no-token');
+      if (!push) return;
       // Silent on failure, and unguarded on purpose. Registering is idempotent
       // server-side — it keys on the address — so re-sending costs one small POST
       // per connect and buys the only recovery there is from the gateway losing
@@ -843,7 +1054,11 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       dispatch({
         type: 'frame',
         frame: { kind: 'status', status: 'speaking', message: reply.text, user: null },
-        at: Date.now(),
+        // the notification's own arrival time when it has one, which the tray
+        // sweep does. A briefing pushed at 8 AM is swept whenever the app is next
+        // opened — stamping `now` filed it under lunchtime, above the things that
+        // really did come after it, and the panel's order was then a lie
+        at: reply.at ?? Date.now(),
       });
 
     let alive = true;
@@ -929,34 +1144,56 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   }, []);
 
   /**
-   * Unread activity, for the count on the bell.
+   * Unread activity, per entry, for the count on the bell and the marks in the panel.
    *
    * The bell carried a dot driven by `parked.length`, which answered "is anything
    * blocked" and nothing else — so a timeline full of things you had not seen
-   * looked identical to an empty one.
+   * looked identical to an empty one. It then carried a count derived from one
+   * mount-time timestamp, which answered "is any of this newer than this launch".
+   * Neither could answer the panel's own question: which of these have I looked at.
    *
-   * Baselined at mount for the same reason the chat is: `hydrate` brings back a log
-   * that was already read, and launching the app to "37 new" would train you to
-   * ignore the number. Parked items are counted separately by the bell and
-   * deliberately **not** cleared by marking things read — an approval is not
-   * something you can read away, it needs a decision.
+   * So it is a set of ids now, persisted by `readStore`. Two things follow:
+   * reading one entry leaves its neighbours alone, and a mark survives a restart —
+   * previously every relaunch re-marked the whole log unread, which is how a number
+   * on a bell stops being read.
+   *
+   * Parked approvals are counted separately by the bell and deliberately **not**
+   * cleared by marking things read — an approval is not something you can read
+   * away, it needs a decision.
    */
-  const [alertsReadAt, setAlertsReadAt] = useState(() => Date.now());
-  const markAlertsRead = useCallback(() => setAlertsReadAt(Date.now()), []);
   /**
-   * Only things that happened *to* him.
+   * Only things that happened *to* him, and only things with something to read.
    *
    * The timeline shows "You sent" entries and they belong there — it is a record of
    * what happened, both directions. A count on a bell is a different claim: it says
    * "there is something here you have not seen", and you have seen the message you
    * just typed. Counting it meant sending one thing put 1 on the bell instantly.
+   *
+   * `countable` in `activity.ts` is that rule, shared with the panel so the number
+   * on the bell can only ever describe entries the panel actually shows.
    */
   const alertsUnread = useMemo(
-    () =>
-      hud.chat.filter((c) => c.from === 'jarvis' && c.at > alertsReadAt).length +
-      hud.trace.filter((t) => t.at > alertsReadAt).length,
-    [hud.chat, hud.trace, alertsReadAt]
+    () => countable(timeline(hud.chat, hud.trace)).filter((i) => !readIds.has(i.id)).length,
+    [hud.chat, hud.trace, readIds]
   );
+
+  const markAlertsRead = useCallback(
+    () => remember(countable(timeline(hud.chat, hud.trace)).map((i) => i.id)),
+    [hud.chat, hud.trace, remember]
+  );
+
+  const markRead = useCallback((id: string) => remember(id ? [id] : []), [remember]);
+
+  /**
+   * Withdraw a turn that never left the phone, because it is being sent again.
+   *
+   * Only a failed one is withdrawable — the reducer enforces that. Anything the far
+   * end received stays in the record whatever became of its answer.
+   */
+  const dropTurn = useCallback((at: number) => dispatch({ type: 'turn_drop', at }), []);
+
+  /** take one of your own turns out of the log, in any state. His cannot be removed */
+  const removeTurn = useCallback((at: number) => dispatch({ type: 'turn_remove', at }), []);
 
   /**
    * Whether the app is on screen, which is what decides if a reply is announced.
@@ -1110,6 +1347,11 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       unread,
       alertsUnread,
       markAlertsRead,
+      markRead,
+      readIds,
+      dropTurn,
+      removeTurn,
+      push,
       markChatRead,
       setChatFocused,
       forgetChat: () => {
@@ -1157,6 +1399,11 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       unread,
       alertsUnread,
       markAlertsRead,
+      markRead,
+      readIds,
+      dropTurn,
+      removeTurn,
+      push,
       markChatRead,
       setChatFocused,
       demo,

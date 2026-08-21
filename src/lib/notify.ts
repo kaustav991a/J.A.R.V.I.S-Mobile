@@ -457,8 +457,15 @@ export async function dismiss(id: string | null): Promise<void> {
   }
 }
 
-/** a reply that reached the phone as a push rather than down the socket */
-export type PushedReply = { text: string };
+/**
+ * a reply that reached the phone as a push rather than down the socket
+ *
+ * `at` is the notification's own arrival time, and it is optional because only the
+ * paths that have it supply one. It matters for anything swept out of the tray
+ * hours after it landed: stamping the read time instead files this morning's
+ * briefing under lunchtime, above the things that actually came after it.
+ */
+export type PushedReply = { text: string; at?: number };
 
 /**
  * Read a reply out of a notification, or return null.
@@ -473,15 +480,51 @@ export type PushedReply = { text: string };
  * `local` marks the notification this app raises for itself when a reply lands
  * over the socket while it is off screen. That text is already in the chat, and
  * feeding it back would be an echo.
+ *
+ * **`commute` is taken in too, and the title travels with it.** The briefing is
+ * pushed by the gateway rather than answered over the socket, so it hit the
+ * `kind !== 'reply'` gate and nothing consumed it: it appeared in the shade and
+ * never in the log. Reported from the device on 2026-08-21 — the 8 AM briefing
+ * arrived and the Activity panel was empty, which reads as the panel being
+ * broken rather than as a filter. The title is prefixed rather than dropped
+ * because two briefings arrive in a day, their bodies can be identical, and the
+ * title is the only part that says which door each one was about.
  */
-export function replyFromData(raw: unknown, body: string | null | undefined): PushedReply | null {
+const TAKEN_IN = new Set(['reply', 'commute']);
+
+export function replyFromData(
+  raw: unknown,
+  body: string | null | undefined,
+  extra?: { title?: string | null; at?: number }
+): PushedReply | null {
   if (raw === null || typeof raw !== 'object') return null;
   const d = raw as Record<string, unknown>;
-  if (d.kind !== 'reply') return null;
+  if (typeof d.kind !== 'string' || !TAKEN_IN.has(d.kind)) return null;
   if (d.local === true) return null;
   const text = typeof body === 'string' ? body.trim() : '';
-  return text ? { text } : null;
+  if (!text) return null;
+  // only the briefing wears its title. A reply's title is the bare name
+  // "J.A.R.V.I.S.", and prefixing that would put a signature on every turn
+  const title = d.kind === 'commute' && typeof extra?.title === 'string' ? extra.title.trim() : '';
+  return { text: title ? `${title}\n${text}` : text, at: extra?.at };
 }
+
+/**
+ * One notification, read the same way everywhere.
+ *
+ * Four call sites used to spell this out, and three of them would have had to be
+ * changed together the day the briefing needed its title and its own arrival
+ * time. `n.date` is that arrival time, and it is why this is a function rather
+ * than a longer argument list at each site.
+ */
+const fromNotification = (n: Notifications.Notification | null | undefined): PushedReply | null => {
+  const content = n?.request?.content;
+  if (!content) return null;
+  return replyFromData(content.data ?? null, content.body, {
+    title: content.title,
+    at: typeof n?.date === 'number' ? n.date : undefined,
+  });
+};
 
 /**
  * Replies arriving by push while the app is alive, and replies tapped.
@@ -493,14 +536,13 @@ export function replyFromData(raw: unknown, body: string | null | undefined): Pu
 export function onPushReply(cb: (reply: PushedReply, tapped: boolean) => void): () => void {
   try {
     const shown = Notifications.addNotificationReceivedListener((n) => {
-      const r = replyFromData(n?.request?.content?.data ?? null, n?.request?.content?.body);
+      const r = fromNotification(n);
       // arrived while looking at something else: take it in, do not yank him
       // out of whatever screen he is on
       if (r) cb(r, false);
     });
     const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
-      const content = response?.notification?.request?.content;
-      const r = replyFromData(content?.data ?? null, content?.body);
+      const r = fromNotification(response?.notification);
       // he tapped the answer, so the answer is what he wants to see
       if (r) cb(r, true);
     });
@@ -523,8 +565,7 @@ export function onPushReply(cb: (reply: PushedReply, tapped: boolean) => void): 
 export async function replyFromLaunch(): Promise<PushedReply | null> {
   try {
     const response = await Notifications.getLastNotificationResponseAsync();
-    const content = response?.notification?.request?.content;
-    return replyFromData(content?.data ?? null, content?.body);
+    return fromNotification(response?.notification);
   } catch {
     return null;
   }
@@ -546,9 +587,7 @@ export async function replyFromLaunch(): Promise<PushedReply | null> {
 export async function pendingReplies(): Promise<PushedReply[]> {
   try {
     const shown = await Notifications.getPresentedNotificationsAsync();
-    return shown
-      .map((n) => replyFromData(n?.request?.content?.data ?? null, n?.request?.content?.body))
-      .filter((r): r is PushedReply => r !== null);
+    return shown.map(fromNotification).filter((r): r is PushedReply => r !== null);
   } catch {
     // no tray access is not an empty tray, but there is nothing better to say
     return [];

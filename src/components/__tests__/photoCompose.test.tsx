@@ -82,6 +82,8 @@ describe('what the chat remembers about a photo', () => {
       text: '📷 what is this part',
       at: 1000,
       image: 'file:///cache/shot.jpg',
+      // every turn now arrives knowing nothing about its own delivery
+      state: 'sending',
     });
   });
 
@@ -92,6 +94,11 @@ describe('what the chat remembers about a photo', () => {
    */
   it('leaves an ordinary command alone', () => {
     const next = hudReducer(initialHudState, { type: 'local_command', text: 'lights on', at: 1000 });
-    expect(next.chat[next.chat.length - 1]).toEqual({ from: 'user', text: 'lights on', at: 1000 });
+    expect(next.chat[next.chat.length - 1]).toEqual({
+      from: 'user',
+      text: 'lights on',
+      at: 1000,
+      state: 'sending',
+    });
   });
 });

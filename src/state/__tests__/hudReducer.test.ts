@@ -130,7 +130,9 @@ describe('hudReducer', () => {
       s = hudReducer(s, { type: 'local_command', text: `cmd-${i}`, at: 2000 + i });
     }
     expect(s.chat).toHaveLength(100);
-    expect(s.chat[0]).toEqual({ from: 'user', text: 'cmd-20', at: 2020 });
+    // `sending` since 2026-08-21: a turn arrives knowing nothing about its own
+    // delivery, and saying so is what makes a dropped answer visible later
+    expect(s.chat[0]).toEqual({ from: 'user', text: 'cmd-20', at: 2020, state: 'sending' });
     expect(s.chat[99].text).toBe('cmd-119');
   });
 

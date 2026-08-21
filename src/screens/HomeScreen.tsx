@@ -9,12 +9,16 @@ import { HandoffAnchor } from '../components/ReactorHandoff';
 import { GovernancePanel } from '../components/GovernancePanel';
 import { TypeLine } from '../components/TypeLine';
 import { QuickMenu } from '../components/QuickMenu';
+import { StatusPanel } from '../components/StatusPanel';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
 import { COLOR, SPACE, TYPE, glowBox, glowText } from '../theme/tokens';
 import { greetingFor, msToNextMinute } from '../theme/greeting';
 import { ACCENTS, useAppearance } from '../theme/appearance';
 import { useJarvis } from '../state/JarvisProvider';
+import { useAuth } from '../security/AuthProvider';
+import { cloudArmed } from '../lib/commute';
+import { usageAccessState } from '../lib/status';
 import { SCRIPTS } from '../data/fixtures';
 import { TABS_ID } from '../navigation/types';
 import type { HomeStackParams, TabParams } from '../navigation/types';
@@ -82,7 +86,48 @@ export function HomeScreen() {
     shareLocation,
     place,
     refreshPlace,
+    pairing,
+    push,
   } = useJarvis();
+  const { appLock } = useAuth();
+
+  /**
+   * The two status facts that are not on the context.
+   *
+   * Reads rather than subscriptions, taken when the screen comes into focus: both
+   * change a few times a day at most, and this is the screen you land on. A timer
+   * for either would be a poll for nothing.
+   */
+  const [scheduleAtGateway, setScheduleAtGateway] = useState(false);
+  const [usageAccess, setUsageAccess] = useState<'granted' | 'denied' | 'unknown'>('unknown');
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      /**
+       * Both reads are deferred, and both writes bail out when nothing changed.
+       *
+       * The bail-out is ordinary care. The deferral is not: `useFocusEffect` is
+       * mocked across this repo's screen tests as `(cb) => cb()`, which runs the
+       * callback **during render** — and a synchronous `setState` there re-renders,
+       * which calls the callback again. That is an infinite loop, and it is how the
+       * status panel first arrived: nine Home tests failing with "Too many
+       * re-renders" and nothing on screen to suggest why.
+       *
+       * A microtask is also the better shape on the device: `usageAccessState()` is
+       * a native call, and a native call during render is worth avoiding on its own
+       * terms.
+       */
+      void cloudArmed().then((armed) => {
+        if (alive) setScheduleAtGateway((prev) => (prev === armed ? prev : armed));
+      });
+      void Promise.resolve(usageAccessState()).then((access) => {
+        if (alive) setUsageAccess((prev) => (prev === access ? prev : access));
+      });
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
 
   /**
    * What the bell shows: things you have not seen, plus things still waiting on you.
@@ -332,6 +377,36 @@ export function HomeScreen() {
           );
         })}
       </View>
+
+      {/*
+        Below the grid rather than inside it: eight rows cannot live in a
+        half-width tile, and this is the reading the Connect tile deliberately does
+        not carry. It is also the answer to "what should I tell the developer" —
+        one screenshot naming the thing that is off.
+      */}
+      {/*
+        "What is connected" rather than "Status", because Home already has a Status
+        section further down — the three-column readout. Two sections under one word
+        on one screen, which the phone showed within minutes of shipping: the header
+        read STATUS twice and neither said which was which.
+      */}
+      <SectionLabel>What is connected</SectionLabel>
+      <StatusPanel
+        facts={{
+          connected,
+          connecting,
+          mode,
+          // null rather than false while nothing is connected: the desk may be
+          // perfectly awake and this phone simply cannot see it
+          deskLinked: connected ? hud.deskLinked === true : null,
+          hasToken: pairing.hasToken,
+          push,
+          scheduleAtGateway,
+          shareLocation,
+          usageAccess,
+          appLock,
+        }}
+      />
 
       {hud.parked.length > 0 ? (
         <>

@@ -1,8 +1,17 @@
-import { PropsWithChildren, createContext, useContext, useMemo, useState } from 'react';
+import {
+  PropsWithChildren,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { AccessibilityInfo } from 'react-native';
 import { COLOR } from './tokens';
 
 export type AccentKey = 'blue' | 'violet' | 'pink' | 'green' | 'amber';
-export type ThemeChoice = 'dark' | 'system';
 
 /** the five swatches on the Appearance screen */
 export const ACCENTS: Record<AccentKey, string> = {
@@ -14,8 +23,6 @@ export const ACCENTS: Record<AccentKey, string> = {
 };
 
 export type AppearanceState = {
-  theme: ThemeChoice;
-  setTheme: (t: ThemeChoice) => void;
   accentKey: AccentKey;
   setAccentKey: (a: AccentKey) => void;
   /** resolved hex for the chosen accent */
@@ -27,7 +34,15 @@ export type AppearanceState = {
   setAnimations: (on: boolean) => void;
 };
 
-const DEFAULTS = { theme: 'dark' as ThemeChoice, accentKey: 'blue' as AccentKey, glow: 0.6, animations: true };
+/**
+ * No theme among these, and that is deliberate as of 2026-08-21.
+ *
+ * The choice was Dark or System, System behaved identically, and the screen said so
+ * in a note. A control that changes nothing invites a tap, answers nothing, and
+ * teaches that the rest of the screen might be decoration too. The instrument look
+ * is the product; a light variant comes back only if a real user asks for one.
+ */
+const DEFAULTS = { accentKey: 'blue' as AccentKey, glow: 0.6, animations: true };
 
 const AppearanceContext = createContext<AppearanceState | null>(null);
 
@@ -40,15 +55,49 @@ const AppearanceContext = createContext<AppearanceState | null>(null);
  * storage work, so that there is one place that owns writing to the device.
  */
 export function AppearanceProvider({ children }: PropsWithChildren) {
-  const [theme, setTheme] = useState<ThemeChoice>(DEFAULTS.theme);
   const [accentKey, setAccentKey] = useState<AccentKey>(DEFAULTS.accentKey);
   const [glow, setGlow] = useState(DEFAULTS.glow);
-  const [animations, setAnimations] = useState(DEFAULTS.animations);
+
+  /**
+   * Motion follows the phone until somebody says otherwise.
+   *
+   * Someone who has turned reduced motion on at the OS level has already answered
+   * this question, and making them find a second switch inside one app is the app
+   * not listening. So the OS supplies the default and keeps supplying it — a phone
+   * that changes its mind while this app is open is followed.
+   *
+   * A deliberate toggle outranks it permanently. Reduced motion is a default, not a
+   * veto: reaching into this app's own settings is the more specific instruction, and
+   * from then on the OS is not consulted again. `overridden` is a ref rather than
+   * state because nothing renders differently for it — it only decides who wins.
+   */
+  const [animations, setAnimationsState] = useState(DEFAULTS.animations);
+  const overridden = useRef(false);
+
+  const setAnimations = useCallback((on: boolean) => {
+    overridden.current = true;
+    setAnimationsState(on);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const follow = (reduce: boolean) => {
+      if (alive && !overridden.current) setAnimationsState(!reduce);
+    };
+    // wrapped: this is a native bridge call, and a phone that cannot answer must
+    // leave the default alone rather than take the provider down
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then(follow)
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', follow);
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
 
   const value = useMemo<AppearanceState>(
     () => ({
-      theme,
-      setTheme,
       accentKey,
       setAccentKey,
       accent: ACCENTS[accentKey],
@@ -57,7 +106,7 @@ export function AppearanceProvider({ children }: PropsWithChildren) {
       animations,
       setAnimations,
     }),
-    [theme, accentKey, glow, animations]
+    [accentKey, glow, animations]
   );
 
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>;
@@ -73,7 +122,6 @@ export function useAppearance(): AppearanceState {
   return {
     ...DEFAULTS,
     accent: ACCENTS[DEFAULTS.accentKey],
-    setTheme: () => {},
     setAccentKey: () => {},
     setGlow: () => {},
     setAnimations: () => {},

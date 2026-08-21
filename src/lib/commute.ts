@@ -227,10 +227,74 @@ export async function markBriefed(placeId: string, today: string): Promise<void>
   }
 }
 
+/**
+ * Whether the gateway is arming the briefing, so the phone does not post it too.
+ *
+ * On 2026-08-21 the same briefing arrived twice. Both senders were real: this
+ * phone's WorkManager task and the gateway's push, each holding its own once-a-day
+ * marker — `jarvis_commute_sent` here, `_briefed` there — and neither able to see
+ * the other's. The gateway's text is a deliberate byte-for-byte port of
+ * `commuteBriefing`, so the notification shade could not tell them apart either.
+ *
+ * The phone half was always described as a fallback and was never gated, which
+ * made it a second sender. This is the gate: a successful upload stamps the clock,
+ * and the task declines to post while that stamp is fresh.
+ *
+ * **The direction of the failure is chosen.** A missing, unreadable or stale stamp
+ * reads as "not armed", so the phone posts. A duplicate is an annoyance; a morning
+ * with no briefing is the feature not existing — and this app has already spent
+ * four days reading a correct silence as a broken feature.
+ */
+const CLOUD_KEY = 'jarvis_commute_cloud';
+
+/**
+ * How long an upload is trusted for.
+ *
+ * Long enough that the app does not have to be opened daily — the gateway keeps
+ * the schedule and briefs without it, which is the entire point of moving the
+ * briefing there. Short enough that a gateway which has been unreachable for two
+ * days is assumed redeployed and wiped, because Render's disk goes on every deploy
+ * and that has silently disarmed the briefing twice.
+ */
+export const CLOUD_TTL_HOURS = 48;
+
+export async function markCloudArmed(at: number = Date.now()): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CLOUD_KEY, String(at));
+  } catch {
+    // an unwritten stamp means the phone posts as well for one more window, which
+    // is the failure to prefer over a silent morning
+  }
+}
+
+export async function cloudArmed(now: Date = new Date()): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(CLOUD_KEY);
+    const at = Number(raw);
+    if (!raw || !Number.isFinite(at)) return false;
+    const age = now.getTime() - at;
+    // a negative age is a clock that moved, not an upload from the future
+    return age >= 0 && age <= CLOUD_TTL_HOURS * 3_600_000;
+  } catch {
+    return false;
+  }
+}
+
 export const dayKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** how wide either side of the set time still counts as "now" */
+/**
+ * How long BEFORE the set time a briefing may go out — and it is before only.
+ *
+ * It used to be a window either side, and the gateway went further: it fired at the
+ * time or up to twenty minutes after, on the reasoning that an early warning is
+ * worth less. Asked for directly on 2026-08-21 and the request is right: **a
+ * briefing that arrives as you reach the door is too late to change what you pick
+ * up.** An umbrella has to be decided before the shoes are on.
+ *
+ * So 8:00 AM means somewhere in 7:30–8:00, and a 7 PM departure means 6:30–7:00.
+ * Nothing fires after the time: past it the advice is about a walk already underway.
+ */
 export const DUE_WINDOW_MIN = 30;
 
 /**
@@ -273,7 +337,8 @@ export function dueDeparture(now: Date, s: CommuteSettings): Departure | null {
     s.departures.find((d) => {
       if (!d.on) return false;
       const target = d.hour * 60 + d.minute;
-      return minutesNow >= target - DUE_WINDOW_MIN && minutesNow <= target + DUE_WINDOW_MIN;
+      // before the time, never after: see the note on `DUE_WINDOW_MIN`
+      return minutesNow >= target - DUE_WINDOW_MIN && minutesNow <= target;
     }) ?? null
   );
 }

@@ -10,6 +10,7 @@ import { createApi } from './../api/client';
 import { GENERAL_CHANNEL, postNow } from './notify';
 import {
   alreadyBriefed,
+  cloudArmed,
   commuteBriefing,
   dayKey,
   dueDeparture,
@@ -120,6 +121,21 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
     // the same umbrella three times teaches you to swipe without reading — and
     // this is per departure, so the morning cannot silence the evening
     if (await alreadyBriefed(departure.placeId, today)) {
+      await catchUpJournal();
+      return BackgroundTask.BackgroundTaskResult.Success;
+    }
+
+    /**
+     * The gateway is briefing, so this task must not.
+     *
+     * Checked BEFORE the forecast, because a lookup this run is not allowed to post
+     * is a lookup spent out of a headless task's budget for nothing.
+     *
+     * This is what makes the phone a real fallback rather than a second sender. On
+     * 2026-08-21 both fired and the same briefing arrived twice — see `cloudArmed`
+     * for why the stale case resolves toward posting rather than toward silence.
+     */
+    if (await cloudArmed(now)) {
       await catchUpJournal();
       return BackgroundTask.BackgroundTaskResult.Success;
     }

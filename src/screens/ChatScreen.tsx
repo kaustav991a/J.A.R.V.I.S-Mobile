@@ -10,7 +10,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommandBar } from '../components/CommandBar';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { situationLine } from '../lib/situation';
-import { dueToday } from '../lib/commute';
+import * as Clipboard from 'expo-clipboard';
+import { turnMark } from '../lib/turnMark';
+import { anticipate } from '../lib/anticipate';
+import { loadSpoken, saveSpoken } from '../lib/spokenStore';
+import { usageForAsk } from '../lib/journal/rollup';
+import { openJournal } from '../lib/journal/store';
+import { dayKey, dueToday } from '../lib/commute';
 import { msToNextMinute } from '../theme/greeting';
 import { EmptyState } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
@@ -55,54 +61,15 @@ const KEYBOARD_EASE = Easing.out(Easing.quad);
  */
 const REPLY_TIMEOUT_MS = 120_000;
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-
 /**
- * A time for today's turns, a date and time for anything older.
+ * The day rules and the clock, shared with the Activity panel.
  *
- * A bare `14:32` is unambiguous only while the log dies with the app. Once it
- * survives a restart, the same string could be from any day, so the date has to
- * appear — but only where it carries information: stamping today's turns with
- * today's date is noise on every line.
+ * Re-exported because the chat's own tests import `dayHeading` from here, and
+ * because this is still the screen the rules were written for — the panel is the
+ * borrower. The comments on why each rule exists live at the definitions.
  */
-const clock = (at: number): string => {
-  const d = new Date(at);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-};
-
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
-
-/** which calendar day a turn belongs to, for grouping */
-const dayOf = (at: number): string => {
-  const d = new Date(at);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-};
-
-/**
- * The heading over a day's turns.
- *
- * Every line used to carry its own date once the log outlived the app, which put
- * `12 Aug, 14:32` on twenty consecutive lines from the same afternoon. A date is
- * information the first time a day changes and noise every time after, so it
- * moved to a rule between the days and the lines went back to a bare time.
- *
- * Named while a name is more use than a number: yesterday and last Tuesday are how
- * people hold recent days, and a date is only easier once the day has stopped being
- * recent.
- */
-export function dayHeading(at: number, now: Date = new Date()): string {
-  const d = new Date(at);
-  const midnight = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const daysBack = Math.round((midnight(now) - midnight(d)) / 86_400_000);
-  if (daysBack <= 0) return 'Today';
-  if (daysBack === 1) return 'Yesterday';
-  // inside a week the weekday alone places it; beyond that it stops being useful,
-  // because "Tuesday" could be any Tuesday
-  if (daysBack < 7) return WEEKDAYS[d.getDay()];
-  const stamp = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  // the year only when it is not this one — it is almost never the useful part
-  return d.getFullYear() === now.getFullYear() ? stamp : `${stamp} ${d.getFullYear()}`;
-}
+export { dayHeading } from '../lib/day';
+import { clockLabel as clock, dayHeading, dayOf } from '../lib/day';
 
 /**
  * The conversation, both directions, as it happens.
@@ -120,7 +87,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, sendVoice, sendPhoto, connected, markChatRead, setChatFocused, mode, place } =
+  const { hud, sendCommand, sendVoice, sendPhoto, connected, markChatRead, setChatFocused, mode, place, dropTurn, removeTurn } =
     useJarvis();
 
   /**
@@ -204,16 +171,68 @@ export function ChatScreen() {
    * the callback during render hit the temporal dead zone and said so. The order
    * was wrong either way, and only the harness was in a position to notice.
    */
+  /**
+   * The unprompted remark, if there is one to make.
+   *
+   * Assembled from what the phone already holds — the journal against its own
+   * baseline, the next departure, the place — and decided in code by
+   * `lib/anticipate.ts`. Never by a model: asked whether something is worth saying,
+   * a model always finds something, which is precisely how the gateway announced a
+   * Saturday shift that did not exist.
+   *
+   * Marked spoken the moment it is shown rather than when it is read, because "at
+   * most one a day" has to hold against a screen that is opened twenty times.
+   */
+  const [remark, setRemark] = useState<string | null>(null);
+
+  /**
+   * The turn whose menu is open, or null.
+   *
+   * Only ever one of yours. His turns are the record of what was said to you, and a
+   * conversation where either side can be edited is not a record of anything — so
+   * the long press is not even offered on them.
+   */
+  const [menuFor, setMenuFor] = useState<ChatEntry | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       let alive = true;
       void dueToday(new Date()).then((d) => {
         if (alive) setNextBriefing(d);
       });
+      void (async () => {
+        try {
+          const now = new Date();
+          const [spokenBefore, departure, usage] = await Promise.all([
+            loadSpoken(),
+            dueToday(now),
+            usageForAsk(await openJournal(), now.getTime()).catch(() => null),
+          ]);
+          if (!alive) return;
+          const said = anticipate({
+            now,
+            // no baseline means no usage remark: "unusual" against nothing is not a
+            // finding, and `usual` is null until the journal has enough days
+            usage:
+              usage && typeof usage.usual === 'number'
+                ? { today: usage.today, usual: usage.usual, days: usage.days }
+                : null,
+            departure: departure ? { label: departure.label, hour: departure.hour, minute: departure.minute } : null,
+            place,
+            spokenBefore,
+          });
+          if (!said) return;
+          setRemark(said.line);
+          await saveSpoken({ day: dayKey(now), about: said.about });
+        } catch {
+          // a remark is the most optional thing in this app; nothing it needs may
+          // ever be the reason the chat fails to open
+        }
+      })();
       return () => {
         alive = false;
       };
-    }, [])
+    }, [place, minute])
   );
 
   /** a photo taken and not yet sent. Null is the ordinary state of this screen. */
@@ -604,6 +623,20 @@ export function ChatScreen() {
               briefing: nextBriefing,
             })}
           />
+          {/*
+            A line rather than a chat turn, deliberately.
+
+            A turn would claim he said it in conversation, and would be persisted and
+            replayed like everything else in the log — so tomorrow the record would
+            show him volunteering something he was never asked. This is a readout of
+            now, which is what it actually is, and it disappears when it stops being
+            true. The same reasoning as the situation line directly above it.
+          */}
+          {remark ? (
+            <Text testID="chat-remark" style={styles.remark}>
+              {remark}
+            </Text>
+          ) : null}
         </View>
 
         {turns.length === 0 ? (
@@ -654,6 +687,15 @@ export function ChatScreen() {
                   entry={item}
                   accent={accent}
                   reveal={index === 0 && item.from === 'jarvis' && animations && focused}
+                  // the list is inverted, so index 0 is the newest turn
+                  isLast={index === 0}
+                  // withdraw the failed attempt, then send again: a retry is the
+                  // same message having another go, not a second message
+                  onLongPress={item.from === 'user' ? () => setMenuFor(item) : undefined}
+                  onRetry={(text) => {
+                    dropTurn(item.at);
+                    void sendCommand(text).catch(() => {});
+                  }}
                 />
                 {/* The rule goes on the *oldest* turn of each day — a later index
                     is an older turn, so the boundary is where the next index is a
@@ -707,6 +749,53 @@ export function ChatScreen() {
           />
         </Glass>
       </KeyboardAvoidingView>
+      {/*
+        An in-tree overlay rather than a `Modal`: RN 0.86's `Modal` is not exported
+        under this jest setup, so its contents are silently absent from any test —
+        the same reason the Activity detail box is built this way.
+      */}
+      {menuFor ? (
+        <View style={styles.menuShade}>
+          <Touchable
+            testID="turn-menu-dismiss"
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            onPress={() => setMenuFor(null)}
+            style={styles.menuFill}
+          />
+          <View testID="turn-menu" style={styles.menu}>
+            <Touchable
+              testID="turn-menu-copy"
+              accessibilityRole="button"
+              accessibilityLabel="Copy message"
+              onPress={() => {
+                // the words, not the markup — the same reason the screen reader gets
+                // `plainText`: nobody wants asterisks on their clipboard
+                void Clipboard.setStringAsync(plainText(menuFor.text));
+                setMenuFor(null);
+                toast.show('Copied to the clipboard');
+              }}
+              style={styles.menuRow}
+            >
+              <Ionicons name="copy-outline" size={17} color={COLOR.blue} />
+              <Text style={styles.menuText}>Copy message</Text>
+            </Touchable>
+            <Touchable
+              testID="turn-menu-remove"
+              accessibilityRole="button"
+              accessibilityLabel="Remove message"
+              onPress={() => {
+                removeTurn(menuFor.at);
+                setMenuFor(null);
+              }}
+              style={styles.menuRow}
+            >
+              <Ionicons name="trash-outline" size={17} color={COLOR.red} />
+              <Text style={[styles.menuText, styles.menuTextBad]}>Remove message</Text>
+            </Touchable>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -766,10 +855,19 @@ function Bubble({
   accent,
   onPress,
   reveal = false,
+  isLast = false,
+  onRetry,
+  onLongPress,
 }: {
   entry: ChatEntry;
   accent: string;
   onPress?: () => void;
+  /** only the newest turn can still be waiting on an answer */
+  isLast?: boolean;
+  /** offered only where re-sending cannot repeat something already done */
+  onRetry?: (text: string) => void;
+  /** a menu for your own turns: copy, or take it out. Absent on his */
+  onLongPress?: () => void;
   /**
    * Pace this reply on screen.
    *
@@ -782,9 +880,19 @@ function Bubble({
 }) {
   const mine = entry.from === 'user';
   const shown = useReveal(entry.text, reveal);
+  /**
+   * Read at render rather than held in state.
+   *
+   * The only time-dependent case is a carried turn going unanswered, and the list
+   * re-renders on focus and on every arriving frame — which is exactly when the
+   * answer would have come. A ticker per bubble would be a timer per message for a
+   * label that changes once.
+   */
+  const mark = turnMark(entry, Date.now(), isLast);
   return (
     <Touchable
       testID={`turn-${entry.at}`}
+      onLongPress={onLongPress}
       accessibilityRole={onPress ? 'button' : 'text'}
       /**
        * The WORDS, not the markup.
@@ -820,7 +928,34 @@ function Bubble({
         */}
         <RichText text={shown} style={[styles.text, mine ? styles.textMine : null]} />
       </View>
-      <Text style={styles.time}>{`${mine ? 'You' : 'Jarvis'} · ${clock(entry.at)}`}</Text>
+      <View style={styles.meta}>
+        <Text style={styles.time}>{`${mine ? 'You' : 'Jarvis'} · ${clock(entry.at)}`}</Text>
+        {/*
+          What became of your own turn, and nothing at all for a settled one. The
+          rules are in `lib/turnMark.ts`; the short version is that a mark on every
+          message is noise you stop reading, and then the one that matters is noise
+          too.
+        */}
+        {mark ? (
+          <Text
+            testID={`turn-mark-${entry.at}`}
+            style={[styles.mark, mark.tone === 'bad' ? styles.markBad : null]}
+          >
+            {mark.label}
+          </Text>
+        ) : null}
+        {mark?.retry && onRetry ? (
+          <Touchable
+            testID={`turn-retry-${entry.at}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Send again: ${plainText(entry.text)}`}
+            hitSlop={10}
+            onPress={() => onRetry(entry.text)}
+          >
+            <Text style={styles.retry}>SEND AGAIN</Text>
+          </Touchable>
+        ) : null}
+      </View>
     </Touchable>
   );
 }
@@ -902,7 +1037,27 @@ const styles = StyleSheet.create({
     backgroundColor: COLOR.blueDim,
   },
   textMine: { color: COLOR.white },
-  time: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.dim, marginTop: 4, letterSpacing: 1 },
+  // the row carries the margin now that the clock has company beside it
+  meta: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginTop: 4 },
+  time: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.dim, letterSpacing: 1 },
+  // the accent, because it is the one line on this screen nobody asked for and it
+  // has to be distinguishable from the situation line it sits under
+  remark: { ...TYPE.meta, fontSize: 12, color: COLOR.blue, marginTop: SPACE.sm, lineHeight: 17 },
+  mark: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.dim, letterSpacing: 1 },
+  markBad: { color: COLOR.red },
+  retry: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.blue, letterSpacing: 1 },
+  menuShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: SPACE.xl },
+  menuFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.72)' },
+  menu: {
+    backgroundColor: COLOR.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLOR.line,
+    overflow: 'hidden',
+  },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingHorizontal: SPACE.lg, paddingVertical: SPACE.lg },
+  menuText: { ...TYPE.meta, fontSize: 14, color: COLOR.white },
+  menuTextBad: { color: COLOR.red },
   dayRule: {
     flexDirection: 'row',
     alignItems: 'center',

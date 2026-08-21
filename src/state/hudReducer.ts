@@ -27,6 +27,17 @@ export type ChatEntry = {
    * survives in `text` either way.
    */
   image?: string;
+  /**
+   * What became of a turn you sent. Absent on Jarvis's own turns, and absent on
+   * anything restored from a log written before this existed — a fortnight of old
+   * messages redrawn as "sending" would be a lie about every one of them.
+   *
+   * `awaiting` is the interesting one and the reason this exists at all: it means
+   * something carried the message and no answer has come back. That is the state a
+   * dropped reply leaves behind, and until now it was indistinguishable on screen
+   * from a reply still being written.
+   */
+  state?: 'sending' | 'awaiting' | 'failed' | 'answered';
 };
 
 /**
@@ -73,6 +84,29 @@ export type HudState = {
 export type HudAction =
   | { type: 'frame'; frame: JarvisFrame; at: number }
   | { type: 'local_command'; text: string; at: number; image?: string }
+  /** something carried the turn stamped `at`; the wait for an answer starts */
+  | { type: 'turn_sent'; at: number }
+  /** nothing could carry it, so there is nothing to wait for */
+  | { type: 'turn_failed'; at: number }
+  /**
+   * Withdraw a failed attempt, because it is being sent again.
+   *
+   * Only a `failed` turn can be withdrawn. Anything that reached the far end is part
+   * of the record whatever became of its answer, and quietly deleting it would let
+   * the log disagree with what the desk actually received.
+   */
+  | { type: 'turn_drop'; at: number }
+  /**
+   * Take one of the user's own turns out, because they asked.
+   *
+   * Distinct from `turn_drop`, which withdraws a failed attempt about to be retried.
+   * This removes a turn in any state, including one the desk received — the user
+   * gets to decide what stays in their own log.
+   *
+   * **His turns cannot be removed.** They are the record of what was said to you, and
+   * a conversation where either side can be edited is not a record of anything.
+   */
+  | { type: 'turn_remove'; at: number }
   | { type: 'resolving'; id: string }
   | { type: 'resolved_local'; id: string }
   | { type: 'intruder_resolving'; id: string }
@@ -119,6 +153,22 @@ const WATCH_SAID = {
 } as const;
 
 const cap = <T,>(list: T[], max: number): T[] => (list.length > max ? list.slice(list.length - max) : list);
+
+/**
+ * An answer settles the oldest question still waiting for one.
+ *
+ * The **oldest**, not the newest: two questions in a row and one reply means the first
+ * has been answered and the second is still owed something. Guessing the other way
+ * around would mark the wrong turn done and leave a settled one looking abandoned.
+ *
+ * Only `awaiting` turns are eligible. A turn that never left the phone is `failed` and
+ * an unrelated answer does not redeem it, which is the distinction that makes the
+ * state worth keeping at all.
+ */
+const settle = (chat: ChatEntry[]): ChatEntry[] => {
+  const i = chat.findIndex((c) => c.from === 'user' && c.state === 'awaiting');
+  return i < 0 ? chat : chat.map((c, n) => (n === i ? { ...c, state: 'answered' as const } : c));
+};
 
 /**
  * Merge what a frame actually said into a parked action, and nothing else.
@@ -195,7 +245,7 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
         user: frame.user ?? state.user,
         chat:
           frame.message && !repeated && !linkNotice
-            ? cap([...state.chat, { from: 'jarvis' as const, text: frame.message, at }], CHAT_CAP)
+            ? cap([...settle(state.chat), { from: 'jarvis' as const, text: frame.message, at }], CHAT_CAP)
             : state.chat,
       };
     }
@@ -301,6 +351,8 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
               from: 'user' as const,
               text: action.text,
               at: action.at,
+              // nothing is known about delivery yet, and saying so is the point
+              state: 'sending' as const,
               // spread rather than `image: action.image`, so a typed command's
               // entry has no such key at all — see the note on `ChatEntry.image`
               ...(action.image ? { image: action.image } : {}),
@@ -308,6 +360,43 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
           ],
           CHAT_CAP
         ),
+      };
+    /**
+     * The result of trying to carry one turn, matched by its timestamp.
+     *
+     * A mark for a turn no longer in the log is dropped rather than appended: the log
+     * is capped, so a slow result can land after its turn has aged out, and inventing
+     * an entry for it would put the same message on screen twice.
+     *
+     * Only a `sending` turn is moved, so a late result cannot drag an already-answered
+     * turn backwards into waiting.
+     */
+    case 'turn_sent':
+    case 'turn_failed': {
+      const settled = action.type === 'turn_sent' ? ('awaiting' as const) : ('failed' as const);
+      return {
+        ...state,
+        chat: state.chat.map((c) =>
+          c.from === 'user' && c.at === action.at && c.state === 'sending' ? { ...c, state: settled } : c
+        ),
+      };
+    }
+    /**
+     * A retry replaces the attempt that failed rather than joining it.
+     *
+     * Reported from the device: SEND AGAIN left the red turn on screen and put the new
+     * one under it, so the chat showed one sentence twice. A retry is the same message
+     * having another go.
+     */
+    case 'turn_drop':
+      return {
+        ...state,
+        chat: state.chat.filter((c) => !(c.from === 'user' && c.at === action.at && c.state === 'failed')),
+      };
+    case 'turn_remove':
+      return {
+        ...state,
+        chat: state.chat.filter((c) => !(c.from === 'user' && c.at === action.at)),
       };
     case 'resolving':
       return {

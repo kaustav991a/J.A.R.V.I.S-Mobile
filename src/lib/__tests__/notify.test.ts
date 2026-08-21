@@ -327,3 +327,43 @@ describe('a reply that arrived as a push', () => {
     expect(replyFromData({ kind: 'reply' }, undefined)).toBeNull();
   });
 });
+
+/**
+ * The departure briefing is pushed with `{"kind": "commute"}`, and until now
+ * nothing on the phone consumed it: `replyFromData` returned null for every kind
+ * but `reply`, so a briefing was shown in the shade and never entered the log.
+ * Reported from the device on 2026-08-21 — the 8 AM briefing arrived and the
+ * Activity panel was empty, which reads as the panel being broken.
+ */
+describe('a departure briefing that arrived as a push', () => {
+  it('is taken in, so the panel can show what was said', () => {
+    expect(
+      replyFromData({ kind: 'commute', placeId: 'home' }, 'An umbrella, then. (8 AM–11 AM)', {
+        title: 'Before you leave Home, sir',
+      })
+    ).toEqual({ text: 'Before you leave Home, sir\nAn umbrella, then. (8 AM–11 AM)' });
+  });
+
+  it('keeps the title, which names the door the briefing is about', () => {
+    // two of these arrive in a day and the bodies can be identical; the title is
+    // the only part that says which departure it was
+    const taken = replyFromData({ kind: 'commute', placeId: 'office' }, 'Nothing to carry.', {
+      title: 'Nothing in your way from Office, sir',
+    });
+    expect(taken?.text.startsWith('Nothing in your way from Office, sir')).toBe(true);
+  });
+
+  it('carries the time the notification arrived, not the time it was read', () => {
+    // swept out of the tray hours later: stamping it `now` would file this
+    // morning's briefing under lunchtime and put it above things that came after
+    const taken = replyFromData({ kind: 'commute' }, 'An umbrella, then.', {
+      title: 'Before you leave Home, sir',
+      at: 1_755_000_000_000,
+    });
+    expect(taken?.at).toBe(1_755_000_000_000);
+  });
+
+  it('still refuses a briefing with no body, rather than posting a bare title', () => {
+    expect(replyFromData({ kind: 'commute' }, '  ', { title: 'Before you leave Home, sir' })).toBeNull();
+  });
+});

@@ -4,46 +4,26 @@ import { Slider } from '../components/ui/Slider';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { COLOR, SPACE, TYPE } from '../theme/tokens';
-import { ACCENTS, AccentKey, ThemeChoice, useAppearance } from '../theme/appearance';
-
-const THEMES: ReadonlyArray<{ key: ThemeChoice; label: string }> = [
-  { key: 'dark', label: 'Dark' },
-  { key: 'system', label: 'System' },
-];
+import { ACCENTS, AccentKey, useAppearance } from '../theme/appearance';
 
 export function AppearanceScreen() {
-  const { theme, setTheme, accentKey, setAccentKey, accent, glow, setGlow, animations, setAnimations } =
+  const { accentKey, setAccentKey, accent, glow, setGlow, animations, setAnimations } =
     useAppearance();
 
   return (
     <Screen testID="appearance-screen">
       <ScreenTitle title="APPEARANCE" />
-      <SectionLabel>Theme</SectionLabel>
-      <View style={styles.group}>
-        {THEMES.map((t, i) => {
-          const selected = theme === t.key;
-          return (
-            <Pressable
-              key={t.key}
-              testID={`theme-${t.key}`}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              onPress={() => setTheme(t.key)}
-              style={[styles.row, i < THEMES.length - 1 && styles.divided]}
-            >
-              <Ionicons
-                name={selected ? 'radio-button-on' : 'radio-button-off'}
-                size={18}
-                color={selected ? accent : COLOR.dim}
-              />
-              <Text style={styles.rowLabel}>{t.label}</Text>
-              {selected ? <Ionicons name="checkmark-circle" size={18} color={accent} /> : null}
-            </Pressable>
-          );
-        })}
-      </View>
-      <Text style={styles.note}>The app is dark by design; System is kept for parity and behaves the same.</Text>
+      {/*
+        The theme picker is gone, and that is the decision rather than a deferral.
 
+        It offered Dark and System, and System behaved identically — the screen even
+        said so in a note underneath. A control that cannot change anything is worse
+        than an absent one: it invites a tap, answers nothing, and quietly teaches
+        that the rest of this screen might be decoration too.
+
+        The instrument look IS the product here, so a light variant is not owed. If
+        a real user asks for one, it comes back as a theme that does something.
+      */}
       <SectionLabel>Accent colour</SectionLabel>
       <View style={styles.swatches}>
         {(Object.keys(ACCENTS) as AccentKey[]).map((key) => {

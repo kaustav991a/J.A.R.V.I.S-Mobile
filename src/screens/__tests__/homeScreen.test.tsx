@@ -39,9 +39,20 @@ jest.mock('../../state/JarvisProvider', () => ({
     setShareLocation: jest.fn().mockResolvedValue(true),
     alertsUnread: 0,
     markAlertsRead: jest.fn(),
+    pairing: { deskBase: 'http://d', cloudBase: null, usingDefault: true, hasToken: false },
+    push: 'unasked',
     ...mockJarvis,
   }),
 }));
+
+/**
+ * The app-lock setting, for the status panel.
+ *
+ * Mocked rather than wrapped in a real `AuthProvider`: that one reaches for the
+ * biometric sensor on mount, which does not exist under jest, and Home only needs
+ * to know whether the lock is switched on.
+ */
+jest.mock('../../security/AuthProvider', () => ({ useAuth: () => ({ appLock: true }) }));
 
 beforeEach(() => {
   mockJarvis = {};

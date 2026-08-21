@@ -21,6 +21,7 @@ import { AboutScreen } from '../screens/AboutScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
 import { PlacesScreen } from '../screens/PlacesScreen';
 import { MemoryScreen } from '../screens/MemoryScreen';
+import { CapabilitiesScreen } from '../screens/CapabilitiesScreen';
 import { JournalScreen } from '../screens/JournalScreen';
 import { UpdatesScreen } from '../screens/UpdatesScreen';
 import { TABS_ID } from './types';
@@ -121,6 +122,7 @@ function SettingsStackScreens() {
       <SettingsStack.Screen name="Memory" component={MemoryScreen} />
       <SettingsStack.Screen name="Journal" component={JournalScreen} />
       <SettingsStack.Screen name="Updates" component={UpdatesScreen} />
+      <SettingsStack.Screen name="Capabilities" component={CapabilitiesScreen} />
       <SettingsStack.Screen name="About" component={AboutScreen} />
     </SettingsStack.Navigator>
   );

@@ -305,7 +305,7 @@ Jest:
   0–15 minutes. Also fixes arrival detection and would make call-log rules
   dependable. Highest-leverage native work available; deferred until real use
   says the free path is not enough.
-- **Learned rules.** NEXT.md §7. Same engine, baseline-written rules, needs two
+- **Learned rules.** `ROADMAP.md` §3.4 (anticipation). Same engine, baseline-written rules, needs two
   to four weeks of journal before "unusual" means anything.
 - **Rule editing.** Delete and re-declare. Editing a parsed rule in a form
   means building the form this design deliberately avoided.
