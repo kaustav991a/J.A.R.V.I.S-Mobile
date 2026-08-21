@@ -137,7 +137,9 @@ describe('what rides on every question', () => {
     await j.putEvents([{ at: startOfDay(NOW) + 1000, kind: 'unlock', app: null }]);
 
     const u = await usageForAsk(j, NOW);
-    expect(u).toEqual({ today: 60, pickups: 1, top: ['Gmail'], usual: 120, days: 1 });
+    // `usualPickups` since 2026-08-21: `rollup` always computed it and this dropped it,
+    // so a fidgety day was invisible to everything above
+    expect(u).toEqual({ today: 60, pickups: 1, top: ['Gmail'], usual: 120, usualPickups: 0, days: 1 });
   });
 
   it('says there is no usual yet rather than sending a zero', async () => {

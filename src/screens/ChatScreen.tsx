@@ -220,6 +220,11 @@ export function ChatScreen() {
                 ? { today: usage.today, usual: usage.usual, days: usage.days }
                 : null,
             departure: departure ? { label: departure.label, hour: departure.hour, minute: departure.minute } : null,
+            // a fidgety day is not the same fact as a heavy one, and a total hides it
+            pickups:
+              usage && typeof usage.usualPickups === 'number'
+                ? { today: usage.pickups, usual: usage.usualPickups, days: usage.days }
+                : null,
             place,
             /**
              * Whether he is somewhere he is usually gone from by now.

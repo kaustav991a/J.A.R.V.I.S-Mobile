@@ -146,6 +146,8 @@ export type AskUsage = {
    * nobody has watched yet.
    */
   usual: number | null;
+  /** pickups on an ordinary day, or null when there is no baseline */
+  usualPickups: number | null;
   /** how many completed days that average rests on */
   days: number;
 };

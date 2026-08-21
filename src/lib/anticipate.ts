@@ -26,6 +26,14 @@ export type Observations = {
   /** minutes of screen time today, the usual for this many days, from the journal */
   usage: { today: number; usual: number; days: number } | null;
   /**
+   * Pickups today against an ordinary day.
+   *
+   * A separate observation from minutes, and not a redundant one: a heavy day and a
+   * *fidgety* day are different things, and the second is invisible in a total. The
+   * journal has computed `avgPickups` all along and `usageForAsk` was dropping it.
+   */
+  pickups: { today: number; usual: number; days: number } | null;
+  /**
    * The next departure still ahead today.
    *
    * **Read and deliberately unused.** A countdown to it was the first trigger built
@@ -81,6 +89,9 @@ const OVER = 1.5;
 /** a minimum, so a heavy morning against a very light usual is not a finding */
 const OVER_FLOOR_MIN = 60;
 
+/** the same idea for pickups: twice a very quiet day is still a quiet day */
+const PICKUPS_FLOOR = 40;
+
 const dayKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -107,7 +118,7 @@ export function anticipate(o: Observations): Remark | null {
   // muted, and a muted assistant cannot say the one thing that mattered
   if (o.spokenBefore?.day === dayKey(o.now)) return null;
 
-  const candidate = placeRemark(o) ?? usageRemark(o);
+  const candidate = placeRemark(o) ?? usageRemark(o) ?? pickupsRemark(o);
   if (!candidate) return null;
 
   // never the same subject twice running — one a day is not enough on its own, and
@@ -132,6 +143,25 @@ function placeRemark(o: Observations): Remark | null {
   return {
     about: 'place',
     line: `Still at ${o.place}, sir. You are usually gone by ${clock(o.goneBy)}.`,
+  };
+}
+
+/**
+ * A day of unusually many pickups, which a total of minutes hides.
+ *
+ * Ranked below the screen-time remark rather than above it: forty extra minutes is
+ * a bigger fact about a day than forty extra glances, and only one remark is spent.
+ * Both quote their figures, for the same reason — an adjective about somebody's
+ * habits with no measurement behind it cannot be disagreed with.
+ */
+function pickupsRemark(o: Observations): Remark | null {
+  const p = o.pickups;
+  if (!p || p.days < ENOUGH_DAYS) return null;
+  // a floor as well as a ratio: twice a very quiet day is still a quiet day
+  if (p.today < PICKUPS_FLOOR || p.today < p.usual * OVER) return null;
+  return {
+    about: 'pickups',
+    line: `${p.today} pickups today against a usual ${p.usual}, sir.`,
   };
 }
 

@@ -18,6 +18,7 @@ const at = (h: number, m = 0) => new Date(2026, 7, 21, h, m);
 const seen = (over: Partial<Observations> = {}): Observations => ({
   now: at(12),
   usage: null,
+  pickups: null,
   departure: null,
   place: null,
   stillHereLate: false,
@@ -171,4 +172,32 @@ describe('the voice', () => {
       expect(said!.line).not.toContain('!');
     }
   });
+});
+
+/**
+ * A fidgety day, which a total of minutes hides completely.
+ */
+describe('a day of unusually many pickups', () => {
+  const fidgety = seen({ pickups: { today: 120, usual: 45, days: 9 } });
+
+  it('is named, with both figures', () => {
+    const said = anticipate(fidgety);
+    expect(said?.about).toBe('pickups');
+    expect(said?.line).toContain('120');
+    expect(said?.line).toContain('45');
+  });
+
+  it('loses to the screen-time remark, which is the bigger fact about a day', () => {
+    const said = anticipate({ ...fidgety, usage: { today: 400, usual: 100, days: 9 } });
+    expect(said?.about).toBe('usage');
+  });
+
+  it('waits for a baseline like everything else here', () => {
+    expect(anticipate({ ...fidgety, pickups: { today: 120, usual: 45, days: 2 } })).toBeNull();
+  });
+
+  it('says nothing about twice a very quiet day', () => {
+    expect(anticipate({ ...fidgety, pickups: { today: 20, usual: 8, days: 9 } })).toBeNull();
+  });
+
 });

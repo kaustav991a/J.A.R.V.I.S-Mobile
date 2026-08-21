@@ -110,6 +110,9 @@ export async function usageForAsk(j: Journal, now: number): Promise<AskUsage | n
     // null, not zero, when there is no completed day behind it — a zero baseline
     // invites "far more than usual" about someone nobody has watched yet
     usual: r.usual.days ? minutes(r.usual.avgMs) : null,
+    // the same for pickups, which `rollup` has always computed and this has always
+    // dropped. Null for the same reason: no baseline is not a baseline of zero
+    usualPickups: r.usual.days ? r.usual.avgPickups : null,
     days: r.usual.days,
   };
 }
