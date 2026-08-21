@@ -31,7 +31,7 @@ that bear on unbuilt work are cross-referenced where they bite.
 
 ## 0. Where the app actually stands — 2026-08-21
 
-21 screens, **866 tests**, `tsc --noEmit` clean. (`AGENTS.md` said 461 and the old
+21 screens, **879 tests**, `tsc --noEmit` clean. (`AGENTS.md` said 461 and the old
 roadmap said 426. Both were stale. This number will be too — run `npm test`.)
 
 Live gateway, read this morning:
@@ -79,6 +79,7 @@ Live gateway, read this morning:
 | The chat log is flushed when the app leaves the foreground | done — two turns were lost to a force-stop on a 400ms debounce |
 | The briefing fires BEFORE the time, never after | phone done; **gateway owed** — addendum in the mailbox spec |
 | Full anticipation | spec written — `docs/superpowers/specs/2026-08-21-anticipation-design.md` |
+| A WATCHING panel on Home | **proved** on the device 18:27 — and it showed `Today: SPOKEN`, so anticipation had already spoken |
 | The remark the timeline unlocks | done — *"Still at Office, sir. You are usually gone by 6:40 PM."* Ranked above the screen-time remark, being about right now |
 | **A local release build silently breaks OTA** | found and worked around — `expo_runtime_version` stayed `file:fingerprint`; see `AGENTS.md` |
 | Microphone verified | **not done** — needs hands on the phone, not adb |

@@ -149,6 +149,25 @@ export function usuallyGoneBy(seen: Seen[], place: string, now: Date): number | 
 }
 
 /**
+ * How many distinct EARLIER days he has been seen at a place.
+ *
+ * For the Home panel to count down honestly — "3 more days" is progress, where a
+ * silent feature is indistinguishable from a broken one. Today is excluded for the
+ * same reason `usuallyGoneBy` excludes it: today is the day being judged, not
+ * evidence about it.
+ */
+export function daysSeenAt(seen: Seen[], place: string, now: Date): number {
+  const today = dayKey(now.getTime());
+  const days = new Set<string>();
+  for (const s of seen) {
+    if (s.place !== place) continue;
+    const key = dayKey(s.at);
+    if (key !== today) days.add(key);
+  }
+  return days.size;
+}
+
+/**
  * Whether you are at a place well past the hour you are usually gone from it.
  *
  * `false` whenever it cannot know — no history, not enough days, or not yet past the

@@ -10,6 +10,7 @@ import { GovernancePanel } from '../components/GovernancePanel';
 import { TypeLine } from '../components/TypeLine';
 import { QuickMenu } from '../components/QuickMenu';
 import { StatusPanel } from '../components/StatusPanel';
+import { WatchingPanel } from '../components/WatchingPanel';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
 import { COLOR, SPACE, TYPE, glowBox, glowText } from '../theme/tokens';
@@ -17,8 +18,13 @@ import { greetingFor, msToNextMinute } from '../theme/greeting';
 import { ACCENTS, useAppearance } from '../theme/appearance';
 import { useJarvis } from '../state/JarvisProvider';
 import { useAuth } from '../security/AuthProvider';
-import { cloudArmed } from '../lib/commute';
+import { cloudArmed, dayKey } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
+import type { WatchFacts } from '../lib/watching';
+import { daysSeenAt, loadSeen } from '../lib/timeline';
+import { loadSpoken } from '../lib/spokenStore';
+import { usageForAsk } from '../lib/journal/rollup';
+import { openJournal } from '../lib/journal/store';
 import { SCRIPTS } from '../data/fixtures';
 import { TABS_ID } from '../navigation/types';
 import type { HomeStackParams, TabParams } from '../navigation/types';
@@ -100,6 +106,7 @@ export function HomeScreen() {
    */
   const [scheduleAtGateway, setScheduleAtGateway] = useState(false);
   const [usageAccess, setUsageAccess] = useState<'granted' | 'denied' | 'unknown'>('unknown');
+  const [watch, setWatch] = useState<WatchFacts | null>(null);
   useFocusEffect(
     useCallback(() => {
       let alive = true;
@@ -123,10 +130,55 @@ export function HomeScreen() {
       void Promise.resolve(usageAccessState()).then((access) => {
         if (alive) setUsageAccess((prev) => (prev === access ? prev : access));
       });
+      /**
+       * What anticipation is watching, and what it is short of.
+       *
+       * Read here rather than inside the panel, so the panel stays pure and testable —
+       * and on focus rather than on a timer, for the same reason as the two reads above
+       * it: none of this changes more than a few times a day.
+       */
+      void (async () => {
+        try {
+          const now = new Date();
+          const [seen, spoken, usage] = await Promise.all([
+            loadSeen(),
+            loadSpoken(),
+            usageForAsk(await openJournal(), now.getTime()).catch(() => null),
+          ]);
+          if (!alive) return;
+          const next: WatchFacts = {
+            baselineDays: usage?.days ?? 0,
+            placeDays: place ? daysSeenAt(seen, place, now) : 0,
+            place,
+            spokenToday: spoken?.day === dayKey(now),
+          };
+          /**
+           * Bail out when nothing changed, and this is NOT an optimisation.
+           *
+           * A fresh object every time is a new state value every time, and
+           * `useFocusEffect` is mocked in this repo as `(cb) => cb()` — so it
+           * re-renders, re-runs, and never stops. Nine Home tests timed out at five
+           * seconds each. The two reads above already carry this warning; I wrote a
+           * third read and walked into it anyway, which is why the guard belongs in the
+           * shape rather than in the discipline.
+           */
+          setWatch((prev) =>
+            prev &&
+            prev.baselineDays === next.baselineDays &&
+            prev.placeDays === next.placeDays &&
+            prev.place === next.place &&
+            prev.spokenToday === next.spokenToday
+              ? prev
+              : next
+          );
+        } catch {
+          // a readout about a remark is the most optional thing on this screen
+        }
+      })();
       return () => {
         alive = false;
       };
-    }, [])
+    }, [place])
   );
 
   /**
@@ -407,6 +459,19 @@ export function HomeScreen() {
           appLock,
         }}
       />
+
+      {/*
+        Under what-is-connected, because it answers the neighbouring question: that
+        panel says whether he CAN reach you, this one says whether he has anything
+        to say yet. Absent until the first read completes, rather than rendering an
+        empty frame.
+      */}
+      {watch ? (
+        <>
+          <SectionLabel>What he is watching</SectionLabel>
+          <WatchingPanel facts={watch} />
+        </>
+      ) : null}
 
       {hud.parked.length > 0 ? (
         <>

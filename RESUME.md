@@ -12,7 +12,7 @@
 
 ## 🏠 HANDOFF — 2026-08-21, end of day. Read this first.
 
-**866 tests, `tsc --noEmit` clean.** Both repos committed and pushed. The phone is
+**879 tests, `tsc --noEmit` clean.** Both repos committed and pushed. The phone is
 running everything below.
 
 ### The state of the two repos
@@ -32,6 +32,44 @@ channel against that fingerprint — last publish `168e1f66`.
 cost an hour today and it fails completely silently.
 
 ---
+
+### 18:27 — the WATCHING panel, and anticipation confirmed speaking
+
+Read off the phone, scrolled to it:
+
+```
+WHAT HE IS WATCHING
+WATCHING                          1 OF 3 READY
+o Today                             SPOKEN
+  One remark a day. Nothing more until tomorrow.
+* Screen time against your usual    6 DAYS
+o When you are usually gone      4 MORE DAYS
+  Learning your hours at Office. Sightings happen when you open the app.
+```
+
+**`Today — SPOKEN` is the important line.** Anticipation made its one remark today, off
+the screen-time trigger. It works, it fired, and it was easy to miss — which is the
+entire argument for this panel.
+
+**Why the panel exists.** Anticipation is silent most days by design and silent for its
+first four days by necessity. Without a readout, a working feature and a broken one are
+identical — the failure this project has paid for more than any other. `lib/watching.ts`
+is pure and tested; `WatchingPanel` renders it; Home reads it on focus.
+
+It never says when he will next speak. That depends on the day being unusual, which is
+not knowable in advance, and a promise this panel could not keep would be worse than no
+panel. It says what he has, and what he is short of.
+
+**The re-render trap, walked into a second time.** `setWatch({...})` is a new object
+every call, and `useFocusEffect` is mocked repo-wide as `(cb) => cb()` — so it
+re-renders, re-runs and never stops. Nine Home tests timed out at five seconds each.
+The two reads directly above it already carried that warning in a comment; writing a
+third read hit it anyway. **The guard now lives in the shape** — a field-by-field
+comparison returning `prev` — rather than in remembering.
+
+Also: `openJournal()` in a Home focus effect opens a real SQLite database through the
+`node:sqlite` adapter under jest. Home does not care what the journal holds, only how
+many days of it there are, so the test mocks both.
 
 ### Late addition, 18:10 — the location timeline
 

@@ -1,4 +1,4 @@
-import { ENOUGH_PLACE_DAYS, LATE_BY_MIN, stillHereLate, usuallyGoneBy } from '../timeline';
+import { ENOUGH_PLACE_DAYS, LATE_BY_MIN, daysSeenAt, stillHereLate, usuallyGoneBy } from '../timeline';
 import type { Seen } from '../timeline';
 
 /**
@@ -86,5 +86,25 @@ describe('whether you are still there, late', () => {
 
   it('is false when nowhere is known', () => {
     expect(stillHereLate([], 'Office', NOW)).toBe(false);
+  });
+});
+
+/**
+ * The countdown the Home panel shows, so a silent feature is not mistaken for a
+ * broken one — the failure this project has paid for more than any other.
+ */
+describe('how many days it has seen you somewhere', () => {
+  it('counts distinct days, not sightings', () => {
+    // two sightings on one day is one day of evidence
+    expect(daysSeenAt(office, 'Office', NOW)).toBe(4);
+  });
+
+  it('excludes today, which is the day being judged', () => {
+    const withToday = [...office, ...seen([21, 9, 0, 'Office'])];
+    expect(daysSeenAt(withToday, 'Office', NOW)).toBe(4);
+  });
+
+  it('is zero somewhere it has never seen you', () => {
+    expect(daysSeenAt(office, 'Airport', NOW)).toBe(0);
   });
 });

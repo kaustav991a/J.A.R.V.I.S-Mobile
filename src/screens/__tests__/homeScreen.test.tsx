@@ -54,6 +54,18 @@ jest.mock('../../state/JarvisProvider', () => ({
  */
 jest.mock('../../security/AuthProvider', () => ({ useAuth: () => ({ appLock: true }) }));
 
+/**
+ * The journal, which Home now reads on focus for the watching panel.
+ *
+ * Unmocked, `openJournal()` opens a real SQLite database through the node:sqlite
+ * adapter in `jest-setup` — every Home test then timed out at five seconds. Home does
+ * not care what the journal holds, only how many days of it there are.
+ */
+jest.mock('../../lib/journal/store', () => ({ openJournal: jest.fn().mockResolvedValue({}) }));
+jest.mock('../../lib/journal/rollup', () => ({
+  usageForAsk: jest.fn().mockResolvedValue({ today: 42, pickups: 7, top: [], usual: 60, days: 9 }),
+}));
+
 beforeEach(() => {
   mockJarvis = {};
 });
