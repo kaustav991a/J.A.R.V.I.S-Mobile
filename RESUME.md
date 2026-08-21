@@ -88,7 +88,7 @@ Everything here is on the phone and untested by a human. `TESTING.md` has the ch
 
 - Message states on your own turns: `SENDING`, `NOT SENT` + `SEND AGAIN`
 - `SEND AGAIN` withdraws the failed attempt (one message in the log, not two)
-- Long-press your own message: copy, or remove. **His cannot be removed**
+- ~~Long-press your own message: copy, or remove~~ — **proved on the device 18:14**, two messages removed. His cannot be removed
 - Anticipation v1: screen time against your own baseline, one remark a day
 - The briefing gate — the phone stands down when the gateway holds the schedule
 - Photos settle instead of reading `SENDING` forever

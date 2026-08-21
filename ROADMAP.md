@@ -74,7 +74,7 @@ Live gateway, read this morning:
 | Message states in the chat: `SENDING` / `NOT SENT` + `SEND AGAIN` / `NO ANSWER` | done, unseen |
 | Anticipation v1 — he notices when you open the app | done — one trigger, screen time against your own baseline |
 | The leaving-time countdown | **withdrawn the same day** — it recited a setting you typed, and the situation line already printed it |
-| Long-press your own message: copy, remove | done, unseen — his cannot be removed |
+| Long-press your own message: copy, remove | **proved** on the device 18:14 — two messages removed. His cannot be removed |
 | Photos settle instead of saying `SENDING` forever | done — the states were wired into `sendCommand` only |
 | The chat log is flushed when the app leaves the foreground | done — two turns were lost to a force-stop on a 400ms debounce |
 | The briefing fires BEFORE the time, never after | phone done; **gateway owed** — addendum in the mailbox spec |
