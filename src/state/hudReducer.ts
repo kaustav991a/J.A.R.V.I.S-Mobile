@@ -166,17 +166,39 @@ const cap = <T,>(list: T[], max: number): T[] => (list.length > max ? list.slice
  * state worth keeping at all.
  */
 /**
- * What makes two chat entries the same event rather than two similar ones.
+ * How far apart two identical turns can be and still be one event.
  *
- * Same sender, same words, same millisecond. Used by `hydrate` when a restored log meets
- * a live one, and by the `status` append when a pushed reply comes back through the tray
- * sweep carrying its original timestamp — see the test file for the log this was read off.
+ * A reply can be delivered twice — the push carries the notification's own time, the
+ * socket stamps arrival — so the copies land a few hundred milliseconds apart rather than
+ * in the same millisecond. Measured on the device: **422 ms and 459 ms**.
  *
- * The text is part of the key because two different turns from the same side can land in
- * one millisecond, and on `(from, at)` alone the restored one was thrown away. The `at` is
- * part of it because the same sentence said again later is a second thing that was said.
+ * The window is chosen from the same evidence rather than by taste. In that 100-entry log
+ * every genuine repeat is far away — the closest is **32.9 s** (the same words sent twice
+ * by hand), then 65.9 s, then 72.5 s. Five seconds sits about 11× above the largest
+ * duplicate and 6.6× below the nearest real repeat, so neither call is close.
  */
-const sameTurn = (c: ChatEntry) => `${c.from}@${c.at}@${c.text}`;
+const SAME_TURN_WINDOW_MS = 5_000;
+
+/**
+ * Whether the log already holds this turn, as opposed to one that merely looks like it.
+ *
+ * Same sender, same words, within the window above. Used by `hydrate` when a restored log
+ * meets a live one, and by the `status` append when a pushed reply comes back through the
+ * tray sweep — see the test file for the log this was read off.
+ *
+ * The sender is part of it because the same sentence from the other side of the
+ * conversation is a different event. The text is part of it because two different turns
+ * from the same side can land together, and on time alone the restored one was thrown
+ * away. The window is part of it because the same sentence said again later is genuinely a
+ * second thing that was said.
+ */
+const holdsTurn = (chat: ChatEntry[], turn: { from: ChatEntry['from']; text: string; at: number }) =>
+  chat.some(
+    (c) =>
+      c.from === turn.from &&
+      c.text === turn.text &&
+      Math.abs(c.at - turn.at) <= SAME_TURN_WINDOW_MS
+  );
 
 const settle = (chat: ChatEntry[]): ChatEntry[] => {
   const i = chat.findIndex((c) => c.from === 'user' && c.state === 'awaiting');
@@ -249,9 +271,7 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
        * Identity rather than adjacency, so the behaviour above is untouched: a genuine
        * second occurrence carries its own timestamp and still appends.
        */
-      const alreadyLogged = state.chat.some(
-        (c) => sameTurn(c) === sameTurn({ from: 'jarvis', text: frame.message, at })
-      );
+      const alreadyLogged = holdsTurn(state.chat, { from: 'jarvis', text: frame.message, at });
       /**
        * `online` and `offline` are the link talking about itself, not
        * J.A.R.V.I.S. saying something.
@@ -462,19 +482,18 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
       // Restored turns go BEFORE whatever is already here. The socket can open and
       // J.A.R.V.I.S. can answer before a disk read finishes, and replacing would
       // throw away a turn that had already happened in this session.
-      // De-duplicated on `sameTurn`: a relaunch that restores a log and then receives
-      // the same greeting again should not show it twice. The same key gates the
+      // De-duplicated with `holdsTurn`: a relaunch that restores a log and then receives
+      // the same greeting again should not show it twice. The same predicate gates the
       // `status` append, so the two paths cannot disagree about what one event is.
       //
-      // The set grows as it goes, so the restored log is also de-duplicated against
-      // ITSELF. It has to be: logs written while the pushed-reply duplicate was live
-      // carry both copies, and a fix that leaves them on screen reads exactly like a fix
-      // that did not work.
-      const seen = new Set(state.chat.map(sameTurn));
+      // Kept entries accumulate, so the restored log is de-duplicated against ITSELF as
+      // well as against live state. It has to be: logs written while the duplicate was
+      // live carry both copies, and a fix that leaves them on screen reads exactly like a
+      // fix that did not work.
+      const kept: ChatEntry[] = [...state.chat];
       const restored = action.chat.filter((c) => {
-        const k = sameTurn(c);
-        if (seen.has(k)) return false;
-        seen.add(k);
+        if (holdsTurn(kept, c)) return false;
+        kept.push(c);
         return true;
       });
       return { ...state, chat: cap([...restored, ...state.chat], CHAT_CAP) };

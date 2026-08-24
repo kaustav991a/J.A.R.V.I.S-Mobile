@@ -247,11 +247,19 @@ describe('a status that repeats', () => {
 
   it('is logged again once something else has been said', () => {
     // the same answer after other turns is information, not an echo
+    //
+    // **The spacing was 1, 2, 3 ms and was widened on 2026-08-24, deliberately.** The
+    // assertion is unchanged; only the clock is. A duplicate delivered twice — once
+    // pushed, once over the socket — lands 422–459 ms apart on the real device, so at
+    // millisecond spacing "a genuine re-answer" and "the same event twice" are the same
+    // input and no rule can honour both. The measured gap between real repeats in that
+    // same log is 32.9 s at the closest. This test asks for the behaviour that actually
+    // happens, at the distance it actually happens at.
     const said = { kind: 'status' as const, status: 'speaking', message: 'Working on it.', user: null };
     let s = hudReducer(initialHudState, { type: 'frame', frame: said, at: 1 });
     s = hudReducer(s, { type: 'local_command', text: 'what time is it', at: 2 });
-    s = hudReducer(s, { type: 'frame', frame: said, at: 3 });
-    expect(s.chat.map((c) => c.at)).toEqual([1, 2, 3]);
+    s = hudReducer(s, { type: 'frame', frame: said, at: 40_000 });
+    expect(s.chat.map((c) => c.at)).toEqual([1, 2, 40_000]);
   });
 });
 
@@ -441,8 +449,8 @@ describe('a pushed reply that was also carried over the socket', () => {
     // the behaviour the consecutive guard was written to preserve: a repeated answer
     // with its own timestamp is a second thing that was said, not an echo
     let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1219 });
-    s = hudReducer(s, { type: 'local_command', text: 'you there?', at: 1300 });
-    s = hudReducer(s, { type: 'frame', frame: greeting, at: 1301 });
+    s = hudReducer(s, { type: 'local_command', text: 'you there?', at: 40000 });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 41000 });
 
     expect(s.chat.filter((c) => c.text === 'Standing by, Sir.')).toHaveLength(2);
   });
@@ -474,8 +482,92 @@ describe('a pushed reply that was also carried over the socket', () => {
       type: 'hydrate',
       chat: [
         { from: 'jarvis', text: 'Standing by, Sir.', at: 1219 },
-        { from: 'jarvis', text: 'Standing by, Sir.', at: 1400 },
+        { from: 'jarvis', text: 'Standing by, Sir.', at: 41000 },
       ],
+    });
+    expect(s.chat).toHaveLength(2);
+  });
+
+  /**
+   * The real numbers, read off the device on 2026-08-24 with a temporary audit.
+   *
+   * The exact-millisecond key shipped first and did not clear the screen, because the two
+   * copies are not in the same millisecond:
+   *
+   * ```
+   * 97 jarvis at=1787392364989 len=273 h=12mc64f
+   * 99 jarvis at=1787392364530 len=273 h=12mc64f   <- 459 ms EARLIER, appended later
+   * 85 jarvis at=1787381385363 len=17  h=1amiqwh
+   * 88 jarvis at=1787381384941 len=17  h=1amiqwh   <- 422 ms earlier, appended later
+   * ```
+   *
+   * The push carries the notification's own time and the socket stamps arrival, so the
+   * same reply lands twice a few hundred milliseconds apart — and the copy sorts *before*
+   * its original while sitting *after* it in the log.
+   *
+   * The window is safe by a wide margin rather than by taste. In the same 100-entry log,
+   * every genuine repeat is far apart: the closest is 32.9 s (two identical sends by the
+   * user), then 65.9 s, then 72.5 s. Duplicates are 422–459 ms. Five seconds sits ~11×
+   * above the largest duplicate and ~6.6× below the closest real repeat.
+   */
+  it('collapses a copy that arrives a few hundred milliseconds off', () => {
+    const long = 'x'.repeat(273);
+    let s = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: long, user: null },
+      at: 1787392364989,
+    });
+    s = hudReducer(s, { type: 'local_command', text: 'something else', at: 1787392400000 });
+    // the tray sweep re-enters it with the notification's own, earlier stamp
+    s = hudReducer(s, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: long, user: null },
+      at: 1787392364530,
+    });
+    expect(s.chat.filter((c) => c.text === long)).toHaveLength(1);
+  });
+
+  it('keeps the same words said again half a minute later', () => {
+    // 32.9 s apart is the closest genuine repeat in the real log, and it must survive
+    let s = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null },
+      at: 1787351752535,
+    });
+    s = hudReducer(s, { type: 'local_command', text: 'you there?', at: 1787351760000 });
+    s = hudReducer(s, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null },
+      at: 1787351785436,
+    });
+    expect(s.chat.filter((c) => c.text === 'Standing by, Sir.')).toHaveLength(2);
+  });
+
+  it('clears the near-miss duplicates already sitting in a restored log', () => {
+    const long = 'x'.repeat(273);
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [
+        { from: 'jarvis', text: long, at: 1787392364989 },
+        { from: 'jarvis', text: 'a later thing', at: 1787392720472 },
+        { from: 'jarvis', text: long, at: 1787392364530 },
+      ],
+    });
+    expect(s.chat).toHaveLength(2);
+    expect(s.chat.filter((c) => c.text === long)).toHaveLength(1);
+  });
+
+  it('does not collapse a near-miss from the other side of the conversation', () => {
+    // same words within the window but a different speaker is a different event
+    let s = hudReducer(initialHudState, {
+      type: 'local_command',
+      text: 'Standing by, Sir.',
+      at: 1787392364530,
+    });
+    s = hudReducer(s, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null },
+      at: 1787392364989,
     });
     expect(s.chat).toHaveLength(2);
   });
