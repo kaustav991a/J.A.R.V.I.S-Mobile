@@ -375,3 +375,117 @@ describe('the bugs an audit found in the reducer', () => {
     expect(s.chat).toHaveLength(1);
   });
 });
+
+/**
+ * A reply that was pushed AND carried over the socket is one thing that happened.
+ *
+ * Read off the phone on 2026-08-24, and the order is the tell — it cannot come from
+ * appending in arrival order:
+ *
+ * ```
+ * Standing by, Sir.                    Jarvis · 12:19
+ * do you tell me .. what's on screen   You    · 12:20
+ * I can't see your screen from here    Jarvis · 12:21
+ * Standing by, Sir.                    Jarvis · 12:19   <- again, and below 12:21
+ * ```
+ *
+ * The second copy carries the FIRST one's timestamp, so it was appended last while
+ * describing something that happened earlier. That is the tray sweep: `pendingReplies()`
+ * returns a notification still sitting in the shade, and the provider dispatches it with
+ * `at: reply.at` — its original arrival time — so a reply already logged over the socket
+ * comes back as a second entry stamped in the past.
+ *
+ * The consecutive-duplicate guard cannot catch it, and that is not a flaw in the guard:
+ * by the time the sweep runs, other turns have landed, so the copy is not adjacent to its
+ * original. Widening the guard to "same text anywhere" would break the behaviour it was
+ * written for — the same answer arriving after something else was said IS information.
+ *
+ * The distinction that holds is identity, not adjacency: same sender, same text, same
+ * millisecond is the same event. A genuine second occurrence carries a different `at` and
+ * must still append. `hydrate` already draws the line exactly there and the key below is
+ * the same one, deliberately.
+ */
+describe('a pushed reply that was also carried over the socket', () => {
+  const greeting = { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null } as const;
+
+  it('is logged once when the sweep re-enters it with its original timestamp', () => {
+    // logged live over the socket at 12:19
+    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1219 });
+    // the user says something, and is answered — so the copy will not be adjacent
+    s = hudReducer(s, { type: 'local_command', text: "what's on screen", at: 1220 });
+    s = hudReducer(s, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: "I can't see your screen.", user: null },
+      at: 1221,
+    });
+    // now the tray sweep re-enters the 12:19 reply, stamped 12:19
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 1219 });
+
+    expect(s.chat.filter((c) => c.text === 'Standing by, Sir.')).toHaveLength(1);
+  });
+
+  it('leaves the log in the order things actually happened', () => {
+    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1219 });
+    s = hudReducer(s, { type: 'local_command', text: "what's on screen", at: 1220 });
+    s = hudReducer(s, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: "I can't see your screen.", user: null },
+      at: 1221,
+    });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 1219 });
+
+    expect(s.chat.map((c) => c.at)).toEqual([1219, 1220, 1221]);
+  });
+
+  it('still logs the same answer twice when it genuinely happened twice', () => {
+    // the behaviour the consecutive guard was written to preserve: a repeated answer
+    // with its own timestamp is a second thing that was said, not an echo
+    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1219 });
+    s = hudReducer(s, { type: 'local_command', text: 'you there?', at: 1300 });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 1301 });
+
+    expect(s.chat.filter((c) => c.text === 'Standing by, Sir.')).toHaveLength(2);
+  });
+
+  /**
+   * The duplicates already written to disk have to go too, or the fix is invisible.
+   *
+   * `hydrate` de-duplicated the restored log against what was already in state and never
+   * against itself, so a log that was persisted while the bug was live comes back with
+   * both copies intact — the phone would show the same wrong screen after the fix
+   * shipped, which reads exactly like a fix that did not work.
+   */
+  it('drops a duplicate that is already inside the restored log', () => {
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [
+        { from: 'jarvis', text: 'Standing by, Sir.', at: 1219 },
+        { from: 'user', text: "what's on screen", at: 1220 },
+        { from: 'jarvis', text: "I can't see your screen.", at: 1221 },
+        { from: 'jarvis', text: 'Standing by, Sir.', at: 1219 },
+      ],
+    });
+    expect(s.chat.map((c) => c.at)).toEqual([1219, 1220, 1221]);
+  });
+
+  it('keeps two restored turns that only look alike', () => {
+    // same words, different moments — a real repeat, and it survives the restore
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [
+        { from: 'jarvis', text: 'Standing by, Sir.', at: 1219 },
+        { from: 'jarvis', text: 'Standing by, Sir.', at: 1400 },
+      ],
+    });
+    expect(s.chat).toHaveLength(2);
+  });
+
+  it('still collapses the greeting repeated back to back on a re-dial', () => {
+    // unchanged: the phone re-dials on foreground, network change and watchdog, and
+    // the gateway greets every connection
+    let s = hudReducer(initialHudState, { type: 'frame', frame: greeting, at: 1219 });
+    s = hudReducer(s, { type: 'frame', frame: greeting, at: 1220 });
+
+    expect(s.chat).toHaveLength(1);
+  });
+});
