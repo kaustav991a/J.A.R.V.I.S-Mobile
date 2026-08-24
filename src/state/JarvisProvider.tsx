@@ -865,28 +865,6 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     let alive = true;
     void loadChat().then((chat) => {
       if (!alive || !chat.length) return;
-      /**
-       * TEMPORARY DIAGNOSTIC — remove once the duplicate-entry question is settled.
-       *
-       * The chat log on the device shows the same reply twice with a stale stamp at the
-       * foot of the list, and the exact-millisecond fix did not clear it — so the two
-       * copies must carry different `at` values. Reading them off a screenshot is what
-       * got the first hypothesis half wrong; this prints the real numbers.
-       *
-       * **No message text.** The rule that raw content is never logged is load-bearing
-       * and a chat log is exactly what it is for, so this emits the sender, the full
-       * millisecond, and a hash — enough to see two entries as the same words, and not a
-       * copy of them.
-       */
-      const stamp = (t: string) => {
-        let h = 0;
-        for (let i = 0; i < t.length; i += 1) h = (h * 31 + t.charCodeAt(i)) | 0;
-        return (h >>> 0).toString(36);
-      };
-      console.log(`[chat-audit] restored ${chat.length} entries`);
-      chat.forEach((c, i) =>
-        console.log(`[chat-audit] ${i} ${c.from} at=${c.at} len=${c.text.length} h=${stamp(c.text)}`)
-      );
       dispatch({ type: 'hydrate', chat });
       /**
        * A restored log has already been seen, so it arrives read.
