@@ -372,21 +372,21 @@
 
   <div class="meters">
     <div class="meter">
-      <span class="meter-num" style="color:var(--proved)">49<span>%</span></span>
+      <span class="meter-num" style="color:var(--proved)">48<span>%</span></span>
       <span class="meter-label">Proved on the phone</span>
-      <div class="track"><i style="width:49%;background:var(--proved)"></i></div>
-      <p class="meter-sub">39 of 80 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
+      <div class="track"><i style="width:48%;background:var(--proved)"></i></div>
+      <p class="meter-sub">39 of 82 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
     </div>
     <div class="meter">
       <span class="meter-num" style="color:var(--accent)">71<span>%</span></span>
       <span class="meter-label">Has code</span>
       <div class="track"><i style="width:71%;background:var(--accent)"></i></div>
-      <p class="meter-sub">57 rows: proved, partial, unexercised and broken together. The gap to the left is the honesty gap.</p>
+      <p class="meter-sub">58 rows: proved, partial, unexercised and broken together. The gap to the left is the honesty gap.</p>
     </div>
     <div class="meter">
       <span class="meter-num" style="color:#ff8fa0">31</span>
       <span class="meter-label">Blocked outside this repo</span>
-      <div class="track"><i style="width:39%;background:#ff8fa0"></i></div>
+      <div class="track"><i style="width:38%;background:#ff8fa0"></i></div>
       <p class="meter-sub">19 on the brain, 2 on the desk, 10 on the phone in hand. Marked on every row below.</p>
     </div>
     <div class="meter">
@@ -529,7 +529,7 @@
   </section>
 
   <section>
-    <h2>The ledger — all 80 rows</h2>
+    <h2>The ledger — all 82 rows</h2>
     <p class="sec-note">
       <strong>Proved</strong> — a human has seen it work on the phone.
       <strong>Partial</strong> — works, with a named gap.
@@ -556,7 +556,7 @@
       <button class="filter" data-k="b" data-f="desk" aria-pressed="false">Desk (2)</button>
       <button class="filter" data-k="b" data-f="device" aria-pressed="false">Phone (10)</button>
       <button class="filter" data-k="b" data-f="app-build" aria-pressed="false">App · build (2)</button>
-      <button class="filter" data-k="b" data-f="app" aria-pressed="false">App (8)</button>
+      <button class="filter" data-k="b" data-f="app" aria-pressed="false">App (10)</button>
     </div>
 
     <div id="areas">
@@ -997,9 +997,9 @@
       <div class="area">
         <div class="area-head">
           <h3>Memory and the journal</h3>
-          <span class="area-stat"><b>3</b> proved of 11 · 8 have code</span>
+          <span class="area-stat"><b>3</b> proved of 13 · 9 have code</span>
         </div>
-        <div class="bar" role="img" aria-label="0 broken, 4 partial, 1 unexercised, 3 proved, 3 not built"><i class="partial" style="width:36.36363636363637%"></i><i class="untested" style="width:9.090909090909092%"></i><i class="proved" style="width:27.27272727272727%"></i><i class="none" style="width:27.27272727272727%"></i></div>
+        <div class="bar" role="img" aria-label="0 broken, 5 partial, 1 unexercised, 3 proved, 4 not built"><i class="partial" style="width:38.46153846153847%"></i><i class="untested" style="width:7.6923076923076925%"></i><i class="proved" style="width:23.076923076923077%"></i><i class="none" style="width:30.76923076923077%"></i></div>
         <div class="rows">
           <div class="row" data-s="partial" data-b="brain">
             <div>
@@ -1008,6 +1008,26 @@
             </div>
             <div class="row-tags">
               <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">Anything he learns from what you actually say</div>
+              <div class="row-note"><strong>The largest gap in the memory story, and it was not in this ledger until 2026-08-24.</strong> <code>shareFacts</code> derives from the journal rollup and named places only — four keys, all about the handset: <code>phone:screen-time</code>, <code>phone:pickups</code>, <code>phone:top-apps</code>, plus the places. <strong>Nothing reads the conversation.</strong> How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past <code>CHAT_CAP</code> (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in <code>chat_turns</code>, so this is not data loss — it is that no turn is ever promoted to a fact.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="app">
+            <div>
+              <div class="row-name">A chat log that is not a one-day window</div>
+              <div class="row-note"><code>CHAT_CAP = 100</code> in <code>hudReducer.ts</code>, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned <strong>Fri 20:03 to Sat 15:28</strong>, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
               <span class="chip partial">Partial</span>
             </div>
           </div>
@@ -1601,7 +1621,7 @@
   <section>
     <h2>Every task, and what is actually finished</h2>
     <p class="sec-note">
-      All 21 of them, blocked ones included. <strong>A title is struck through only
+      All 23 of them, blocked ones included. <strong>A title is struck through only
       when it is proved</strong> — a human has seen it work — which is the same bar the ledger
       uses. <span class="q-tag q-tag-shipped">Shipped · unproved</span> means code landed, tests
       green, published, and still nobody has looked: the most recent one was correct in
@@ -1610,7 +1630,7 @@
     </p>
     <p class="sec-note" style="margin-top:-10px">
       <strong>1 proved · 1 shipped and unproved ·
-      11 open · 8 blocked elsewhere.</strong>
+      13 open · 8 blocked elsewhere.</strong>
       Detail for each in <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>.
     </p>
     <div class="queue">
@@ -1844,6 +1864,28 @@
           <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
           <span class="q-tag q-tag-open" title="Not started.">Open</span>
         </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">20</span>
+        <div>
+          <p class="q-t">Promote what he is told into what he knows</p>
+          <p class="q-d">Today he learns four things, all about the phone: screen time, pickups, top apps, plus named places. He learns <strong>nothing</strong> from what you say — the only route from a sentence to a durable fact is typing it into the Memory screen yourself. Meanwhile the chat window holds about a day and rolls silently. The pattern to copy already exists and is proved: <code>shareFacts</code> derives, keeps a ledger of what it already sent, supersedes what changed, and — critically — sends <strong>derived facts, never raw rows</strong>. A turn-to-fact pass wants the same shape and the same restraint, plus a rule about consent, because quietly distilling everything a person says is a different product from one that remembers what it was told.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">21</span>
+        <div>
+          <p class="q-t">A day boundary in the chat</p>
+          <p class="q-d">The log renders times with no date, so Saturday noon reads as this morning — it misled a debugging session on 2026-08-24 before the timestamps were read directly. Small, and it is the difference between a log you can trust and one you have to decode.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div></div>
   </section>
 
@@ -1874,7 +1916,7 @@
     });
     const shown = rows.filter((r) => !r.classList.contains('hide')).length;
     countEl.textContent = shown === rows.length
-      ? `80 rows · 39 proved · 23 not built`
+      ? `82 rows · 39 proved · 24 not built`
       : shown + ' of ' + rows.length + ' rows';
     try { localStorage.setItem('jarvis-status-filter', JSON.stringify(pick)); } catch (e) { /* private window, or site data blocked */ }
   }

@@ -211,7 +211,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**39 of 80 rows are proved on the phone** (49%). 57 have code (71%). 31 cannot be finished in this repo: 19 on the brain, 2 on the desk, 10 on the phone.
+**39 of 82 rows are proved on the phone** (48%). 58 have code (71%). 31 cannot be finished in this repo: 19 on the brain, 2 on the desk, 10 on the phone.
 
 ### Transport, pairing, security
 
@@ -277,11 +277,13 @@ in §2; `—` — not built.
 
 ### Memory and the journal
 
-*3 proved of 11.*
+*3 proved of 13.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
 | Facts stored and recalled | partial | Brain | 14 facts known. Volunteered exactly once, wrongly. |
+| Anything he learns from what you actually say | — | App | **The largest gap in the memory story, and it was not in this ledger until 2026-08-24.** `shareFacts` derives from the journal rollup and named places only — four keys, all about the handset: `phone:screen-time`, `phone:pickups`, `phone:top-apps`, plus the places. **Nothing reads the conversation.** How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past `CHAT_CAP` (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in `chat_turns`, so this is not data loss — it is that no turn is ever promoted to a fact. |
+| A chat log that is not a one-day window | partial | App | `CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets. |
 | One assistant across desk, phone and chat | partial | Brain | App and chat share one history. A desk answering with its own brain bypasses it, so those turns never join the shared history. |
 | Rolling memory durable across restarts | partial | Brain | In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified. |
 | Deploy-durable gateway state | untested | Brain | Committed on `fix/durable-state`, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing. |

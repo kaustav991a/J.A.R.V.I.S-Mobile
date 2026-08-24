@@ -460,6 +460,20 @@
           "note": "14 facts known. Volunteered exactly once, wrongly."
         },
         {
+          "id": "facts-from-talking",
+          "name": "Anything he learns from what you actually say",
+          "status": "none",
+          "blockedBy": "app",
+          "note": "**The largest gap in the memory story, and it was not in this ledger until 2026-08-24.** `shareFacts` derives from the journal rollup and named places only — four keys, all about the handset: `phone:screen-time`, `phone:pickups`, `phone:top-apps`, plus the places. **Nothing reads the conversation.** How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past `CHAT_CAP` (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in `chat_turns`, so this is not data loss — it is that no turn is ever promoted to a fact."
+        },
+        {
+          "id": "chat-window",
+          "name": "A chat log that is not a one-day window",
+          "status": "partial",
+          "blockedBy": "app",
+          "note": "`CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets."
+        },
+        {
           "id": "one-assistant",
           "name": "One assistant across desk, phone and chat",
           "status": "partial",
@@ -965,6 +979,20 @@
       "state": "open",
       "blockedBy": "app",
       "detail": "Scope is styling: the logo does not change and no copy changes. The pieces exist and are under-used. Land it on one screen and live with it for a day before propagating — the item most likely to sprawl. The Android glass blur stays last of all: it adds no capability and its failure mode is a segfault that takes the process."
+    },
+    {
+      "n": 20,
+      "title": "Promote what he is told into what he knows",
+      "state": "open",
+      "blockedBy": "app",
+      "detail": "Today he learns four things, all about the phone: screen time, pickups, top apps, plus named places. He learns **nothing** from what you say — the only route from a sentence to a durable fact is typing it into the Memory screen yourself. Meanwhile the chat window holds about a day and rolls silently. The pattern to copy already exists and is proved: `shareFacts` derives, keeps a ledger of what it already sent, supersedes what changed, and — critically — sends **derived facts, never raw rows**. A turn-to-fact pass wants the same shape and the same restraint, plus a rule about consent, because quietly distilling everything a person says is a different product from one that remembers what it was told."
+    },
+    {
+      "n": 21,
+      "title": "A day boundary in the chat",
+      "state": "open",
+      "blockedBy": "app",
+      "detail": "The log renders times with no date, so Saturday noon reads as this morning — it misled a debugging session on 2026-08-24 before the timestamps were read directly. Small, and it is the difference between a log you can trust and one you have to decode."
     }
   ]
 }
