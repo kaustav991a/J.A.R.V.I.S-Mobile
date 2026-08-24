@@ -211,7 +211,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**37 of 77 rows are proved on the phone** (48%). 54 have code (70%). 31 cannot be finished in this repo: 17 on the brain, 2 on the desk, 12 on the phone.
+**38 of 77 rows are proved on the phone** (49%). 54 have code (70%). 30 cannot be finished in this repo: 17 on the brain, 2 on the desk, 11 on the phone.
 
 ### Transport, pairing, security
 
@@ -241,7 +241,7 @@ in §2; `—` — not built.
 | The opening line is the real situation | proved |  | On-device, no model, no await. |
 | “What can you do”, answered without a round trip | proved |  | On-device, so it answers with everything even offline. |
 | A Capabilities screen listing the same thing | proved |  | One list, two surfaces. Read back over adb. |
-| A status panel naming every seam | partial | Phone | Eight rows, four states, assembled on the device so it is readable with nothing connected at all — which is exactly when it will be looked at. The briefing row was watched going red then green as the stamp landed. **The briefing row was refined 2026-08-24** to a third state, `CANNOT TELL`, so a stamp that has merely aged stops asserting the gateway lost the schedule; that state has 10 tests and no device pass yet. |
+| A status panel naming every seam | partial | Phone | Eight rows, four states, assembled on the device so it is readable with nothing connected at all — which is exactly when it will be looked at. **Read on the phone again 2026-08-24, on the new bundle:** all eight rows render, the caption counts `1 OFF` for the sleeping desk alone, and the briefing row reads `AT THE GATEWAY` while the link is cloud. Named gap: the third briefing state added that day, `CANNOT TELL`, cannot be reached on a cloud-linked phone — the stamp is fresh, so it would take two days of workspace-only sessions or a debug build to see it. |
 | Whether the gateway holds a push address | proved |  | Nothing exposed this before, and it is the most diagnostic fact in the app. |
 | Photo preview and caption before sending | proved |  |  |
 | A photo answering with its own lookup marker | proved |  | Shared by the text and vision paths. |
@@ -287,12 +287,12 @@ in §2; `—` — not built.
 | The journal’s denial path | proved |  | Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction. |
 | Any background work running unattended | — | Phone | **Cannot**, and measured twice rather than assumed: `expo-background-task` hardcodes `setRequiredNetworkType(CONNECTED)` and the uid reads `blocked=REASON_APP_BACKGROUND\|REASON_APP_STANDBY` with `#netAvail=0` in a RARE bucket. Stopped, not deferred. Everything in §3.1 is chosen around this. |
 | The commute task body exercised by a test | proved |  | 10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate. |
-| Location timeline | untested | Phone | Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. |
+| Location timeline | partial | Phone | Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen. |
 | Call log, archive import | — | App · build | Native build, and fatal for a store listing. |
 
 ### Knowing and acting
 
-*4 proved of 14.*
+*5 proved of 14.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -307,7 +307,7 @@ in §2; `—` — not built.
 | Run history | — | Brain | Reports currently invents “Last run: 2h ago” from a fixture. |
 | Presence — awake but idle | — | Brain | Inferred from socket state today. |
 | Declared rules (“tell me if I haven’t…”) | — | Brain | Spec written and awaiting review. Its presence half rests on a measurement that no longer holds. |
-| Anticipation v1 — noticed when you open the app | untested | Phone | Decided in code from the journal against its own baseline and the next departure. At most one a day, never the same subject twice running, silent by default. |
+| Anticipation v1 — noticed when you open the app | proved |  | Decided in code from the journal against its own baseline and the next departure. At most one a day, never the same subject twice running, silent by default. **Device pass 2026-08-24:** the WATCHING panel read `2 OF 3 READY`, and its counters had advanced since 08-21 — `4 MORE DAYS` to `3 MORE DAYS`, and Today from `SPOKEN` to `LISTENING`. The day gate and the baseline counters are therefore working across days, not merely rendering. It was confirmed speaking on 08-21; whether a given remark is *worth* making is a separate question from whether the machinery runs. |
 | Anticipation that finds you in your pocket | — | Brain | Needs the gateway push or a foreground service — the phone measurably cannot do it alone. |
 | Anticipation from learned habit rather than a written rule | — | Phone | Needs the senses and weeks of baseline. Not shortenable by code. |
 

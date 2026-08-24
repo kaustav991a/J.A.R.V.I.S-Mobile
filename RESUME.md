@@ -159,6 +159,88 @@ what it did, not whether it mattered.
 *Now in `AGENTS.md`:* check the fingerprint before touching `package.json`, and read the
 runtime in every publish output against the phone's.
 
+### On the phone, 11:54–11:59 — what the device settled and what it could not
+
+Device `84f40716`, screen dozing behind the keyguard. `adb` woke it and could not unlock
+it, as documented; the keyguard was cleared by hand and the app launched onto Home, which
+is where the panel lives — the tab bar cannot be driven by `adb`, so landing on the right
+tab is the whole trick.
+
+**Two tooling traps, both new.**
+
+`uiautomator dump` returns **`ERROR: could not get idle state`** on this app and always
+will: the reactor animates continuously, so the accessibility tree never settles. The file
+it leaves behind is a stale SystemUI tree, which reads like a successful dump of the wrong
+screen. **Use `screencap` and read the image.**
+
+And Git Bash rewrites `/sdcard/…` into `C:/Program Files/Git/sdcard/…` before `adb` sees
+it — `adb pull` then fails with *failed to stat remote object* naming a Windows path,
+which looks like a device problem and is not. Run `adb` from PowerShell for anything
+touching a device path.
+
+**The OTA did arrive, and proving it took a manifest request.** The app logged
+`CheckCompleteUnavailable` / `NoUpdatesAvailable`, which reads like the update never
+landed. Two things separate "already has it" from "cannot see it":
+
+- `aapt2 dump resources` on the APK pulled off the device: `expo_runtime_version` is
+  `31c64113d7d13a400eb1c56ef81c4d0d4be3fa17` — a real hash, so this install was
+  fingerprinted correctly and is not the placeholder trap.
+- Asking the update server exactly what the phone asks — `expo-platform: android`,
+  `expo-runtime-version: 31c64113…`, `expo-channel-name: production` — returns manifest
+  `01a0326a-e407-752a-b990-b4b752474c48`, created 06:17:41Z, runtime `31c64113…`. The
+  update *is* servable for this runtime and channel.
+
+So `Unavailable` means **nothing newer than what it already holds**: it took the update on
+the 11:54 launch and applied it on the 11:55 relaunch. Worth writing down because
+`NoUpdatesAvailable` is the same string whether you are up to date or invisible to the
+server, and only the manifest request tells them apart.
+
+**Read off the screen, on the new bundle.** All eight status rows, and the caption
+counting `1 OFF` for the sleeping desk alone:
+
+```
+STATUS                                 1 OFF
+o The desk                            ASLEEP
+  No PC control, files or terminal.
+* The link                             CLOUD
+* Pairing token                         HELD
+* He can reach you              REGISTERED
+* Briefing schedule       AT THE GATEWAY
+* Location sharing                        ON
+* Usage access                     GRANTED
+* App lock                                ON
+
+WATCHING                        2 OF 3 READY
+* Today                            LISTENING
+* Screen time against your usual      6 DAYS
+o When you are usually gone     3 MORE DAYS
+  Learning your hours at Office. Sightings
+  happen when you open the app.
+```
+
+**Anticipation v1 → `proved`, and the evidence is the movement rather than the render.**
+Against the same panel read on 08-21: `4 MORE DAYS` is now `3 MORE DAYS`, and Today has
+gone from `SPOKEN` to `LISTENING`. Both only change if the day gate and the baseline
+counters are actually running between sessions. It was confirmed speaking on 08-21;
+whether a particular remark is worth making is a different question from whether the
+machinery runs, and this settles the second one.
+
+**The location timeline → `partial`.** *Learning your hours at Office*, with a countdown
+that has decremented since 08-21 — which only happens if sightings are being recorded at a
+named place. Named gap: nothing it has learned has been used for anything yet, so its
+output is still unseen. Deliberate; it is silent for its first four days.
+
+**What the phone could not settle, and why.** The new `CANNOT TELL` state is unreachable
+here. The phone is linked over cloud, so `syncCommute` runs and the stamp is fresh —
+`AT THE GATEWAY` is the correct row and the only reachable one. Seeing the third state
+needs two days of workspace-only sessions, or a debug build where the stamp can be aged by
+hand. Writing the stamp directly is not available: `run-as` is refused on a release build.
+
+The clock was **not** moved forward to force it. Ageing a stamp by moving the device clock
+would also move the briefing window and the day keys the journal writes, which is a large
+side effect for one row of text.
+
+
 
 
 ---

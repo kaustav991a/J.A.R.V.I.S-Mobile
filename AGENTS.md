@@ -79,6 +79,32 @@ of rediscovering them is high.
   are in-tree absolute views; see `DetailBox` in `src/screens/ActivityScreen.tsx`.
   An absolute child of `Screen` scrolls away with the content, so such an overlay
   goes beside `Screen`, not inside it.
+- **`uiautomator dump` never succeeds on this app.** It returns
+  `ERROR: could not get idle state` because the reactor animates continuously, so the
+  accessibility tree never settles — and it leaves a **stale SystemUI tree** behind,
+  which reads like a successful dump of the wrong screen. Use `adb shell screencap -p`
+  and read the image instead.
+- **Run `adb` from PowerShell, not Git Bash, for anything with a device path.** Git Bash
+  rewrites `/sdcard/x.png` into `C:/Program Files/Git/sdcard/x.png` before `adb` sees it,
+  and `adb pull` then fails with *failed to stat remote object* naming a Windows path.
+  It looks like a device fault and is not.
+- **`NoUpdatesAvailable` does not mean the update failed to arrive.** It means *nothing
+  newer than what I already hold*, which is the same string whether the app is up to date
+  or invisible to the server. To tell them apart, ask the server exactly what the app asks:
+
+  ```bash
+  curl -s -H "expo-platform: android" \
+       -H "expo-runtime-version: <the phone's hash>" \
+       -H "expo-channel-name: production" \
+       -H "expo-protocol-version: 1" -H "expo-api-version: 1" \
+       -H "expo-expect-signature: false" \
+       https://u.expo.dev/f047fd2e-e0fd-4d50-a70c-564bfb1d6da6
+  ```
+
+  A manifest back means the update is servable for that runtime, so `Unavailable` is
+  "already applied". Read the phone's own hash with
+  `aapt2 dump resources <apk> | grep -A 1 expo_runtime_version` after pulling the APK
+  with `adb pull $(adb shell pm path <pkg> | cut -d: -f2)`.
 - **Adding an npm script silently breaks OTA.** `packageJson:scripts` is a
   **fingerprint input**, so `runtimeVersion: { policy: "fingerprint" }` moves the
   moment you add one. Two convenience scripts took the runtime from `31c64113` to
