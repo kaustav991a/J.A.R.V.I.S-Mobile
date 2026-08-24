@@ -7,8 +7,120 @@
 > how a project relearns a lesson it already paid for.
 >
 > **This file is the archaeology: how something was proved and what it cost to find
-> out.** It is not the status and not the queue — both live in `ROADMAP.md`, §0b and
-> §10. See the division of labour at the top of that file.
+> out.** It is not the status and not the queue.
+>
+> **Since 2026-08-24 the status lives in `docs/status/ledger.json`** — the single source of
+> truth, and the only place a status claim may live. `ROADMAP.md` §0b and §0c are generated
+> from it by `node scripts/build-status.mjs`, along with `docs/completion-tracker.html`;
+> the plan and its reasoning stay in `ROADMAP.md`, §10 for the order. Entries below dated
+> before then say "§0b" meaning the status — that is now the ledger, and the dated entries
+> are left as written rather than rewritten.
+
+## 🛑 STOP POINT — 2026-08-24, 13:0x. Start here.
+
+**903 tests, 70 suites, `tsc --noEmit` clean, generated docs in step with the ledger.**
+Working tree clean, `feat/mobile-hud` level with `origin` at `daee2c3`. **`jarvis-brain`
+was not touched all session** and needed no push — clean tree, HEAD `c86d176` identical to
+its remote. Local `feat/cloud-gateway` there is 42 commits *behind* its remote, so work
+that felt missing from this machine is on GitHub and merely absent from this checkout.
+
+### The one thing to know before touching anything
+
+**Status now has exactly one home: `docs/status/ledger.json`.** 82 rows, the ten §0c
+criteria, a timeline, and 22 queue items, each with a typed `blockedBy`. `ROADMAP.md`
+§0b/§0c and `docs/completion-tracker.html` are **generated from it** — edit the ledger and
+run `node scripts/build-status.mjs`, or the next generate reverts you.
+`node scripts/build-status.mjs --check` fails on stale output and belongs beside
+`npm test` and `npm run typecheck` before any claim.
+
+**Do not make it an npm script.** `packageJson:scripts` is a fingerprint input; adding two
+convenience scripts moved the runtime from `31c64113` to `3f9be979`, and the publish that
+followed went to a runtime no device has — it printed `Published!` and arrived nowhere.
+
+### Where the numbers stand
+
+| | |
+| --- | --- |
+| Proved on the phone | 39 of 82 rows |
+| Has code | 58 of 82 |
+| Blocked outside this repo | 31 — 19 brain, 2 desk, 10 phone-in-hand |
+| §0c criteria met | 0 of 10; 5 partial; 5 need the brain, so this repo tops out at 50% |
+
+### Finished this session, end to end
+
+- **The briefing row stops asserting what it cannot know.** `cloudArmedState()` sits beside
+  `cloudArmed()` — three states, `AT THE GATEWAY` / `CANNOT TELL` / `ON THIS PHONE`. The
+  task's gate is untouched: a stale stamp still means the phone posts. Shipped and live.
+  *Owed:* the `CANNOT TELL` state itself is unreachable on a cloud-linked phone, so it
+  needs two workspace-only days or a debug build.
+- **Duplicate chat entries — fixed and proven on the device.** The copies land **422–459 ms**
+  apart, not in the same millisecond: the push carries the notification's own time, the
+  socket stamps arrival. So the key is a window, and the window came from measurement —
+  every genuine repeat in that log is ≥ **32.9 s** away, so 5 s sits 11× above the largest
+  duplicate and 6.6× below the nearest real repeat. Audit before/after:
+  `restored 100, 2 near-miss pairs` → `restored 98, 0 pairs`. Old duplicates self-heal in
+  two launches, because hydrate drops them and the debounced save writes the shorter log.
+- **The OTA channel gate closed**, and an OTA was watched arriving for the first time
+  unambiguously — `isUpdatePending=true`, `downloadProgress=1.0`.
+
+### Open, and the next decision is yours not mine
+
+**The memory gap is the big one.** He learns four things, all about the handset —
+`phone:screen-time`, `phone:pickups`, `phone:top-apps` — plus named places. **Nothing reads
+the conversation.** A turn is never promoted to a fact; the only route from a sentence to a
+durable claim is typing it into the Memory screen. The raw turns do survive brain-side in
+`chat_turns`, so the phone's 100-entry cap is a display window and not the memory — but the
+ask envelope still carries **one turn**, so he answers cold even though the history exists.
+
+*The question to answer before any code:* **should he distil facts from conversation
+automatically, or only when told to remember?** That one choice decides the whole design.
+The shape to copy is `shareFacts` — derive, keep a ledger of what was already sent,
+supersede what changed, send derived facts and never raw rows — but consent comes first,
+because quietly distilling everything a person says is a different product.
+
+**Still open, precisely measured rather than suspected:**
+
+- **One out-of-order chat entry**, index 89, off by **496,789 ms**, hash appearing exactly
+  once — a unique reply swept from the tray long after it arrived, so it is placed by
+  arrival rather than by time. Distinct from the duplicate, and not claimed as fixed.
+- **No day boundary in the chat.** It renders times without dates, so **Saturday noon reads
+  as this morning** — it cost part of today's debugging before the raw timestamps were read.
+  The whole persisted log spans Fri 20:03 → Sat 15:28; 100 entries is about a day.
+- **Two brain-side defects, seen on the device, not attempted.** The voice rule is not
+  applied to what the model writes — `Sir` capitalised in every reply while the situation
+  line gets it right — and an unprompted weekday assertion is still live: *"Are you working
+  this Saturday, by the way?"* on a Monday. Consistent with `c86d176` being undeployed.
+- **Task 2, provider effect cancellation**, never started. Inventory done: 8 of 9 `.then`
+  sites already carry an `alive` guard, and `JarvisProvider.tsx:240`
+  (`loadShareLocation().then(setShareLocationState)`) is the only unguarded one. Needs no
+  device and can reach `proved` in one sitting.
+
+### Traps found today, all now in `AGENTS.md`
+
+1. **An npm script breaks OTA** — `packageJson:scripts` is a fingerprint input. Check the
+   fingerprint before touching `package.json`, and read the runtime in every publish output
+   against the phone's.
+2. **`NoUpdatesAvailable` does not mean it failed to arrive** — it means *nothing newer than
+   I hold*, the same string either way. A manifest request with the phone's own runtime
+   header separates them.
+3. **`uiautomator dump` never succeeds here** — the reactor animates continuously so it
+   never idles, and it leaves a stale SystemUI tree that reads like a good dump of the wrong
+   screen. Use `screencap`.
+4. **Run `adb` from PowerShell, not Git Bash** — Git Bash rewrites `/sdcard/x.png` into
+   `C:/Program Files/Git/sdcard/x.png` and the failure looks like a device fault.
+5. **Home's Chat card is the way into Chat without a finger** — the tab bar cannot be
+   driven by `adb`, and there is no `linking` config, so deep links go nowhere.
+
+### The device, and how to read it
+
+Phone `84f40716`, unlocked by hand — `adb` wakes the display and cannot dismiss the
+keyguard. Installed APK baked at runtime `31c64113d7d13a400eb1c56ef81c4d0d4be3fa17`,
+verified with `aapt2 dump resources`. **JS `console.log` reaches logcat in the release
+build** (`adb logcat -s ReactNativeJS:V`), which is how today's audit was read — no debug
+build was needed, and none was made, so no app data was risked.
+
+---
+
 
 ## 🏠 HANDOFF — 2026-08-24. Read this first; the 08-21 handoff below still stands.
 
