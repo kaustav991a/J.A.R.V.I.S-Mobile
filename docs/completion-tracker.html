@@ -375,19 +375,19 @@
       <span class="meter-num" style="color:var(--proved)">49<span>%</span></span>
       <span class="meter-label">Proved on the phone</span>
       <div class="track"><i style="width:49%;background:var(--proved)"></i></div>
-      <p class="meter-sub">38 of 77 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
+      <p class="meter-sub">39 of 80 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
     </div>
     <div class="meter">
-      <span class="meter-num" style="color:var(--accent)">70<span>%</span></span>
+      <span class="meter-num" style="color:var(--accent)">71<span>%</span></span>
       <span class="meter-label">Has code</span>
-      <div class="track"><i style="width:70%;background:var(--accent)"></i></div>
-      <p class="meter-sub">54 rows: proved, partial, unexercised and broken together. The gap to the left is the honesty gap.</p>
+      <div class="track"><i style="width:71%;background:var(--accent)"></i></div>
+      <p class="meter-sub">57 rows: proved, partial, unexercised and broken together. The gap to the left is the honesty gap.</p>
     </div>
     <div class="meter">
-      <span class="meter-num" style="color:#ff8fa0">30</span>
+      <span class="meter-num" style="color:#ff8fa0">31</span>
       <span class="meter-label">Blocked outside this repo</span>
       <div class="track"><i style="width:39%;background:#ff8fa0"></i></div>
-      <p class="meter-sub">17 on the brain, 2 on the desk, 11 on the phone in hand. Marked on every row below.</p>
+      <p class="meter-sub">19 on the brain, 2 on the desk, 10 on the phone in hand. Marked on every row below.</p>
     </div>
     <div class="meter">
       <span class="meter-num">0<span>/10</span></span>
@@ -529,7 +529,7 @@
   </section>
 
   <section>
-    <h2>The ledger — all 77 rows</h2>
+    <h2>The ledger — all 80 rows</h2>
     <p class="sec-note">
       <strong>Proved</strong> — a human has seen it work on the phone.
       <strong>Partial</strong> — works, with a named gap.
@@ -552,11 +552,11 @@
     <div class="controls">
       <span class="controls-label">Blocked on</span>
       <button class="filter" data-k="b" data-f="all" aria-pressed="true">Anything</button>
-      <button class="filter" data-k="b" data-f="brain" aria-pressed="false">Brain (17)</button>
+      <button class="filter" data-k="b" data-f="brain" aria-pressed="false">Brain (19)</button>
       <button class="filter" data-k="b" data-f="desk" aria-pressed="false">Desk (2)</button>
-      <button class="filter" data-k="b" data-f="device" aria-pressed="false">Phone (11)</button>
+      <button class="filter" data-k="b" data-f="device" aria-pressed="false">Phone (10)</button>
       <button class="filter" data-k="b" data-f="app-build" aria-pressed="false">App · build (2)</button>
-      <button class="filter" data-k="b" data-f="app" aria-pressed="false">App (7)</button>
+      <button class="filter" data-k="b" data-f="app" aria-pressed="false">App (8)</button>
     </div>
 
     <div id="areas">
@@ -651,9 +651,9 @@
       <div class="area">
         <div class="area-head">
           <h3>Talking to him</h3>
-          <span class="area-stat"><b>9</b> proved of 17 · 12 have code</span>
+          <span class="area-stat"><b>10</b> proved of 20 · 15 have code</span>
         </div>
-        <div class="bar" role="img" aria-label="0 broken, 2 partial, 1 unexercised, 9 proved, 5 not built"><i class="partial" style="width:11.76470588235294%"></i><i class="untested" style="width:5.88235294117647%"></i><i class="proved" style="width:52.94117647058824%"></i><i class="none" style="width:29.411764705882355%"></i></div>
+        <div class="bar" role="img" aria-label="3 broken, 1 partial, 1 unexercised, 10 proved, 5 not built"><i class="broken" style="width:15%"></i><i class="partial" style="width:5%"></i><i class="untested" style="width:5%"></i><i class="proved" style="width:50%"></i><i class="none" style="width:25%"></i></div>
         <div class="rows">
           <div class="row" data-s="proved" data-b="none">
             <div>
@@ -685,20 +685,50 @@
               <span class="chip proved">Proved</span>
             </div>
           </div>
-          <div class="row" data-s="partial" data-b="device">
+          <div class="row" data-s="broken" data-b="app">
             <div>
-              <div class="row-name">Reasoning monologues can never reach the screen</div>
-              <div class="row-note">Proved in the harness, never on the device.</div>
+              <div class="row-name">The chat log in the right order, once each</div>
+              <div class="row-note"><strong>Still broken on the phone after one fix, and the fix was not wasted.</strong> Landed <code>fd8b31d</code>: a reply re-entered by the tray sweep with the *same* millisecond is now one entry, not two, and <code>hydrate</code> de-duplicates the restored log against itself so old duplicates on disk clear. 6 tests, shipped and applied on the device (<code>isUpdatePending=true</code>, <code>downloadProgress=1.0</code>). <strong>The screen is still wrong</strong>, which narrows the cause rather than reopening it: the surviving pair must carry *different* timestamps for the same reply — the socket logs it at arrival, the push carries the notification’s own time — so identity on an exact millisecond cannot unify them. Second confirmed symptom: yesterday’s <code>15:xx</code> entries render <strong>below</strong> today’s <code>12:xx</code> ones, so they were appended today by the sweep while describing yesterday. Next step is the actual <code>at</code> values, which need a debug build or a temporary diagnostic — not another fix inferred from a screenshot, having been wrong that way once.</div>
             </div>
             <div class="row-tags">
-              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
-              <span class="chip partial">Partial</span>
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip broken">Broken</span>
+            </div>
+          </div>
+          <div class="row" data-s="broken" data-b="brain">
+            <div>
+              <div class="row-name">The voice rule applied to what the model writes</div>
+              <div class="row-note"><strong>Found on the phone 2026-08-24.</strong> <code>sir</code> is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in <code>commute.ts</code> and <code>_briefing_text</code>; the persona prompt never got it.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip broken">Broken</span>
+            </div>
+          </div>
+          <div class="row" data-s="broken" data-b="brain">
+            <div>
+              <div class="row-name">No unprompted weekday assertion</div>
+              <div class="row-note"><strong>Seen again on the phone 2026-08-24, a Monday.</strong> *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as <code>c86d176</code> and undeployed, which is exactly what this looks like.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip broken">Broken</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Reasoning monologues can never reach the screen</div>
+              <div class="row-note"><code>_strip_reasoning()</code>. <strong>Device pass 2026-08-24:</strong> two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
             </div>
           </div>
           <div class="row" data-s="proved" data-b="none">
             <div>
               <div class="row-name">The opening line is the real situation</div>
-              <div class="row-note">On-device, no model, no await.</div>
+              <div class="row-note">On-device, no model, no await. <strong>Read again 2026-08-24:</strong> *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.* Note the lowercase <code>sir</code> — this line obeys the voice rule, which is what makes the replies below it violating the same rule so visible.</div>
             </div>
             <div class="row-tags">
               
@@ -1393,9 +1423,9 @@
         <tbody>
         <tr>
           <td><span class="dep dep-brain">Brain</span></td>
-          <td class="num">17</td>
+          <td class="num">19</td>
           <td>jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.</td>
-          <td class="held">Capability-split tokens · Token expiry · Sent / delivered / read ticks · Reply to a message · He speaks first, once a day · Facts stored and recalled · One assistant across desk, phone and chat · Rolling memory durable across restarts · Deploy-durable gateway state · Chat history sent with the ask · Weather and distance from measured figures · The situation sent to the persona · Scripts: create, update, delete, run by id · Run history · Presence — awake but idle · Declared rules (“tell me if I haven’t…”) · Anticipation that finds you in your pocket</td>
+          <td class="held">Capability-split tokens · Token expiry · The voice rule applied to what the model writes · No unprompted weekday assertion · Sent / delivered / read ticks · Reply to a message · He speaks first, once a day · Facts stored and recalled · One assistant across desk, phone and chat · Rolling memory durable across restarts · Deploy-durable gateway state · Chat history sent with the ask · Weather and distance from measured figures · The situation sent to the persona · Scripts: create, update, delete, run by id · Run history · Presence — awake but idle · Declared rules (“tell me if I haven’t…”) · Anticipation that finds you in your pocket</td>
         </tr>
         <tr>
           <td><span class="dep dep-desk">Desk</span></td>
@@ -1405,9 +1435,9 @@
         </tr>
         <tr>
           <td><span class="dep dep-device">Phone</span></td>
-          <td class="num">11</td>
+          <td class="num">10</td>
           <td>Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.</td>
-          <td class="held">Reasoning monologues can never reach the screen · A status panel naming every seam · Microphone in · The local task gated so it cannot double-post · Full message on tap, day rules, paged list · Any background work running unattended · Location timeline · Named places, location sharing, located answers · Anticipation from learned habit rather than a written rule · Motion defaulted from the OS · Screen-reader pass</td>
+          <td class="held">A status panel naming every seam · Microphone in · The local task gated so it cannot double-post · Full message on tap, day rules, paged list · Any background work running unattended · Location timeline · Named places, location sharing, located answers · Anticipation from learned habit rather than a written rule · Motion defaulted from the OS · Screen-reader pass</td>
         </tr></tbody>
       </table>
     </div>
@@ -1571,7 +1601,7 @@
   <section>
     <h2>Every task, and what is actually finished</h2>
     <p class="sec-note">
-      All 20 of them, blocked ones included. <strong>A title is struck through only
+      All 21 of them, blocked ones included. <strong>A title is struck through only
       when it is proved</strong> — a human has seen it work — which is the same bar the ledger
       uses. <span class="q-tag q-tag-shipped">Shipped · unproved</span> means code landed, tests
       green, published, and still nobody has looked: the most recent one was correct in
@@ -1580,7 +1610,7 @@
     </p>
     <p class="sec-note" style="margin-top:-10px">
       <strong>1 proved · 1 shipped and unproved ·
-      10 open · 8 blocked elsewhere.</strong>
+      11 open · 8 blocked elsewhere.</strong>
       Detail for each in <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>.
     </p>
     <div class="queue">
@@ -1604,6 +1634,17 @@
         <div class="row-tags">
           <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
           <span class="q-tag q-tag-shipped" title="Code landed and published. No human has seen it yet.">Shipped · unproved</span>
+        </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">2.5</span>
+        <div>
+          <p class="q-t">The chat log in the right order, once each</p>
+          <p class="q-d">One fix landed and shipped — exact-millisecond duplicates and self-duplicating restores are gone, with 6 tests. The screen is still wrong, and the remaining cause is now narrow: the same reply logged by the socket and by the push carries two different timestamps, and yesterday’s entries are being appended today by the tray sweep. Needs the real <code>at</code> values before more code: a debug build, or a temporary diagnostic behind a flag.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
         </div>
       </div>
       <div class="q q-open">
@@ -1833,7 +1874,7 @@
     });
     const shown = rows.filter((r) => !r.classList.contains('hide')).length;
     countEl.textContent = shown === rows.length
-      ? `77 rows · 38 proved · 23 not built`
+      ? `80 rows · 39 proved · 23 not built`
       : shown + ' of ' + rows.length + ' rows';
     try { localStorage.setItem('jarvis-status-filter', JSON.stringify(pick)); } catch (e) { /* private window, or site data blocked */ }
   }

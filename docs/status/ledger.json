@@ -233,18 +233,39 @@
           "note": ""
         },
         {
+          "id": "chat-order",
+          "name": "The chat log in the right order, once each",
+          "status": "broken",
+          "blockedBy": "app",
+          "note": "**Still broken on the phone after one fix, and the fix was not wasted.** Landed `fd8b31d`: a reply re-entered by the tray sweep with the *same* millisecond is now one entry, not two, and `hydrate` de-duplicates the restored log against itself so old duplicates on disk clear. 6 tests, shipped and applied on the device (`isUpdatePending=true`, `downloadProgress=1.0`). **The screen is still wrong**, which narrows the cause rather than reopening it: the surviving pair must carry *different* timestamps for the same reply — the socket logs it at arrival, the push carries the notification’s own time — so identity on an exact millisecond cannot unify them. Second confirmed symptom: yesterday’s `15:xx` entries render **below** today’s `12:xx` ones, so they were appended today by the sweep while describing yesterday. Next step is the actual `at` values, which need a debug build or a temporary diagnostic — not another fix inferred from a screenshot, having been wrong that way once."
+        },
+        {
+          "id": "voice-rule-replies",
+          "name": "The voice rule applied to what the model writes",
+          "status": "broken",
+          "blockedBy": "brain",
+          "note": "**Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it."
+        },
+        {
+          "id": "unprompted-weekday",
+          "name": "No unprompted weekday assertion",
+          "status": "broken",
+          "blockedBy": "brain",
+          "note": "**Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like."
+        },
+        {
           "id": "no-reasoning",
           "name": "Reasoning monologues can never reach the screen",
-          "status": "partial",
-          "blockedBy": "device",
-          "note": "Proved in the harness, never on the device."
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "`_strip_reasoning()`. **Device pass 2026-08-24:** two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only."
         },
         {
           "id": "opening-line",
           "name": "The opening line is the real situation",
           "status": "proved",
           "blockedBy": "none",
-          "note": "On-device, no model, no await."
+          "note": "On-device, no model, no await. **Read again 2026-08-24:** *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.* Note the lowercase `sir` — this line obeys the voice rule, which is what makes the replies below it violating the same rule so visible."
         },
         {
           "id": "capabilities-answer",
@@ -811,6 +832,13 @@
       "state": "shipped",
       "blockedBy": "device",
       "detail": "A workspace-only week ages the upload stamp, and the panel asserted the gateway lost the schedule — which the phone cannot know. Three states now: `AT THE GATEWAY`, `CANNOT TELL`, `ON THIS PHONE`. `cloudArmedState()` sits beside `cloudArmed()`, so the task gate is untouched and a stale stamp still means the phone posts. 10 tests; committed `d5eff11`; published to runtime `31c64113`. **On the phone 2026-08-24:** the new bundle is live (the update server serves it for this exact runtime and the app reports nothing newer), the panel renders, and the briefing row reads `AT THE GATEWAY` correctly while the link is cloud. **Still owed:** the new `CANNOT TELL` state itself is unreachable on a cloud-linked phone — the stamp is fresh — so it needs two days of workspace-only sessions or a debug build."
+    },
+    {
+      "n": 2.5,
+      "title": "The chat log in the right order, once each",
+      "state": "open",
+      "blockedBy": "app",
+      "detail": "One fix landed and shipped — exact-millisecond duplicates and self-duplicating restores are gone, with 6 tests. The screen is still wrong, and the remaining cause is now narrow: the same reply logged by the socket and by the push carries two different timestamps, and yesterday’s entries are being appended today by the tray sweep. Needs the real `at` values before more code: a debug build, or a temporary diagnostic behind a flag."
     },
     {
       "n": 2,

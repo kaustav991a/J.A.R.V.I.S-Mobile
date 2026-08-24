@@ -240,6 +240,67 @@ The clock was **not** moved forward to force it. Ageing a stamp by moving the de
 would also move the briefing window and the day keys the journal writes, which is a large
 side effect for one row of text.
 
+### The chat, read on the phone — three defects, and two rows earned
+
+Reached without a finger: **Home's Chat card is an ordinary `Pressable`**, so
+`adb shell input tap` opens Chat even though the tab bar cannot be driven. There is no
+`linking` config on the navigator, so deep links go nowhere — that was checked before
+reaching for one.
+
+Phone clock: **Mon Aug 24 12:24 IST 2026**. That date is what makes the rest legible.
+
+**Two rows earned their promotion.**
+
+`_strip_reasoning()` had only ever been proved in a harness. Two full screens of real
+replies were read, including a multi-sentence answer and one reasoning about a
+screenshot — no monologue, no stray tags, nothing leaked. **`proved`.**
+
+The opening line read *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.*
+Correct, on-device, no model — and note the **lowercase `sir`**, which is what makes the
+next finding so visible.
+
+**Defect 1 — the log shows duplicates, out of order.**
+
+```
+Standing by, Sir.                        Jarvis · 12:19
+do you tell me .. what's on screen …     You    · 12:20
+I can't see your screen from here …      Jarvis · 12:21
+Standing by, Sir.                        Jarvis · 12:19   <- again, below 12:21
+no Jarvis .. I'm working on you …        You    · 14:40
+I can't authorise task approvals …       Jarvis · 14:31   <- below a later stamp
+no Jarvis .. I'm working on you …        You    · 14:40   <- again
+```
+
+Two causes are tangled here and **only one is proved**: the log carries duplicates the
+consecutive-duplicate guard cannot see, because other entries land between the copies;
+and the list renders **times with no day boundary**, so anything from a previous day
+interleaves with today — `14:31` and `14:40` are both in the future relative to `12:24`,
+so those are yesterday's, displayed as if they were not. Either alone makes the order a
+lie. The sweep code already anticipates the first: its own comment says a reply *arrives
+twice, once pushed, once down a socket that reopened underneath it*.
+
+Recorded as `broken`, blocked on the app, with the root cause named as unproven rather
+than guessed.
+
+**Defect 2 — the voice rule is not applied to what the model writes.** `sir` is
+punctuation: lowercase, spent once. The situation line obeys it. Every reply does not —
+*Standing by, Sir.*, *I can't see your screen from here in the cloud, Sir.*, *I can't
+authorise task approvals from the cloud, Sir.* Systematic, not a slip, and the same gap
+the nudge path has: the rule lives in `commute.ts` and `_briefing_text`, and the persona
+prompt never got it. Brain-side.
+
+**Defect 3 — an unprompted weekday assertion, still live.** *"I can't authorise task
+approvals from the cloud, Sir. **Are you working this Saturday, by the way?**"* — appended
+to an unrelated refusal, on a Monday. Same class as the false Saturday shift: a stored
+Mon–Fri pattern asserted as a fact about today. The fix is committed in the brain as
+`c86d176` and undeployed, and this is what that looks like from the outside.
+
+**What this session did not do:** none of these three were fixed. Two are brain-side and
+that repo is deliberately untouched; the third wants the duplicate-versus-day-boundary
+question answered before code is written, because fixing the wrong one would leave the
+screen just as wrong.
+
+
 
 
 

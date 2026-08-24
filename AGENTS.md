@@ -79,6 +79,12 @@ of rediscovering them is high.
   are in-tree absolute views; see `DetailBox` in `src/screens/ActivityScreen.tsx`.
   An absolute child of `Screen` scrolls away with the content, so such an overlay
   goes beside `Screen`, not inside it.
+- **Home's Chat card is the way into Chat without a finger.** The tab bar cannot be
+  driven by `adb` (see the trap below), but the Chat card on Home is an ordinary
+  `Pressable` and `adb shell input tap` opens it. Scroll Home to the top first, then tap
+  around `(612, 781)` on a 1236×2750 screen. There is no `linking` config on the
+  navigator, so **deep links will not route to a screen** — do not reach for
+  `am start -d exp+jarvis-mobile://…`, it goes nowhere.
 - **`uiautomator dump` never succeeds on this app.** It returns
   `ERROR: could not get idle state` because the reactor animates continuously, so the
   accessibility tree never settles — and it leaves a **stale SystemUI tree** behind,

@@ -211,7 +211,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**38 of 77 rows are proved on the phone** (49%). 54 have code (70%). 30 cannot be finished in this repo: 17 on the brain, 2 on the desk, 11 on the phone.
+**39 of 80 rows are proved on the phone** (49%). 57 have code (71%). 31 cannot be finished in this repo: 19 on the brain, 2 on the desk, 10 on the phone.
 
 ### Transport, pairing, security
 
@@ -230,15 +230,18 @@ in §2; `—` — not built.
 
 ### Talking to him
 
-*9 proved of 17.*
+*10 proved of 20.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
 | Text chat, both directions | proved |  |  |
 | Replies arrive word by word | proved |  |  |
 | Markdown rendered, not shown as asterisks | proved |  |  |
-| Reasoning monologues can never reach the screen | partial | Phone | Proved in the harness, never on the device. |
-| The opening line is the real situation | proved |  | On-device, no model, no await. |
+| The chat log in the right order, once each | broken | App | **Still broken on the phone after one fix, and the fix was not wasted.** Landed `fd8b31d`: a reply re-entered by the tray sweep with the *same* millisecond is now one entry, not two, and `hydrate` de-duplicates the restored log against itself so old duplicates on disk clear. 6 tests, shipped and applied on the device (`isUpdatePending=true`, `downloadProgress=1.0`). **The screen is still wrong**, which narrows the cause rather than reopening it: the surviving pair must carry *different* timestamps for the same reply — the socket logs it at arrival, the push carries the notification’s own time — so identity on an exact millisecond cannot unify them. Second confirmed symptom: yesterday’s `15:xx` entries render **below** today’s `12:xx` ones, so they were appended today by the sweep while describing yesterday. Next step is the actual `at` values, which need a debug build or a temporary diagnostic — not another fix inferred from a screenshot, having been wrong that way once. |
+| The voice rule applied to what the model writes | broken | Brain | **Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it. |
+| No unprompted weekday assertion | broken | Brain | **Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like. |
+| Reasoning monologues can never reach the screen | proved |  | `_strip_reasoning()`. **Device pass 2026-08-24:** two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only. |
+| The opening line is the real situation | proved |  | On-device, no model, no await. **Read again 2026-08-24:** *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.* Note the lowercase `sir` — this line obeys the voice rule, which is what makes the replies below it violating the same rule so visible. |
 | “What can you do”, answered without a round trip | proved |  | On-device, so it answers with everything even offline. |
 | A Capabilities screen listing the same thing | proved |  | One list, two surfaces. Read back over adb. |
 | A status panel naming every seam | partial | Phone | Eight rows, four states, assembled on the device so it is readable with nothing connected at all — which is exactly when it will be looked at. **Read on the phone again 2026-08-24, on the new bundle:** all eight rows render, the caption counts `1 OFF` for the sleeping desk alone, and the briefing row reads `AT THE GATEWAY` while the link is cloud. Named gap: the third briefing state added that day, `CANNOT TELL`, cannot be reached on a cloud-linked phone — the stamp is fresh, so it would take two days of workspace-only sessions or a debug build to see it. |
