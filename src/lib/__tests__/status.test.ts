@@ -15,7 +15,7 @@ const facts = (over: Partial<StatusFacts> = {}): StatusFacts => ({
   deskLinked: true,
   hasToken: true,
   push: 'registered',
-  scheduleAtGateway: true,
+  scheduleAtGateway: 'armed',
   shareLocation: true,
   usageAccess: 'granted',
   appLock: true,
@@ -101,12 +101,36 @@ describe('push', () => {
 describe('the briefing schedule', () => {
   it('is on when the gateway is holding it', () => {
     expect(row('schedule').state).toBe('on');
+    expect(row('schedule').word).toBe('AT THE GATEWAY');
   });
 
-  it('is off when the gateway has not been given it, or has gone stale', () => {
+  it('says the phone is briefing only when nothing was ever uploaded', () => {
     // this is the row that explains a missing briefing, and the one that explains a
     // duplicate: while it is off, the phone posts the briefing itself
-    expect(row('schedule', { scheduleAtGateway: false }).state).toBe('off');
+    const r = row('schedule', { scheduleAtGateway: 'never' });
+    expect(r.state).toBe('off');
+    expect(r.word).toBe('ON THIS PHONE');
+  });
+
+  /**
+   * The row used to read `off` for a stamp that had merely aged, which asserts the
+   * gateway lost the schedule. The phone cannot know that: the stamp is written only
+   * on a cloud connect, so workspace-only sessions age it out while the gateway may
+   * be armed perfectly well. Claiming otherwise sent someone hunting a fault that did
+   * not exist.
+   */
+  it('refuses to claim the phone is briefing when the stamp has merely aged', () => {
+    const r = row('schedule', { scheduleAtGateway: 'stale' });
+    expect(r.state).toBe('unknown');
+    expect(r.word).toBe('CANNOT TELL');
+    expect(r.note).toContain('may still hold');
+  });
+
+  it('does not count a stale stamp among the things that are off', () => {
+    // the caption counts what is genuinely off, and an unknown is not a fault
+    const stale = statusRows(facts({ scheduleAtGateway: 'stale' })).filter((r) => r.state === 'off');
+    const armed = statusRows(facts({ scheduleAtGateway: 'armed' })).filter((r) => r.state === 'off');
+    expect(stale).toHaveLength(armed.length);
   });
 });
 

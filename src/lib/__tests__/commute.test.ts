@@ -4,6 +4,7 @@ import {
   CLOUD_TTL_HOURS,
   alreadyBriefed,
   cloudArmed,
+  cloudArmedState,
   clockLabel,
   commuteBriefing,
   dueDeparture,
@@ -474,5 +475,56 @@ describe('whether the gateway holds the schedule', () => {
   it('is not armed by a stamp from the future, which is a clock that moved', async () => {
     await markCloudArmed(now.getTime() + 86_400_000);
     expect(await cloudArmed(now)).toBe(false);
+  });
+});
+
+/**
+ * What the phone may *claim* about the gateway, which is a narrower thing than what
+ * the task decides.
+ *
+ * These exist because the status panel read `ON THIS PHONE` — asserting the gateway
+ * did not hold the schedule — after a run of workspace-only sessions. The stamp is
+ * written only by `syncCommute`, and that effect returns early unless the link is
+ * `cloud`, so a week on the LAN ages it out while the gateway may be armed perfectly
+ * well. `cloudArmed` collapsing that into `false` is right for the task and wrong for
+ * a row of text.
+ *
+ * The task's own behaviour must not move: a stale stamp still means the phone posts.
+ */
+describe('what the phone can honestly claim about the gateway', () => {
+  const now = new Date(2026, 7, 21, 8, 5);
+  const hoursAgo = (h: number) => now.getTime() - h * 3_600_000;
+
+  it('reads armed while the stamp is fresh', async () => {
+    await markCloudArmed(hoursAgo(1));
+    await expect(cloudArmedState(now)).resolves.toBe('armed');
+  });
+
+  it('reads stale — not never — once the stamp ages out', async () => {
+    await markCloudArmed(hoursAgo(CLOUD_TTL_HOURS + 1));
+    await expect(cloudArmedState(now)).resolves.toBe('stale');
+  });
+
+  it('reads never when no upload has ever been stamped', async () => {
+    await expect(cloudArmedState(now)).resolves.toBe('never');
+  });
+
+  it('reads never when the stamp is unreadable, because that is not evidence either way', async () => {
+    await AsyncStorage.setItem('jarvis_commute_cloud', 'not a number');
+    await expect(cloudArmedState(now)).resolves.toBe('never');
+  });
+
+  it('treats a clock that moved backwards as stale, not armed', async () => {
+    // the age is meaningless, and meaningless must not read as proved
+    await markCloudArmed(now.getTime() + 86_400_000);
+    await expect(cloudArmedState(now)).resolves.toBe('stale');
+  });
+
+  it('keeps the boolean gate agreeing with the tri-state', async () => {
+    // the whole point: the task still stands the gateway down, the panel stops
+    // asserting something it cannot know
+    await markCloudArmed(hoursAgo(CLOUD_TTL_HOURS + 1));
+    expect(await cloudArmed(now)).toBe(false);
+    await expect(cloudArmedState(now)).resolves.toBe('stale');
   });
 });

@@ -280,6 +280,45 @@ export async function cloudArmed(now: Date = new Date()): Promise<boolean> {
   }
 }
 
+/**
+ * `never` means no upload has ever been accepted, so the phone is certainly the
+ * briefer. `stale` means one was, long enough ago that it proves nothing now.
+ */
+export type CloudArmedState = 'armed' | 'stale' | 'never';
+
+/**
+ * The same read as `cloudArmed`, but it distinguishes the two ways of not being armed.
+ *
+ * `cloudArmed` collapses them on purpose — the task's decision is binary and the
+ * direction of its failure is chosen. Displaying it is the opposite problem: a stamp
+ * that has merely aged is not evidence that the gateway lost the schedule, and a row
+ * reading `ON THIS PHONE` for both is asserting something the phone cannot know.
+ *
+ * Why the stamp ages while the gateway may be armed perfectly well: it is written only
+ * by `syncCommute`, and that effect returns early unless the link is `cloud`
+ * (`JarvisProvider.tsx`) — `api.syncCommute` is a gateway route, so there is no LAN
+ * upload to stamp. A week of workspace-only sessions is enough to age it out.
+ *
+ * A stamp from the future is `stale` rather than `armed`: the clock moved, so the age
+ * is meaningless, and meaningless must not read as proved. An unreadable stamp is
+ * `never` rather than `stale`, because a store that cannot be read is not evidence
+ * that an upload once happened.
+ *
+ * Nothing here changes what the task does. `cloudArmed` is still the gate.
+ */
+export async function cloudArmedState(now: Date = new Date()): Promise<CloudArmedState> {
+  try {
+    const raw = await AsyncStorage.getItem(CLOUD_KEY);
+    const at = Number(raw);
+    if (!raw || !Number.isFinite(at)) return 'never';
+    const age = now.getTime() - at;
+    if (age < 0) return 'stale';
+    return age <= CLOUD_TTL_HOURS * 3_600_000 ? 'armed' : 'stale';
+  } catch {
+    return 'never';
+  }
+}
+
 export const dayKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 

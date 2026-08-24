@@ -18,7 +18,8 @@ import { greetingFor, msToNextMinute } from '../theme/greeting';
 import { ACCENTS, useAppearance } from '../theme/appearance';
 import { useJarvis } from '../state/JarvisProvider';
 import { useAuth } from '../security/AuthProvider';
-import { cloudArmed, dayKey } from '../lib/commute';
+import { cloudArmedState, dayKey } from '../lib/commute';
+import type { CloudArmedState } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
 import { daysSeenAt, loadSeen } from '../lib/timeline';
@@ -104,7 +105,7 @@ export function HomeScreen() {
    * change a few times a day at most, and this is the screen you land on. A timer
    * for either would be a poll for nothing.
    */
-  const [scheduleAtGateway, setScheduleAtGateway] = useState(false);
+  const [scheduleAtGateway, setScheduleAtGateway] = useState<CloudArmedState>('never');
   const [usageAccess, setUsageAccess] = useState<'granted' | 'denied' | 'unknown'>('unknown');
   const [watch, setWatch] = useState<WatchFacts | null>(null);
   useFocusEffect(
@@ -124,8 +125,8 @@ export function HomeScreen() {
        * a native call, and a native call during render is worth avoiding on its own
        * terms.
        */
-      void cloudArmed().then((armed) => {
-        if (alive) setScheduleAtGateway((prev) => (prev === armed ? prev : armed));
+      void cloudArmedState().then((state) => {
+        if (alive) setScheduleAtGateway((prev) => (prev === state ? prev : state));
       });
       void Promise.resolve(usageAccessState()).then((access) => {
         if (alive) setUsageAccess((prev) => (prev === access ? prev : access));

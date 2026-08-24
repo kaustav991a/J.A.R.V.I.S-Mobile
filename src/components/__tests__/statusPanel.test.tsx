@@ -14,7 +14,7 @@ const facts = (over: Partial<StatusFacts> = {}): StatusFacts => ({
   deskLinked: true,
   hasToken: true,
   push: 'registered',
-  scheduleAtGateway: true,
+  scheduleAtGateway: 'armed',
   shareLocation: true,
   usageAccess: 'granted',
   appLock: true,
@@ -53,7 +53,7 @@ describe('the status panel', () => {
   });
 
   it('explains a state that cannot explain itself', async () => {
-    const { findByTestId } = await mount({ scheduleAtGateway: false });
+    const { findByTestId } = await mount({ scheduleAtGateway: 'never' });
     const note = await findByTestId('status-note-schedule');
     expect(note.props.children).toContain('The phone is briefing');
   });
@@ -61,6 +61,24 @@ describe('the status panel', () => {
   it('does not call a setting a fault', async () => {
     const { findByTestId } = await mount({ shareLocation: false });
     expect((await findByTestId('status-word-location')).props.children).toBe('OFF BY CHOICE');
+  });
+
+  /**
+   * The panel used to say `ON THIS PHONE` for a stamp that had only aged, which
+   * asserts the gateway lost the schedule. It cannot know that — the stamp is written
+   * on a cloud connect alone, so a workspace-only week ages it out regardless of what
+   * the gateway holds. This is the row going honest rather than going red.
+   */
+  it('will not assert the gateway lost the schedule from a stale stamp alone', async () => {
+    const { findByTestId } = await mount({ scheduleAtGateway: 'stale' });
+    expect((await findByTestId('status-word-schedule')).props.children).toBe('CANNOT TELL');
+    const note = await findByTestId('status-note-schedule');
+    expect(note.props.children).toContain('may still hold');
+  });
+
+  it('does not report a stale stamp in the count of what is off', async () => {
+    const { findByTestId } = await mount({ scheduleAtGateway: 'stale' });
+    expect((await findByTestId('status-summary')).props.children).toBe('ALL PRESENT');
   });
 });
 
@@ -78,7 +96,7 @@ describe('read aloud', () => {
   });
 
   it('carries the explanation into the same announcement', async () => {
-    const { findByTestId } = await mount({ scheduleAtGateway: false });
+    const { findByTestId } = await mount({ scheduleAtGateway: 'never' });
     const label = (await findByTestId('status-schedule')).props.accessibilityLabel;
     expect(label).toContain('Briefing schedule: ON THIS PHONE.');
     expect(label).toContain('The phone is briefing');

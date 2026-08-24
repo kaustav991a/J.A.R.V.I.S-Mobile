@@ -1,4 +1,5 @@
 import type { LinkMode } from '../link/config';
+import type { CloudArmedState } from './commute';
 
 /**
  * What is connected, and what is not — one row per seam.
@@ -63,8 +64,14 @@ export type StatusFacts = {
    * which. The consequence is identical either way, and the note says it.
    */
   push: 'registered' | 'no-token' | 'unasked';
-  /** the gateway is holding the commute schedule — `cloudArmed()` in `commute.ts` */
-  scheduleAtGateway: boolean;
+  /**
+   * What the phone can honestly claim about the gateway holding the commute schedule —
+   * `cloudArmedState()` in `commute.ts`. Three states rather than two because the stamp
+   * is written only on a cloud connect: workspace-only sessions age it out while the
+   * gateway may be armed perfectly well, and one red row for both sends someone hunting
+   * a fault that does not exist.
+   */
+  scheduleAtGateway: CloudArmedState;
   shareLocation: boolean;
   usageAccess: 'granted' | 'denied' | 'unknown';
   appLock: boolean;
@@ -127,10 +134,25 @@ export function statusRows(f: StatusFacts): StatusRow[] {
       id: 'schedule',
       label: 'Briefing schedule',
       // explains both failure shapes: while this is off the gateway cannot brief,
-      // and the phone posts the briefing itself instead
-      ...(f.scheduleAtGateway
+      // and the phone posts the briefing itself instead.
+      //
+      // Three states, because the stamp behind it is written only on a cloud connect —
+      // a workspace-only week ages it out while the gateway may still hold the
+      // schedule. `off` asserts something about the gateway, and a stale stamp is not
+      // grounds for that assertion. See `cloudArmedState` in `commute.ts`.
+      ...(f.scheduleAtGateway === 'armed'
         ? { state: 'on' as const, word: 'AT THE GATEWAY' }
-        : { state: 'off' as const, word: 'ON THIS PHONE', note: 'The phone is briefing, which it often cannot.' }),
+        : f.scheduleAtGateway === 'stale'
+          ? {
+              state: 'unknown' as const,
+              word: 'CANNOT TELL',
+              note: 'Not uploaded in two days. The gateway may still hold it; the phone will brief as well.',
+            }
+          : {
+              state: 'off' as const,
+              word: 'ON THIS PHONE',
+              note: 'The phone is briefing, which it often cannot.',
+            }),
     },
     {
       id: 'location',
