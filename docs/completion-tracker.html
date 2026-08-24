@@ -1,0 +1,1459 @@
+<title>JARVIS Mobile Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<!--
+  GENERATED FILE. Do not edit.
+
+  Written by `npm run status` from docs/status/ledger.json, which is the single source
+  of truth for every status claim in this repo. Editing this file is lost work: the next
+  generate overwrites it without asking.
+-->
+
+<style>
+  :root {
+    /* the app's own ground and accent, from app.json — inherited, not invented */
+    --ground: #020814;
+    --panel: #0b1526;
+    --panel-2: #101f35;
+    --line: #1c304c;
+    --accent: #3ea6ff;
+    --accent-dim: #1d5a92;
+    --proved: #2fd4b5;
+    --partial: #f5a524;
+    --untested: #8b7fd4;
+    --broken: #ff5d5d;
+    --none: #48607d;
+    --text: #e8f1fb;
+    --dim: #8aa1ba;
+    --dimmer: #5f7794;
+    --display: 'Orbitron', 'Trebuchet MS', sans-serif;
+    --body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px 96px; position: relative; }
+
+  .bloom {
+    position: absolute;
+    inset: -80px -200px auto -200px;
+    height: 460px;
+    background: radial-gradient(ellipse 50% 60% at 50% 0%, rgba(62,166,255,0.16), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header { position: relative; z-index: 1; padding: 56px 0 36px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.9rem, 5vw, 3rem);
+    line-height: 1.05;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+
+  .standfirst { max-width: 62ch; color: var(--dim); font-size: 1.05rem; margin: 0 0 22px; }
+
+  .provenance {
+    max-width: 68ch;
+    margin: 0 0 26px;
+    padding: 14px 18px;
+    border-left: 3px solid var(--accent-dim);
+    background: rgba(62,166,255,0.05);
+    border-radius: 0 4px 4px 0;
+    color: var(--dim);
+    font-size: 0.89rem;
+  }
+
+  .provenance strong { color: var(--text); font-weight: 600; }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 10px; font-family: var(--mono); font-size: 0.78rem; margin: 0; padding: 0; list-style: none; }
+  .facts li { border: 1px solid var(--line); border-radius: 3px; padding: 5px 10px; color: var(--dim); background: rgba(11,21,38,0.7); }
+  .facts b { color: var(--text); font-weight: 500; }
+
+  .meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 0 0 20px; }
+  .meter { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 20px 22px 18px; }
+  .meter-num { font-family: var(--display); font-weight: 700; font-size: 2.9rem; line-height: 1; font-variant-numeric: tabular-nums; display: block; }
+  .meter-num span { font-size: 1.2rem; font-weight: 500; margin-left: 2px; }
+  .meter-label { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); display: block; margin-top: 10px; }
+  .meter-sub { font-size: 0.85rem; color: var(--dimmer); margin: 8px 0 0; }
+  .track { height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; margin-top: 14px; }
+  .track i { display: block; height: 100%; border-radius: 3px; }
+
+  section { position: relative; z-index: 1; margin-top: 52px; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.35rem;
+    margin: 0 0 6px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sec-note { color: var(--dim); font-size: 0.94rem; max-width: 70ch; margin: 14px 0 24px; }
+  code { font-family: var(--mono); font-size: 0.87em; color: var(--accent); background: rgba(62,166,255,0.09); padding: 1px 5px; border-radius: 3px; }
+
+  .criteria { display: grid; gap: 10px; }
+  .crit {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr auto;
+    gap: 16px;
+    align-items: start;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--none);
+    border-radius: 4px;
+    padding: 15px 18px;
+  }
+  .crit[data-s="partial"] { border-left-color: var(--partial); }
+  .crit[data-s="proved"] { border-left-color: var(--proved); }
+  .crit-n { font-family: var(--mono); font-size: 0.95rem; color: var(--dimmer); padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .crit-t { font-weight: 600; font-size: 1rem; margin: 0 0 4px; }
+  .crit-d { color: var(--dim); font-size: 0.9rem; margin: 0; }
+
+  .row-tags { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 3px;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid;
+  }
+  .chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+  .chip.proved { color: var(--proved); border-color: rgba(47,212,181,0.4); background: rgba(47,212,181,0.09); }
+  .chip.partial { color: var(--partial); border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.09); }
+  .chip.untested { color: var(--untested); border-color: rgba(139,127,212,0.4); background: rgba(139,127,212,0.1); }
+  .chip.broken { color: var(--broken); border-color: rgba(255,93,93,0.45); background: rgba(255,93,93,0.1); }
+  .chip.none { color: var(--none); border-color: rgba(72,96,125,0.5); background: rgba(72,96,125,0.12); }
+  .chip.none::before { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
+
+  /* the dependency badge — the thing that must stay visible on every blocked row */
+  .dep {
+    font-family: var(--mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+    border: 1px solid;
+    font-weight: 500;
+    cursor: help;
+  }
+  .dep-brain { color: #ff8fa0; border-color: rgba(255,143,160,0.45); background: rgba(255,143,160,0.1); }
+  .dep-desk { color: var(--partial); border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.08); }
+  .dep-device { color: var(--untested); border-color: rgba(139,127,212,0.4); background: rgba(139,127,212,0.08); }
+  .dep-app-build { color: var(--accent); border-color: rgba(62,166,255,0.4); background: rgba(62,166,255,0.08); }
+  .dep-app { color: var(--dim); border-color: var(--line); background: transparent; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 22px;
+    padding: 14px 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .controls-label { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dimmer); margin-right: 4px; }
+  button.filter {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 6px 11px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  button.filter:hover { color: var(--text); border-color: var(--accent-dim); }
+  button.filter[aria-pressed="true"] { color: var(--ground); background: var(--accent); border-color: var(--accent); font-weight: 500; }
+  button.filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .count { font-family: var(--mono); font-size: 0.75rem; color: var(--dimmer); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  .area { margin-bottom: 34px; }
+  .area-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-bottom: 4px; }
+  .area-head h3 { font-family: var(--display); font-weight: 500; font-size: 1.02rem; margin: 0; }
+  .area-stat { font-family: var(--mono); font-size: 0.76rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .area-stat b { color: var(--proved); font-weight: 500; }
+
+  .bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin: 10px 0 14px; background: rgba(255,255,255,0.05); }
+  .bar i { display: block; height: 100%; }
+  .bar i.proved { background: var(--proved); }
+  .bar i.partial { background: var(--partial); }
+  .bar i.untested { background: var(--untested); }
+  .bar i.broken { background: var(--broken); }
+  .bar i.none { background: rgba(72,96,125,0.45); }
+
+  .rows { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 8px 18px; padding: 12px 16px; background: var(--panel); align-items: start; }
+  .row:nth-child(even) { background: var(--panel-2); }
+  .row.hide { display: none; }
+  .row-name { font-size: 0.95rem; font-weight: 500; }
+  .row-note { color: var(--dim); font-size: 0.86rem; margin-top: 3px; }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dimmer); background: var(--panel-2); font-weight: 500; white-space: nowrap; }
+  tbody tr { background: var(--panel); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); }
+  td.held { color: var(--dim); font-size: 0.86rem; }
+
+  .queue { display: grid; gap: 10px; }
+  .q { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: 16px; align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 15px 18px; }
+  .q-n { font-family: var(--mono); color: var(--accent); font-size: 0.9rem; padding-top: 2px; }
+  .q-t { font-weight: 600; margin: 0 0 4px; }
+  .q-d { color: var(--dim); font-size: 0.89rem; margin: 0; }
+  .q-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dimmer); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; white-space: nowrap; }
+  .done { opacity: 0.6; }
+  .done .q-t { text-decoration: line-through; text-decoration-color: var(--proved); }
+
+  .callout {
+    background: linear-gradient(180deg, rgba(255,143,160,0.07), rgba(255,143,160,0.02));
+    border: 1px solid rgba(255,143,160,0.28);
+    border-radius: 4px;
+    padding: 18px 22px;
+    margin: 24px 0 0;
+  }
+  .callout h4 { font-family: var(--display); font-weight: 500; font-size: 1rem; margin: 0 0 8px; color: #ff8fa0; }
+  .callout p { margin: 0; color: var(--dim); font-size: 0.93rem; max-width: 72ch; }
+
+  footer { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--dimmer); font-family: var(--mono); font-size: 0.76rem; position: relative; z-index: 1; }
+  footer p { margin: 0 0 6px; }
+
+  @media (max-width: 660px) {
+    .row { grid-template-columns: 1fr; }
+    .row-tags { flex-direction: row; align-items: center; justify-content: flex-start; }
+    .crit, .q { grid-template-columns: 1.8rem 1fr; }
+    .crit > .row-tags, .q > .q-tag { grid-column: 2; justify-self: start; margin-top: 6px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="bloom"></div>
+
+  <header>
+    <p class="eyebrow">Completion tracker · generated 2026-08-24</p>
+    <h1>JARVIS Mobile</h1>
+    <p class="standfirst">
+      Every feature in the ledger, what state it is actually in, and who is holding up the
+      rest. Two numbers matter and they are not the same number: what a human has watched
+      work on the phone, and what merely has code.
+    </p>
+    <p class="provenance">
+      <strong>Generated, not written.</strong> Every row, badge and percentage on this page is
+      counted from <code>docs/status/ledger.json</code> by <code>npm run status</code> — that
+      file is the single source of truth for status, and editing this page is lost work.
+      <code>ROADMAP.md</code> §0b and §0c come from the same place, so the two cannot disagree.
+      <code>RESUME.md</code> is untouched: it answers how something was proved and what it cost
+      to find out, which is a different question.
+    </p>
+    <ul class="facts">
+      <li>Branch <b>feat/mobile-hud</b></li>
+      <li>HEAD <b>b33b110</b></li>
+      <li><b>893</b> tests · 70 suites</li>
+      <li><code>tsc --noEmit</code> <b>clean</b></li>
+      <li>OTA <b>verified</b> 2026-08-24</li>
+    </ul>
+  </header>
+
+  <div class="meters">
+    <div class="meter">
+      <span class="meter-num" style="color:var(--proved)">48<span>%</span></span>
+      <span class="meter-label">Proved on the phone</span>
+      <div class="track"><i style="width:48%;background:var(--proved)"></i></div>
+      <p class="meter-sub">37 of 77 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
+    </div>
+    <div class="meter">
+      <span class="meter-num" style="color:var(--accent)">70<span>%</span></span>
+      <span class="meter-label">Has code</span>
+      <div class="track"><i style="width:70%;background:var(--accent)"></i></div>
+      <p class="meter-sub">54 rows: proved, partial, unexercised and broken together. The gap to the left is the honesty gap.</p>
+    </div>
+    <div class="meter">
+      <span class="meter-num" style="color:#ff8fa0">31</span>
+      <span class="meter-label">Blocked outside this repo</span>
+      <div class="track"><i style="width:40%;background:#ff8fa0"></i></div>
+      <p class="meter-sub">17 on the brain, 2 on the desk, 12 on the phone in hand. Marked on every row below.</p>
+    </div>
+    <div class="meter">
+      <span class="meter-num">0<span>/10</span></span>
+      <span class="meter-label">Criteria fully met</span>
+      <div class="track"><i style="width:50%;background:var(--partial)"></i></div>
+      <p class="meter-sub">5 partly met, 5 not started. 5 need the brain, so this repo tops out at 50%.</p>
+    </div>
+  </div>
+
+  <section>
+    <h2>The definition of complete</h2>
+    <p class="sec-note">
+      The shortest set of things whose absence makes the app <em>incomplete</em> rather than
+      merely unfinished. Its own opening rule is the strict one: <strong>nothing may be
+      unexercised</strong>, because a feature nobody has ever used is a claim, not a capability.
+    </p>
+    <div class="criteria">
+      <article class="crit" data-s="partial">
+        <span class="crit-n">01</span>
+        <div>
+          <p class="crit-t">Every state names itself</p>
+          <p class="crit-d">Already the rule, and the two live defects are both what happens when it slips. A silent failure in a security path is a security failure. One defect is fixed in the app; the other is fixed in the brain and undeployed.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain">Brain</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </article>
+      <article class="crit" data-s="partial">
+        <span class="crit-n">02</span>
+        <div>
+          <p class="crit-t">No feature arrives twice or lies once</p>
+          <p class="crit-d">The anti-duplicate gate is built and its decision carries tests; no departure window has run yet. The false Saturday remark is fixed in the brain as c86d176 and not deployed.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain">Brain</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </article>
+      <article class="crit" data-s="partial">
+        <span class="crit-n">03</span>
+        <div>
+          <p class="crit-t">He can be reached without the app being opened</p>
+          <p class="crit-d">Push is proved — it buzzed. Continuous presence needs BOOT_COMPLETED and the notification listener, and neither exists yet. The listener is itself gated by criterion 7.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app-build">App · build</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </article>
+      <article class="crit" data-s="none">
+        <span class="crit-n">04</span>
+        <div>
+          <p class="crit-t">He speaks and he listens</p>
+          <p class="crit-d">The microphone has never been exercised — the oldest unverified thing here. Voice out is not built at all, and until both land this is a beautifully themed text box.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-device">Phone</span>
+          <span class="chip none">Not started</span>
+        </div>
+      </article>
+      <article class="crit" data-s="none">
+        <span class="crit-n">05</span>
+        <div>
+          <p class="crit-t">He knows where and when he is</p>
+          <p class="crit-d">One field on the persona envelope, and it is a gateway change. The roadmap calls it the most character per line of code in the whole document.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain">Brain</span>
+          <span class="chip none">Not started</span>
+        </div>
+      </article>
+      <article class="crit" data-s="none">
+        <span class="crit-n">06</span>
+        <div>
+          <p class="crit-t">Memory survives a deploy</p>
+          <p class="crit-d">Rolling memory is in Postgres rather than RAM, but deploy-durable state is committed and undeployed. Render's disk goes on every deploy, and that has silently disarmed the briefing twice.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain">Brain</span>
+          <span class="chip none">Not started</span>
+        </div>
+      </article>
+      <article class="crit" data-s="none">
+        <span class="crit-n">07</span>
+        <div>
+          <p class="crit-t">A compromised token does not expose a life</p>
+          <p class="crit-d">One string still gates the socket, push, the commute route and app state alike, and nothing expires. A gate on the senses, not a follow-up: once data has been collected badly, no later fix un-collects it.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain">Brain</span>
+          <span class="chip none">Not started</span>
+        </div>
+      </article>
+      <article class="crit" data-s="partial">
+        <span class="crit-n">08</span>
+        <div>
+          <p class="crit-t">A crash is visible</p>
+          <p class="crit-d">Shipping a fix within the hour is solved — the OTA channel is verified as of today. Seeing the crash at all is not: a crash is silent, and adb logcat on the one machine that built the APK is the only diagnosis.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app">App</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </article>
+      <article class="crit" data-s="none">
+        <span class="crit-n">09</span>
+        <div>
+          <p class="crit-t">A second device is possible</p>
+          <p class="crit-d">Signed with Expo's debug keystore, which is why a local APK and an EAS-signed one cannot replace each other. Fine for one phone, not for the second.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app-build">App · build</span>
+          <span class="chip none">Not started</span>
+        </div>
+      </article>
+      <article class="crit" data-s="partial">
+        <span class="crit-n">10</span>
+        <div>
+          <p class="crit-t">It is usable by someone who cannot see it well</p>
+          <p class="crit-d">Contrast is measured and passing at 4.78 and 4.68 against a 4.5 bar; reduced motion already defaults from the OS. Nothing has been checked with a screen reader.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-device">Phone</span>
+          <span class="chip partial">Partial</span>
+        </div>
+      </article></div>
+
+    <div class="callout">
+      <h4>Why 100% is not reachable from this repo</h4>
+      <p>
+        5 of the 10 criteria are gateway work, which is
+        <code>jarvis-brain</code> and deliberately not being touched — so the app repo alone
+        tops out at 50%. That dependency is kept and marked rather than dropped:
+        every affected row below carries a <span class="dep dep-brain">Brain</span> badge, and
+        the table further down says what each one is waiting for.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The ledger — all 77 rows</h2>
+    <p class="sec-note">
+      <strong>Proved</strong> — a human has seen it work on the phone.
+      <strong>Partial</strong> — works, with a named gap.
+      <strong>Unexercised</strong> — code and tests are in, no human has ever run it.
+      <strong>Broken</strong> — works badly, defect logged.
+      <strong>Not built</strong> — nothing there.
+      Filter by state, or by what is blocking it.
+    </p>
+
+    <div class="controls">
+      <span class="controls-label">State</span>
+      <button class="filter" data-k="s" data-f="all" aria-pressed="true">All</button>
+      <button class="filter" data-k="s" data-f="broken" aria-pressed="false">Broken</button>
+      <button class="filter" data-k="s" data-f="partial" aria-pressed="false">Partial</button>
+      <button class="filter" data-k="s" data-f="untested" aria-pressed="false">Unexercised</button>
+      <button class="filter" data-k="s" data-f="proved" aria-pressed="false">Proved</button>
+      <button class="filter" data-k="s" data-f="none" aria-pressed="false">Not built</button>
+      <span class="count" id="visCount"></span>
+    </div>
+    <div class="controls">
+      <span class="controls-label">Blocked on</span>
+      <button class="filter" data-k="b" data-f="all" aria-pressed="true">Anything</button>
+      <button class="filter" data-k="b" data-f="brain" aria-pressed="false">Brain (17)</button>
+      <button class="filter" data-k="b" data-f="desk" aria-pressed="false">Desk (2)</button>
+      <button class="filter" data-k="b" data-f="device" aria-pressed="false">Phone (12)</button>
+      <button class="filter" data-k="b" data-f="app-build" aria-pressed="false">App · build (2)</button>
+      <button class="filter" data-k="b" data-f="app" aria-pressed="false">App (7)</button>
+    </div>
+
+    <div id="areas">
+      <div class="area">
+        <div class="area-head">
+          <h3>Transport, pairing, security</h3>
+          <span class="area-stat"><b>4</b> proved of 8 · 5 have code</span>
+        </div>
+        <div class="bar" role="img" aria-label="0 broken, 0 partial, 1 unexercised, 4 proved, 3 not built"><i class="untested" style="width:12.5%"></i><i class="proved" style="width:50%"></i><i class="none" style="width:37.5%"></i></div>
+        <div class="rows">
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">LAN probe → cloud fallback → WebSocket, reconnect</div>
+              <div class="row-note">One reducer serves every tab.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">One socket per launch; chat survives force-stop</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Pairing token in SecureStore, with rotation</div>
+              <div class="row-note">New accepted, old refused 403.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Biometric lock, re-locking on background</div>
+              <div class="row-note"><code>strong</code> only — Android rejects <code>BIOMETRIC_WEAK | DEVICE_CREDENTIAL</code> outright, and with a passcode fallback enabled no sheet appears and the promise never settles.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="untested" data-b="desk">
+            <div>
+              <div class="row-name">Desk-key handshake (sealed turns)</div>
+              <div class="row-note"><code>has_desk_key: false</code>. 18 turns dropped and rising, so the encrypted path has never once worked end to end. Sealed-and-dropped is the correct failure and it is still a failure.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-desk" title="Needs the desk machine on. This laptop has no Python — `python` opens the Microsoft Store.">Desk</span>
+              <span class="chip untested">Unexercised</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="desk">
+            <div>
+              <div class="row-name"><code>BRIDGE_SECRET</code> rotation</div>
+              <div class="row-note">The old value went through Render's access log before redaction landed and still opens <code>/desk-link</code>. A fake desk was connected with it repeatedly during testing. The only item whose cost grows while deferred.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-desk" title="Needs the desk machine on. This laptop has no Python — `python` opens the Microsoft Store.">Desk</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Capability-split tokens</div>
+              <div class="row-note">One string gates the socket, push, the commute route and app state alike. A token that can register a push and a token that can read your day must not be the same secret.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Token expiry</div>
+              <div class="row-note">Nothing expires.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div></div>
+      </div>
+      <div class="area">
+        <div class="area-head">
+          <h3>Talking to him</h3>
+          <span class="area-stat"><b>9</b> proved of 17 · 12 have code</span>
+        </div>
+        <div class="bar" role="img" aria-label="0 broken, 2 partial, 1 unexercised, 9 proved, 5 not built"><i class="partial" style="width:11.76470588235294%"></i><i class="untested" style="width:5.88235294117647%"></i><i class="proved" style="width:52.94117647058824%"></i><i class="none" style="width:29.411764705882355%"></i></div>
+        <div class="rows">
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Text chat, both directions</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Replies arrive word by word</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Markdown rendered, not shown as asterisks</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="device">
+            <div>
+              <div class="row-name">Reasoning monologues can never reach the screen</div>
+              <div class="row-note">Proved in the harness, never on the device.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">The opening line is the real situation</div>
+              <div class="row-note">On-device, no model, no await.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">“What can you do”, answered without a round trip</div>
+              <div class="row-note">On-device, so it answers with everything even offline.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">A Capabilities screen listing the same thing</div>
+              <div class="row-note">One list, two surfaces. Read back over adb.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="device">
+            <div>
+              <div class="row-name">A status panel naming every seam</div>
+              <div class="row-note">Eight rows, four states, assembled on the device so it is readable with nothing connected at all — which is exactly when it will be looked at. The briefing row was watched going red then green as the stamp landed. <strong>The briefing row was refined 2026-08-24</strong> to a third state, <code>CANNOT TELL</code>, so a stamp that has merely aged stops asserting the gateway lost the schedule; that state has 10 tests and no device pass yet.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Whether the gateway holds a push address</div>
+              <div class="row-note">Nothing exposed this before, and it is the most diagnostic fact in the app.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Photo preview and caption before sending</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">A photo answering with its own lookup marker</div>
+              <div class="row-note">Shared by the text and vision paths.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">A thumbnail in the chat instead of the word “Photo”</div>
+              <div class="row-note">A reply about a photo cannot be judged without the photo.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">Photo-in-flight indicator; a failed send stays recoverable</div>
+              <div class="row-note">The longest wait in the app, and the least visible.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Sent / delivered / read ticks</div>
+              <div class="row-note">Only the gateway can say delivered and read, and it says neither. Needs a per-message id on both sides. The largest fully-specified thing left.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Reply to a message</div>
+              <div class="row-note">Wants the same per-message id as the ticks, so it follows them rather than inventing a second identity for a message.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="untested" data-b="device">
+            <div>
+              <div class="row-name">Microphone in</div>
+              <div class="row-note"><code>brains.usage.audio</code> is 0. The oldest unverified thing here. If it reads <code>fell_back</code> with <code>last_error_was_quota: false</code> the mime is wrong — the phone records m4a and Google documents <code>audio/aac</code>, not <code>audio/mp4</code>.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip untested">Unexercised</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">Voice out</div>
+              <div class="row-note">The largest single gap in the chat, and app-only — <code>expo-speech</code>.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div></div>
+      </div>
+      <div class="area">
+        <div class="area-head">
+          <h3>Notifications and being spoken to</h3>
+          <span class="area-stat"><b>10</b> proved of 13 · 13 have code</span>
+        </div>
+        <div class="bar" role="img" aria-label="1 broken, 2 partial, 0 unexercised, 10 proved, 0 not built"><i class="broken" style="width:7.6923076923076925%"></i><i class="partial" style="width:15.384615384615385%"></i><i class="proved" style="width:76.92307692307693%"></i></div>
+        <div class="rows">
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Push to a sleeping phone</div>
+              <div class="row-note">It buzzed. Reaches a dead app and is exempt from the background-execution block.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Both notification channels exist on the device</div>
+              <div class="row-note">Confirmed by adb, neither deleted.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">The desk alert outranks an everyday one</div>
+              <div class="row-note">Importance 5 against 3.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Renamed channels are deleted rather than left behind</div>
+              <div class="row-note">Six old channels all confirmed deleted. This app has renamed its everyday channel eight times, and every rename silently broke replies until the gateway was told.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">A notification tap opens Chat</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">A desk-watch alert reaching a closed app</div>
+              <div class="row-note">Tapping it opens the alert screen.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">A pushed departure briefing, unprompted</div>
+              <div class="row-note">It arrives. It also arrived twice — the gate is built but no departure window has run since.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Briefing content, thresholds, quiet-day announcement</div>
+              <div class="row-note">Figures, never the model.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="broken" data-b="brain">
+            <div>
+              <div class="row-name">He speaks first, once a day</div>
+              <div class="row-note">Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised <code>Sir</code>, which the voice rule forbids.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip broken">Broken</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Briefings visible in the Activity panel</div>
+              <div class="row-note">They had been filtered out entirely.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Read / unread per entry, surviving a restart</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="device">
+            <div>
+              <div class="row-name">The local task gated so it cannot double-post</div>
+              <div class="row-note">The stamp works and carries 6 tests on the decision plus 3 on the wiring; the gate cases were checked by removing the gate and watching them go red. The duplicate itself cannot be checked until a departure window. Leave both unswiped and read the tags — a pushed one carries <code>tag=FCM-Notification:*</code>, a local post does not. The *display* half of the stamp's limitation is closed as of 2026-08-24: the panel no longer reads a stale stamp as the gateway having lost the schedule. The gate's own behaviour is unchanged and deliberately so — a stale stamp still means the phone posts.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="device">
+            <div>
+              <div class="row-name">Full message on tap, day rules, paged list</div>
+              <div class="row-note">Shipped, and the box was collapsing to one line on the phone. Fixed and republished, awaiting a second look.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div></div>
+      </div>
+      <div class="area">
+        <div class="area-head">
+          <h3>Memory and the journal</h3>
+          <span class="area-stat"><b>3</b> proved of 11 · 8 have code</span>
+        </div>
+        <div class="bar" role="img" aria-label="0 broken, 3 partial, 2 unexercised, 3 proved, 3 not built"><i class="partial" style="width:27.27272727272727%"></i><i class="untested" style="width:18.181818181818183%"></i><i class="proved" style="width:27.27272727272727%"></i><i class="none" style="width:27.27272727272727%"></i></div>
+        <div class="rows">
+          <div class="row" data-s="partial" data-b="brain">
+            <div>
+              <div class="row-name">Facts stored and recalled</div>
+              <div class="row-note">14 facts known. Volunteered exactly once, wrongly.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="brain">
+            <div>
+              <div class="row-name">One assistant across desk, phone and chat</div>
+              <div class="row-note">App and chat share one history. A desk answering with its own brain bypasses it, so those turns never join the shared history.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="brain">
+            <div>
+              <div class="row-name">Rolling memory durable across restarts</div>
+              <div class="row-note">In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="untested" data-b="brain">
+            <div>
+              <div class="row-name">Deploy-durable gateway state</div>
+              <div class="row-note">Committed on <code>fix/durable-state</code>, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip untested">Unexercised</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Chat history sent with the ask</div>
+              <div class="row-note">The envelope carries one turn.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Journal: usage source, rollup, fact sharing</div>
+              <div class="row-note">Derived facts only, never rows — the pattern every later sense copies.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">The journal’s denial path</div>
+              <div class="row-note">Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="device">
+            <div>
+              <div class="row-name">Any background work running unattended</div>
+              <div class="row-note"><strong>Cannot</strong>, and measured twice rather than assumed: <code>expo-background-task</code> hardcodes <code>setRequiredNetworkType(CONNECTED)</code> and the uid reads <code>blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY</code> with <code>#netAvail=0</code> in a RARE bucket. Stopped, not deferred. Everything in §3.1 is chosen around this.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">The commute task body exercised by a test</div>
+              <div class="row-note">10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="untested" data-b="device">
+            <div>
+              <div class="row-name">Location timeline</div>
+              <div class="row-note">Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip untested">Unexercised</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app-build">
+            <div>
+              <div class="row-name">Call log, archive import</div>
+              <div class="row-note">Native build, and fatal for a store listing.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app-build" title="App repo, but needs a native build or an EAS credentials action rather than an over-the-air publish.">App · build</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div></div>
+      </div>
+      <div class="area">
+        <div class="area-head">
+          <h3>Knowing and acting</h3>
+          <span class="area-stat"><b>4</b> proved of 14 · 7 have code</span>
+        </div>
+        <div class="bar" role="img" aria-label="0 broken, 2 partial, 1 unexercised, 4 proved, 7 not built"><i class="partial" style="width:14.285714285714285%"></i><i class="untested" style="width:7.142857142857142%"></i><i class="proved" style="width:28.57142857142857%"></i><i class="none" style="width:50%"></i></div>
+        <div class="rows">
+          <div class="row" data-s="partial" data-b="device">
+            <div>
+              <div class="row-name">Named places, location sharing, located answers</div>
+              <div class="row-note">Unverified since the fix that touched it.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="partial" data-b="brain">
+            <div>
+              <div class="row-name">Weather and distance from measured figures</div>
+              <div class="row-note">The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip partial">Partial</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">The situation sent to the persona</div>
+              <div class="row-note">Place, battery, link — one field. The highest character-per-line change available anywhere in the plan.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Opening an app on the phone by name</div>
+              <div class="row-note">Confirmed twice over: by <code>topResumedActivity</code> and by the target app’s own launch event. Needed a native build.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Governance: parked actions, approve and deny</div>
+              <div class="row-note">Desk actions only.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Desk-watch countdown, silence locks</div>
+              <div class="row-note">The desk owns the clock; the phone’s countdown is a readout, never a decision timer. Do not move it.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Scripts: list</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Scripts: create, update, delete, run by id</div>
+              <div class="row-note">Which is why editing is disabled.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Run history</div>
+              <div class="row-note">Reports currently invents “Last run: 2h ago” from a fixture.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Presence — awake but idle</div>
+              <div class="row-note">Inferred from socket state today.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Declared rules (“tell me if I haven’t…”)</div>
+              <div class="row-note">Spec written and awaiting review. Its presence half rests on a measurement that no longer holds.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="untested" data-b="device">
+            <div>
+              <div class="row-name">Anticipation v1 — noticed when you open the app</div>
+              <div class="row-note">Decided in code from the journal against its own baseline and the next departure. At most one a day, never the same subject twice running, silent by default.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip untested">Unexercised</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Anticipation that finds you in your pocket</div>
+              <div class="row-note">Needs the gateway push or a foreground service — the phone measurably cannot do it alone.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="device">
+            <div>
+              <div class="row-name">Anticipation from learned habit rather than a written rule</div>
+              <div class="row-note">Needs the senses and weeks of baseline. Not shortenable by code.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div></div>
+      </div>
+      <div class="area">
+        <div class="area-head">
+          <h3>Platform</h3>
+          <span class="area-stat"><b>7</b> proved of 14 · 9 have code</span>
+        </div>
+        <div class="bar" role="img" aria-label="1 broken, 0 partial, 1 unexercised, 7 proved, 5 not built"><i class="broken" style="width:7.142857142857142%"></i><i class="untested" style="width:7.142857142857142%"></i><i class="proved" style="width:50%"></i><i class="none" style="width:35.714285714285715%"></i></div>
+        <div class="rows">
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">19 screens, full suite and clean typecheck</div>
+              <div class="row-note">The number written in a doc goes stale — trust the run, not the comment.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Standalone release APK, no bundler attached</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Haptics, and an animation switch that works</div>
+              
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">OTA updates</div>
+              <div class="row-note"><strong>Verified 2026-08-24.</strong> Channel Active, branch linked, runtime matching the installed APK, latest group is HEAD. A <strong>local</strong> build still receives nothing unless the fingerprint is baked by hand — <code>prebuild</code> writes the literal placeholder and nothing logs a word about it.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">Contrast checked against WCAG AA</div>
+              <div class="row-note">4.78 over the floor and 4.68 over the navy crown, against a bar of 4.5.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">A theme choice that did nothing — removed</div>
+              <div class="row-note">Dark and System were identical. A setting that does nothing is worse than an absent one.</div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="proved" data-b="none">
+            <div>
+              <div class="row-name">arm64-only build</div>
+              <div class="row-note">A config plugin, registered — so <code>prebuild</code> cannot silently revert it, which is this project’s most expensive recurring bug class. Roughly 35 MB against 100.7 MB across four ABIs. <strong>The old ledger listed this as owed; it is done.</strong></div>
+            </div>
+            <div class="row-tags">
+              
+              <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="untested" data-b="device">
+            <div>
+              <div class="row-name">Motion defaulted from the OS</div>
+              <div class="row-note">Implemented at <code>src/theme/appearance.tsx:89</code> and spied on in a test; a deliberate toggle outranks it permanently. <strong>The old ledger called this untested for want of code; it has code and a test, and owes only a device pass.</strong></div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip untested">Unexercised</span>
+            </div>
+          </div>
+          <div class="row" data-s="broken" data-b="app">
+            <div>
+              <div class="row-name">Light theme</div>
+              <div class="row-note">Broken by design — “System” behaves identically to Dark. Decide or remove.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip broken">Broken</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">Appearance surviving a launch</div>
+              <div class="row-note">In-memory only. Accent, glow and motion all reset. The ledger claimed this for days.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">Crash and error reporting</div>
+              <div class="row-note">A native crash is silent — no red box, nothing an error boundary sees — so <code>adb logcat</code> on the one machine that built the APK is the only diagnosis. The JS half is shippable over the air; the native half needs a service and a build.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app-build">
+            <div>
+              <div class="row-name">A real release keystore</div>
+              <div class="row-note">Signed with Expo’s generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app-build" title="App repo, but needs a native build or an EAS credentials action rather than an over-the-air publish.">App · build</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="device">
+            <div>
+              <div class="row-name">Screen-reader pass</div>
+              <div class="row-note">Targets are floored at 44–64px and roles are set; nothing has been checked with TalkBack.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="app">
+            <div>
+              <div class="row-name">Tablet and landscape</div>
+              <div class="row-note">Locked to portrait. The reactor and the 2×2 grid need a breakpoint before a tablet is claimed.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+              <span class="chip none">Not built</span>
+            </div>
+          </div></div>
+      </div></div>
+  </section>
+
+  <section>
+    <h2>What is holding up the rest</h2>
+    <p class="sec-note">
+      Kept and marked, not dropped. Nothing here is being attempted, and each row says why.
+      The brain rows are a deliberate constraint rather than a discovery — that repo is clean
+      and fully pushed.
+    </p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Blocked on</th><th>Rows</th><th>What it means</th><th>Which rows</th></tr></thead>
+        <tbody>
+        <tr>
+          <td><span class="dep dep-brain">Brain</span></td>
+          <td class="num">17</td>
+          <td>jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.</td>
+          <td class="held">Capability-split tokens · Token expiry · Sent / delivered / read ticks · Reply to a message · He speaks first, once a day · Facts stored and recalled · One assistant across desk, phone and chat · Rolling memory durable across restarts · Deploy-durable gateway state · Chat history sent with the ask · Weather and distance from measured figures · The situation sent to the persona · Scripts: create, update, delete, run by id · Run history · Presence — awake but idle · Declared rules (“tell me if I haven’t…”) · Anticipation that finds you in your pocket</td>
+        </tr>
+        <tr>
+          <td><span class="dep dep-desk">Desk</span></td>
+          <td class="num">2</td>
+          <td>Needs the desk machine on. This laptop has no Python — `python` opens the Microsoft Store.</td>
+          <td class="held">Desk-key handshake (sealed turns) · <code>BRIDGE_SECRET</code> rotation</td>
+        </tr>
+        <tr>
+          <td><span class="dep dep-device">Phone</span></td>
+          <td class="num">12</td>
+          <td>Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.</td>
+          <td class="held">Reasoning monologues can never reach the screen · A status panel naming every seam · Microphone in · The local task gated so it cannot double-post · Full message on tap, day rules, paged list · Any background work running unattended · Location timeline · Named places, location sharing, located answers · Anticipation v1 — noticed when you open the app · Anticipation from learned habit rather than a written rule · Motion defaulted from the OS · Screen-reader pass</td>
+        </tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>The plan, in order</h2>
+    <p class="sec-note">
+      From <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>. App repo only.
+      Every task ends green — 893 tests and a clean <code>tsc</code> is the floor,
+      not the goal.
+    </p>
+    <div class="queue">
+      <div class="q done">
+        <span class="q-n">00</span>
+        <div>
+          <p class="q-t">Confirm the OTA channel</p>
+          <p class="q-d">Was one command and gated every JS-only fix behind it. Channel <code>production</code> is Active, the branch is linked, and the runtime matches the installed APK byte for byte — so a publish does reach the phone.</p>
+        </div>
+        <span class="q-tag">Done · verified</span>
+      </div>
+      <div class="q done">
+        <span class="q-n">01</span>
+        <div>
+          <p class="q-t">The briefing-schedule row stops lying</p>
+          <p class="q-d">A workspace-only week ages the upload stamp, and the panel then asserted the gateway lost the schedule — which the phone cannot know. Now three states: <code>AT THE GATEWAY</code>, <code>CANNOT TELL</code>, <code>ON THIS PHONE</code>. <code>cloudArmedState()</code> sits beside <code>cloudArmed()</code> rather than replacing it, so the task's gate is untouched and a stale stamp still means the phone posts. 10 new tests, and <code>tsc</code> caught a third call site the plan had missed.</p>
+        </div>
+        <span class="q-tag">Shipped · device pass owed</span>
+      </div>
+      <div class="q">
+        <span class="q-n">02</span>
+        <div>
+          <p class="q-t">Provider effects that outlive their tree</p>
+          <p class="q-d">An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It has cost six tests and is why the anti-duplicate wiring has none. Cancellation at the source, which the test file itself concluded was the real fix.</p>
+        </div>
+        <span class="q-tag">Ships over the air</span>
+      </div>
+      <div class="q">
+        <span class="q-n">03</span>
+        <div>
+          <p class="q-t">A crash says what it was</p>
+          <p class="q-d">Today a crash restarts in silence. The JS half is catchable, persistable and shippable now; a native crash still needs a service and a build, and stays owed rather than quietly folded in. The record is derived — no chat text, no token — because a crash log is exactly what gets pasted into a chat window.</p>
+        </div>
+        <span class="q-tag">Ships over the air</span>
+      </div>
+      <div class="q">
+        <span class="q-n">04</span>
+        <div>
+          <p class="q-t">He answers out loud</p>
+          <p class="q-d">Voice out is the largest single gap in the chat. The decision of whether and what to speak is pure and tested; the native call sits at the edge. Listening is a device check, not a change.</p>
+        </div>
+        <span class="q-tag">Ships over the air</span>
+      </div>
+      <div class="q">
+        <span class="q-n">05</span>
+        <div>
+          <p class="q-t">He comes back after a reboot</p>
+          <p class="q-d">Free, and the manifest has no <code>RECEIVE_BOOT_COMPLETED</code> today. Goes in a config plugin, never in <code>android/</code> — that directory is regenerated and a hand edit reverts without saying so.</p>
+        </div>
+        <span class="q-tag">Needs a build</span>
+      </div>
+      <div class="q">
+        <span class="q-n">06</span>
+        <div>
+          <p class="q-t">The notification listener — spec and reducer only</p>
+          <p class="q-d">The step change in presence: event-driven, nearly free, and more context than any polling. It is also gated by the token split, which is brain work. So the drop rules and the pure reducer get built and tested; no service is registered and no permission is asked. Data collected badly cannot be un-collected.</p>
+        </div>
+        <span class="q-tag">Gated · token split</span>
+      </div>
+      <div class="q">
+        <span class="q-n">07</span>
+        <div>
+          <p class="q-t">Usable by someone who cannot see it well</p>
+          <p class="q-d">Better than the old ledger admitted: contrast is measured and passing, and reduced motion already follows the OS. What is genuinely owed is a TalkBack pass.</p>
+        </div>
+        <span class="q-tag">Part device</span>
+      </div></div>
+  </section>
+
+  <footer>
+    <p>Single source of truth: <code>docs/status/ledger.json</code>. Regenerate with <code>npm run status</code>; <code>npm run status:check</code> fails if this file is stale.</p>
+    <p>Archaeology — how each thing was proved and what it cost — stays in <code>RESUME.md</code>. What to tap on the device stays in <code>TESTING.md</code>.</p>
+    <p>OTA channel <code>production</code> verified 2026-08-24, runtime <code>31c64113d7d13a400eb1c56ef81c4d0d4be3fa17</code>.</p>
+  </footer>
+</div>
+
+<script>
+  const rows = [...document.querySelectorAll('.row')];
+  const countEl = document.getElementById('visCount');
+  const pick = { s: 'all', b: 'all' };
+
+  function apply() {
+    rows.forEach((r) => {
+      const ok = (pick.s === 'all' || r.dataset.s === pick.s) &&
+                 (pick.b === 'all' || r.dataset.b === pick.b);
+      r.classList.toggle('hide', !ok);
+    });
+    document.querySelectorAll('button.filter').forEach((b) => {
+      b.setAttribute('aria-pressed', String(pick[b.dataset.k] === b.dataset.f));
+    });
+    document.querySelectorAll('.area').forEach((a) => {
+      const any = [...a.querySelectorAll('.row')].some((r) => !r.classList.contains('hide'));
+      a.style.display = any ? '' : 'none';
+    });
+    const shown = rows.filter((r) => !r.classList.contains('hide')).length;
+    countEl.textContent = shown === rows.length
+      ? `77 rows · 37 proved · 23 not built`
+      : shown + ' of ' + rows.length + ' rows';
+    try { localStorage.setItem('jarvis-status-filter', JSON.stringify(pick)); } catch (e) { /* private window, or site data blocked */ }
+  }
+
+  document.querySelectorAll('button.filter').forEach((b) => {
+    b.addEventListener('click', () => { pick[b.dataset.k] = b.dataset.f; apply(); });
+  });
+
+  try {
+    const saved = JSON.parse(localStorage.getItem('jarvis-status-filter') || 'null');
+    if (saved && typeof saved.s === 'string' && typeof saved.b === 'string') Object.assign(pick, saved);
+  } catch (e) { /* nothing stored, nothing to restore */ }
+  apply();
+</script>

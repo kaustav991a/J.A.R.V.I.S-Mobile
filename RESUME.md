@@ -10,6 +10,114 @@
 > out.** It is not the status and not the queue — both live in `ROADMAP.md`, §0b and
 > §10. See the division of labour at the top of that file.
 
+## 🏠 HANDOFF — 2026-08-24. Read this first; the 08-21 handoff below still stands.
+
+**893 tests, `tsc --noEmit` clean.** One gate closed read-only in a single command, one
+docs restructure so status has exactly one home, and one real fix to a row that was
+asserting something the phone cannot know. `jarvis-brain` deliberately untouched
+throughout, and it turns out nothing there was unpushed.
+
+### The OTA channel is real — §6's one-command gate is closed
+
+`eas channel:list`, from this laptop:
+
+```
+Channel   production   ID 01a01a04-f0d6-7718-90dc-dbae6930b0db   Status Active
+Branch    production   Platforms android
+Runtime   31c64113d7d13a400eb1c56ef81c4d0d4be3fa17
+Group     f196158c-c588-4dac-9c05-4468e0b7428d   (kaustav790)
+Message   "a third trigger: pickups against your usual, which a total of minutes hides"
+```
+
+Three things it settles. **The channel is not empty**, which was the whole fear — an
+unlinked channel means the app asks and gets nothing, with no error anywhere. **The
+runtime is byte-identical** to the fingerprint the installed APK carries, so the
+fingerprint trap is not currently armed and a JS-only publish does land on the phone.
+And **the latest group is `b33b110`**, the pickups trigger, so nothing local is waiting
+to ship.
+
+`eas-cli` here is 22.2.0 and says it is outdated. It answered correctly anyway; not
+upgraded, because upgrading a working CLI to close a gate is how the fingerprint hour
+got spent.
+
+The 08-21 handoff below records the last publish as `168e1f66`. It is `f196158c`. That
+entry is left as written.
+
+### The repos, checked read-only
+
+`jarvis-brain` was **deliberately not touched**, and it turns out nothing there is
+unpushed: clean tree, no stash, nothing untracked, HEAD `c86d176` identical to
+`refs/heads/fix/durable-state` on the remote. Local `feat/cloud-gateway` is **42 commits
+behind** its remote — so work that felt missing from this machine is on GitHub already
+and merely absent from this working copy. The remote also holds `feat/app-full-power`
+and `main` at `8d0ea4f`, neither checked out here.
+
+`jarvis-mobile` on `feat/mobile-hud`, HEAD `b33b110`, clean and level with its upstream.
+
+Also worth writing down: the repo root `Test app/` is **not** a git repository, and
+neither is `docs/`. Only the two subdirectories are tracked.
+
+### The briefing row that asserted something it could not know — fixed, 893 tests
+
+`cloudArmed()` collapses "never uploaded" and "uploaded, long ago" into one `false`,
+which is correct for the task and wrong for a row of text. The status panel read that
+boolean and printed **`ON THIS PHONE`** — an assertion *about the gateway* — after a run
+of workspace-only sessions.
+
+**Why the stamp ages while the gateway may be armed perfectly well.** It is written only
+by `syncCommute`, and that effect returns early unless `link.mode === 'cloud'`.
+`api.syncCommute` posts to `/app-commute` through `postCloud`, so **there is no LAN upload
+to stamp** — a week on the workspace ages it past `CLOUD_TTL_HOURS` regardless of what the
+gateway holds.
+
+The roadmap floated two fixes. The other one — *"stamp on any successful upload regardless
+of transport"* — was **not attempted, and cannot be from this repo**: there is no non-cloud
+upload in existence to stamp, and adding one is a gateway route. Written down because it
+looks implementable until you follow `syncCommute` to `postCloud`.
+
+**What landed.** `cloudArmedState()` sits *beside* `cloudArmed()` rather than replacing it:
+
+| Stamp | `cloudArmed` | `cloudArmedState` | Row |
+| --- | --- | --- | --- |
+| fresh | `true` | `armed` | `AT THE GATEWAY` |
+| aged out | `false` | `stale` | **`CANNOT TELL`** |
+| never written | `false` | `never` | `ON THIS PHONE` |
+| unreadable | `false` | `never` | `ON THIS PHONE` |
+| from the future | `false` | `stale` | `CANNOT TELL` |
+
+The task's gate is untouched, and one test asserts exactly that — the boolean still says
+`false` for a stale stamp while the tri-state says `stale`. **The chosen direction of
+failure is preserved: a stale stamp still means the phone posts.** A duplicate is an
+annoyance; a silent morning is the feature not existing.
+
+An unreadable stamp reads `never`, not `stale`: a store that cannot be read is not evidence
+that an upload ever happened. A stamp from the future reads `stale`, because the clock
+moved and the age is meaningless — and meaningless must not read as proved.
+
+**`tsc` found a call site the plan had missed.** The plan named `commute.ts`, `status.ts`
+and `HomeScreen.tsx`. Widening `StatusFacts.scheduleAtGateway` from `boolean` also broke
+three fixtures in `src/components/__tests__/statusPanel.test.tsx`, which nothing had
+thought about. Four errors, all from one type change, all mechanical — the argument for
+widening a type rather than adding a parallel field.
+
+**One test was written from a guess and corrected by the run.** The summary for a panel
+with nothing wrong is `ALL PRESENT`, not `ALL CLEAR`. Cheap here; the same guess in
+production copy would have been a fourth string for a state that already had one.
+
+**Counted, not claimed: 893 tests (was 883), 70 suites, `tsc --noEmit` clean.**
+
+**The proved count went down, 38 → 37.** `status-panel` moved from `proved` to `partial`,
+because the row it now draws has never been seen on a phone. The rule earns nothing if it
+is relaxed the first time it costs a number.
+
+*Owed, and it is one glance:* open Home and read the briefing row. On a phone that has
+been on the workspace for two days it should say **`CANNOT TELL`**, not `ON THIS PHONE`,
+and the note should offer that the gateway may still hold the schedule. That promotes the
+row back to `proved`.
+
+
+---
+
 ## 🏠 HANDOFF — 2026-08-21, end of day. Read this first.
 
 **883 tests, `tsc --noEmit` clean.** Both repos committed and pushed. The phone is

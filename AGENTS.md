@@ -14,13 +14,15 @@ guessing here has cost real time.
 | Read | For |
 | --- | --- |
 | `README.md` | Setting up a machine. Prerequisites, exact SDK/NDK versions, dev builds, adb debugging, and the traps |
-| `ROADMAP.md` | **The single source of truth for status and plan.** §0b is the ledger of what is built and what is not; §10 is the order to do things in. Nothing else in this repo may carry a queue or a status claim |
+| `docs/status/ledger.json` | **The single source of truth for every status claim.** 77 feature rows, the ten completion criteria, and a typed `blockedBy` on each — `brain` / `desk` / `device` / `app-build` / `app`. Small, so read this rather than the prose. Nothing else in this repo may carry a status claim |
+| `ROADMAP.md` | **The plan, and the reasoning behind it.** §10 is the order to do things in. §0b and §0c are **generated** from the ledger above and must not be hand-edited — run `npm run status` |
 | `RESUME.md` | **How something was proved, and what it cost to find out.** Append-only archaeology — the measurements, the wrong hypotheses, the sessions they cost. Not the status, not the queue |
 | `TESTING.md` | **What to tap and what should happen**, feature by feature. For a human with the phone in hand. Never says whether something is built |
 | `docs/desk-watch.md` | What the desk owes for the intruder watch. Phone side done, desk side unbuilt |
 | `docs/cloud-app-link.md` | What the Render gateway owes for cloud failover |
 | `docs/superpowers/specs/` | The original design |
-| `docs/superpowers/plans/` | The original 15-task plan, **partly superseded** — read "Deviations" in `RESUME.md` first |
+| `docs/superpowers/plans/` | The original 15-task plan, **partly superseded** — read "Deviations" in `RESUME.md` first. `2026-08-24-app-completion.md` is the current app-only queue |
+| `docs/completion-tracker.html` | A browser view for a human — percentages, dependency badges, filters by state and by blocker. **Generated**, like §0b: open it, never edit it |
 | `src/ws/frames.ts` | The wire contract. The best single file for understanding the data |
 
 ## Before you claim anything works
@@ -28,11 +30,17 @@ guessing here has cost real time.
 ```bash
 npm test          # 883 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
+npm run status:check  # generated §0b and the tracker still match the ledger
 ```
 
-Both must pass. Several real bugs here were caught by a test rather than by the
-phone, and several more were only caught *on* the phone — so for anything native,
-say what you actually verified and how.
+All three must pass. Several real bugs here were caught by a test rather than by
+the phone, and several more were only caught *on* the phone — so for anything
+native, say what you actually verified and how.
+
+**When you change what is built, change `docs/status/ledger.json` and run
+`npm run status`.** Editing §0b or the tracker directly is lost work — the next
+generate reverts it without saying so. `status:check` is there so a stale table is
+a failure rather than a discovery.
 
 ## Non-obvious rules this codebase has learned
 
