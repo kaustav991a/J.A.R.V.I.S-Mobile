@@ -62,9 +62,7 @@
     "mock": "node mock/server.js",
     "test": "jest",
     "test:watch": "jest --watchAll",
-    "typecheck": "tsc --noEmit",
-    "status": "node scripts/build-status.mjs",
-    "status:check": "node scripts/build-status.mjs --check"
+    "typecheck": "tsc --noEmit"
   },
   "jest": {
     "preset": "jest-expo",

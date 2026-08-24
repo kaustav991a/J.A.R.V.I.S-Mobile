@@ -201,7 +201,7 @@ the single source of truth for every status claim in this repo — edit there an
 
 <!-- BEGIN GENERATED: ledger -->
 
-*Generated from `docs/status/ledger.json` by `npm run status`. Do not edit by hand.*
+*Generated from `docs/status/ledger.json` by `node scripts/build-status.mjs`. Do not edit by hand.*
 
 **Status means exactly this:** `proved` — a human has seen it work on the
 phone; `untested` — the code and its tests are in, no human has ever exercised
@@ -340,7 +340,7 @@ in §2; `—` — not built.
 
 <!-- BEGIN GENERATED: criteria -->
 
-*Generated from `docs/status/ledger.json` by `npm run status`. Do not edit by hand.*
+*Generated from `docs/status/ledger.json` by `node scripts/build-status.mjs`. Do not edit by hand.*
 
 Not a wish list — the shortest set of things whose absence makes the app
 *incomplete* rather than merely unfinished.

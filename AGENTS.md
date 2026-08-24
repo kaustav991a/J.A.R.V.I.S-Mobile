@@ -15,7 +15,7 @@ guessing here has cost real time.
 | --- | --- |
 | `README.md` | Setting up a machine. Prerequisites, exact SDK/NDK versions, dev builds, adb debugging, and the traps |
 | `docs/status/ledger.json` | **The single source of truth for every status claim.** 77 feature rows, the ten completion criteria, and a typed `blockedBy` on each — `brain` / `desk` / `device` / `app-build` / `app`. Small, so read this rather than the prose. Nothing else in this repo may carry a status claim |
-| `ROADMAP.md` | **The plan, and the reasoning behind it.** §10 is the order to do things in. §0b and §0c are **generated** from the ledger above and must not be hand-edited — run `npm run status` |
+| `ROADMAP.md` | **The plan, and the reasoning behind it.** §10 is the order to do things in. §0b and §0c are **generated** from the ledger above and must not be hand-edited — run `node scripts/build-status.mjs` |
 | `RESUME.md` | **How something was proved, and what it cost to find out.** Append-only archaeology — the measurements, the wrong hypotheses, the sessions they cost. Not the status, not the queue |
 | `TESTING.md` | **What to tap and what should happen**, feature by feature. For a human with the phone in hand. Never says whether something is built |
 | `docs/desk-watch.md` | What the desk owes for the intruder watch. Phone side done, desk side unbuilt |
@@ -30,7 +30,7 @@ guessing here has cost real time.
 ```bash
 npm test          # 883 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
-npm run status:check  # generated §0b and the tracker still match the ledger
+node scripts/build-status.mjs --check  # generated §0b and the tracker still match the ledger
 ```
 
 All three must pass. Several real bugs here were caught by a test rather than by
@@ -38,7 +38,7 @@ the phone, and several more were only caught *on* the phone — so for anything
 native, say what you actually verified and how.
 
 **When you change what is built, change `docs/status/ledger.json` and run
-`npm run status`.** Editing §0b or the tracker directly is lost work — the next
+`node scripts/build-status.mjs`.** Editing §0b or the tracker directly is lost work — the next
 generate reverts it without saying so. `status:check` is there so a stale table is
 a failure rather than a discovery.
 
@@ -79,6 +79,23 @@ of rediscovering them is high.
   are in-tree absolute views; see `DetailBox` in `src/screens/ActivityScreen.tsx`.
   An absolute child of `Screen` scrolls away with the content, so such an overlay
   goes beside `Screen`, not inside it.
+- **Adding an npm script silently breaks OTA.** `packageJson:scripts` is a
+  **fingerprint input**, so `runtimeVersion: { policy: "fingerprint" }` moves the
+  moment you add one. Two convenience scripts took the runtime from `31c64113` to
+  `3f9be979` on 2026-08-24, and the publish that followed went to a runtime **no
+  device has** — it uploaded, printed `Published!`, and arrived nowhere. `eas update`
+  cannot warn about this: from its side a new runtime is a normal thing to publish to.
+
+  So **read the runtime in the publish output against the phone's** every time, and
+  before touching `package.json` at all:
+
+  ```bash
+  npx expo-updates fingerprint:generate --platform android   # must not move
+  ```
+
+  Anything that must ship over the air goes in `scripts/` and is invoked directly
+  (`node scripts/build-status.mjs`), not through `npm run`. If a script is genuinely
+  worth the fingerprint change, it needs a new build in the same sitting.
 - **A local release build silently breaks OTA.** `runtimeVersion` is
   `{ policy: "fingerprint" }`, and `expo prebuild` writes the literal placeholder
   `file:fingerprint` into `android/app/src/main/res/values/strings.xml`. **EAS builds

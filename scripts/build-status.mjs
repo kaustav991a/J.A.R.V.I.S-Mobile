@@ -11,7 +11,7 @@
  * with an extra digit of false precision. Everything here is counted from the ledger, so
  * a number on the page cannot disagree with the row it came from.
  *
- * Run with `npm run status`. Pass `--check` to fail instead of writing, which is what a
+ * Run with `node scripts/build-status.mjs`. Pass `--check` to fail instead of writing, which is what a
  * hook or CI wants: it answers "is the generated output stale?" without touching the tree.
  */
 
@@ -27,7 +27,7 @@ const TRACKER = join(ROOT, 'docs', 'completion-tracker.html');
 const CHECK = process.argv.includes('--check');
 
 const ledger = JSON.parse(readFileSync(LEDGER, 'utf8'));
-const { meta, blockers, criteria, areas, queue } = ledger;
+const { meta, blockers, criteria, areas, queue, timeline } = ledger;
 
 /** The order is the reading order everywhere: what is wrong first, then what is done. */
 const ORDER = ['broken', 'partial', 'untested', 'proved', 'none'];
@@ -178,7 +178,7 @@ function splice(text, name, body) {
   if (j < i) throw new Error(`ROADMAP.md has the ${name} markers in the wrong order.`);
   return (
     text.slice(0, i + begin.length) +
-    '\n\n*Generated from `docs/status/ledger.json` by `npm run status`. Do not edit by hand.*\n\n' +
+    '\n\n*Generated from `docs/status/ledger.json` by `node scripts/build-status.mjs`. Do not edit by hand.*\n\n' +
     body +
     '\n' +
     text.slice(j)
@@ -264,19 +264,79 @@ function html() {
     })
     .join('');
 
+  /**
+   * The task list, and what earns a line through a title.
+   *
+   * **Only `proved` strikes through**, and that means a human has seen it work — the same
+   * bar the ledger uses. `shipped` is code landed, tests green and published, which is
+   * emphatically not the same thing: the row this project most recently shipped was
+   * correct in 893 tests and still unseen on a phone. Striking those through would make
+   * the list agree with the tests instead of with reality, and this repo has already paid
+   * for a doc that did that.
+   */
+  const QSTATE = {
+    proved: { word: 'Proved', hint: 'Seen working. Nothing owed.' },
+    shipped: { word: 'Shipped · unproved', hint: 'Code landed and published. No human has seen it yet.' },
+    open: { word: 'Open', hint: 'Not started.' },
+    blocked: { word: 'Blocked', hint: 'Cannot be finished from this repo.' },
+  };
+
+  const qTally = queue.reduce((a, q) => ({ ...a, [q.state]: (a[q.state] ?? 0) + 1 }), {});
+
   const queueBlocks = queue
     .map(
       (q) => `
-      <div class="q${q.done ? ' done' : ''}">
+      <div class="q q-${q.state}">
         <span class="q-n">${String(q.n).padStart(2, '0')}</span>
         <div>
           <p class="q-t">${h(q.title)}</p>
           <p class="q-d">${rich(q.detail)}</p>
         </div>
-        <span class="q-tag">${h(q.ships)}</span>
+        <div class="row-tags">
+          ${q.blockedBy !== 'none' && q.state !== 'proved' ? `<span class="dep dep-${q.blockedBy}" title="${h(blockers[q.blockedBy].detail)}">${h(blockers[q.blockedBy].label)}</span>` : ''}
+          <span class="q-tag q-tag-${q.state}" title="${h(QSTATE[q.state].hint)}">${QSTATE[q.state].word}</span>
+        </div>
       </div>`
     )
     .join('');
+
+  /**
+   * The timeline, newest last.
+   *
+   * `kind` is not decoration: this project's most useful history is the traps and the
+   * measurements, not the features. Colouring a trap like a shipped feature would hide
+   * the thing worth rereading.
+   */
+  const KIND = {
+    built: 'Built',
+    proved: 'Proved',
+    fixed: 'Fixed',
+    broke: 'Broke',
+    trap: 'Trap',
+    rule: 'Rule',
+    measured: 'Measured',
+  };
+
+  const timelineBlocks = timeline
+    .map(
+      (t) => `
+      <li class="tl" data-k="${t.kind}">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">${h(t.date)}</time>
+            <span class="tl-kind tl-${t.kind}">${h(KIND[t.kind] ?? t.kind)}</span>
+          </div>
+          <p class="tl-t">${h(t.title)}</p>
+          <p class="tl-d">${rich(t.detail)}</p>
+        </div>
+      </li>`
+    )
+    .join('');
+
+  const kindCounts = Object.entries(
+    timeline.reduce((acc, t) => ({ ...acc, [t.kind]: (acc[t.kind] ?? 0) + 1 }), {})
+  );
 
   return `<title>JARVIS Mobile Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -286,7 +346,7 @@ function html() {
 <!--
   GENERATED FILE. Do not edit.
 
-  Written by \`npm run status\` from docs/status/ledger.json, which is the single source
+  Written by \`node scripts/build-status.mjs\` from docs/status/ledger.json, which is the single source
   of truth for every status claim in this repo. Editing this file is lost work: the next
   generate overwrites it without asking.
 -->
@@ -523,9 +583,81 @@ function html() {
   .q-n { font-family: var(--mono); color: var(--accent); font-size: 0.9rem; padding-top: 2px; }
   .q-t { font-weight: 600; margin: 0 0 4px; }
   .q-d { color: var(--dim); font-size: 0.89rem; margin: 0; }
-  .q-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dimmer); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; white-space: nowrap; }
-  .done { opacity: 0.6; }
-  .done .q-t { text-decoration: line-through; text-decoration-color: var(--proved); }
+  .q-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dimmer); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; white-space: nowrap; cursor: help; }
+  .q-tag-proved { color: var(--proved); border-color: rgba(47,212,181,0.4); background: rgba(47,212,181,0.08); }
+  .q-tag-shipped { color: var(--partial); border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.08); }
+  .q-tag-blocked { color: #ff8fa0; border-color: rgba(255,143,160,0.4); background: rgba(255,143,160,0.07); }
+
+  /* only proved earns the line through — see the comment at the generator */
+  .q-proved { opacity: 0.55; border-color: rgba(47,212,181,0.22); }
+  .q-proved .q-t { text-decoration: line-through; text-decoration-color: var(--proved); text-decoration-thickness: 2px; }
+  .q-proved .q-n { color: var(--proved); }
+
+  /* shipped-but-unproved is deliberately NOT struck through, and says so */
+  .q-shipped { border-left: 3px solid var(--partial); }
+  .q-blocked { border-left: 3px solid rgba(255,143,160,0.5); }
+  .q-blocked .q-t, .q-blocked .q-d { opacity: 0.82; }
+
+  /* ── timeline ─────────────────────────────────────── */
+  .timeline { list-style: none; margin: 0; padding: 0 0 0 4px; display: grid; gap: 0; }
+
+  .tl { display: grid; grid-template-columns: 1.6rem 1fr; gap: 0 16px; position: relative; }
+
+  /* one continuous rail, drawn by the dots' container rather than a pseudo-element per row */
+  .tl::before {
+    content: '';
+    position: absolute;
+    left: 0.52rem;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line);
+  }
+  .tl:first-child::before { top: 1.1rem; }
+  .tl:last-child::before { bottom: auto; height: 1.1rem; }
+
+  .tl-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ground);
+    border: 2px solid var(--dimmer);
+    margin-top: 0.85rem;
+    position: relative;
+    z-index: 1;
+    justify-self: start;
+    margin-left: 0.19rem;
+  }
+
+  .tl[data-k="proved"] .tl-dot, .tl[data-k="fixed"] .tl-dot { border-color: var(--proved); }
+  .tl[data-k="broke"] .tl-dot { border-color: var(--broken); background: var(--broken); }
+  .tl[data-k="trap"] .tl-dot { border-color: var(--partial); background: var(--partial); }
+  .tl[data-k="measured"] .tl-dot { border-color: var(--untested); }
+  .tl[data-k="rule"] .tl-dot { border-color: var(--accent); }
+  .tl[data-k="built"] .tl-dot { border-color: var(--accent-dim); background: var(--accent-dim); }
+
+  .tl-body { padding: 0 0 22px; min-width: 0; }
+  .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 3px; }
+  .tl-date { font-family: var(--mono); font-size: 0.74rem; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+
+  .tl-kind {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+  .tl-built { color: var(--dim); border-color: var(--line); }
+  .tl-proved, .tl-fixed { color: var(--proved); border-color: rgba(47,212,181,0.4); }
+  .tl-broke { color: var(--broken); border-color: rgba(255,93,93,0.45); }
+  .tl-trap { color: var(--partial); border-color: rgba(245,165,36,0.45); }
+  .tl-measured { color: var(--untested); border-color: rgba(139,127,212,0.42); }
+  .tl-rule { color: var(--accent); border-color: rgba(62,166,255,0.42); }
+
+  .tl-t { font-weight: 600; font-size: 0.98rem; margin: 0 0 3px; }
+  .tl-d { color: var(--dim); font-size: 0.88rem; margin: 0; max-width: 70ch; }
 
   .callout {
     background: linear-gradient(180deg, rgba(255,143,160,0.07), rgba(255,143,160,0.02));
@@ -563,7 +695,7 @@ function html() {
     </p>
     <p class="provenance">
       <strong>Generated, not written.</strong> Every row, badge and percentage on this page is
-      counted from <code>docs/status/ledger.json</code> by <code>npm run status</code> — that
+      counted from <code>docs/status/ledger.json</code> by <code>node scripts/build-status.mjs</code> — that
       file is the single source of truth for status, and editing this page is lost work.
       <code>ROADMAP.md</code> §0b and §0c come from the same place, so the two cannot disagree.
       <code>RESUME.md</code> is untouched: it answers how something was proved and what it cost
@@ -671,17 +803,37 @@ function html() {
   </section>
 
   <section>
-    <h2>The plan, in order</h2>
+    <h2>How it got here</h2>
     <p class="sec-note">
-      From <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>. App repo only.
-      Every task ends green — ${meta.tests} tests and a clean <code>tsc</code> is the floor,
-      not the goal.
+      Newest last. The features are the least interesting rows: what this project actually
+      runs on is the <span class="tl-kind tl-measured">Measured</span> and
+      <span class="tl-kind tl-trap">Trap</span> entries — the things that were assumed,
+      turned out false, and cost a session. They are kept because a project relearns a
+      lesson it has already paid for otherwise.
+    </p>
+    <ol class="timeline">${timelineBlocks}</ol>
+  </section>
+
+  <section>
+    <h2>Every task, and what is actually finished</h2>
+    <p class="sec-note">
+      All ${queue.length} of them, blocked ones included. <strong>A title is struck through only
+      when it is proved</strong> — a human has seen it work — which is the same bar the ledger
+      uses. <span class="q-tag q-tag-shipped">Shipped · unproved</span> means code landed, tests
+      green, published, and still nobody has looked: the most recent one was correct in
+      ${meta.tests} tests and unseen on a phone, and striking that through would make this list
+      agree with the tests rather than with reality.
+    </p>
+    <p class="sec-note" style="margin-top:-10px">
+      <strong>${qTally.proved ?? 0} proved · ${qTally.shipped ?? 0} shipped and unproved ·
+      ${qTally.open ?? 0} open · ${qTally.blocked ?? 0} blocked elsewhere.</strong>
+      Detail for each in <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>.
     </p>
     <div class="queue">${queueBlocks}</div>
   </section>
 
   <footer>
-    <p>Single source of truth: <code>docs/status/ledger.json</code>. Regenerate with <code>npm run status</code>; <code>npm run status:check</code> fails if this file is stale.</p>
+    <p>Single source of truth: <code>docs/status/ledger.json</code>. Regenerate with <code>node scripts/build-status.mjs</code>; <code>node scripts/build-status.mjs --check</code> fails if this file is stale.</p>
     <p>Archaeology — how each thing was proved and what it cost — stays in <code>RESUME.md</code>. What to tap on the device stays in <code>TESTING.md</code>.</p>
     <p>OTA channel <code>${h(meta.otaVerified.channel)}</code> verified ${h(meta.otaVerified.on)}, runtime <code>${h(meta.otaVerified.runtime)}</code>.</p>
   </footer>
@@ -741,7 +893,7 @@ if (CHECK) {
     stale.push('docs/completion-tracker.html (missing)');
   }
   if (stale.length) {
-    console.error('Stale, run `npm run status`:\n  ' + stale.join('\n  '));
+    console.error('Stale, run `node scripts/build-status.mjs`:\n  ' + stale.join('\n  '));
     process.exit(1);
   }
   console.log(`Up to date — ${total} rows, ${T.proved} proved, ${blocked.length} blocked elsewhere.`);

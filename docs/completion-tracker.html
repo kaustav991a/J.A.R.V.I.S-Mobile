@@ -6,7 +6,7 @@
 <!--
   GENERATED FILE. Do not edit.
 
-  Written by `npm run status` from docs/status/ledger.json, which is the single source
+  Written by `node scripts/build-status.mjs` from docs/status/ledger.json, which is the single source
   of truth for every status claim in this repo. Editing this file is lost work: the next
   generate overwrites it without asking.
 -->
@@ -243,9 +243,81 @@
   .q-n { font-family: var(--mono); color: var(--accent); font-size: 0.9rem; padding-top: 2px; }
   .q-t { font-weight: 600; margin: 0 0 4px; }
   .q-d { color: var(--dim); font-size: 0.89rem; margin: 0; }
-  .q-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dimmer); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; white-space: nowrap; }
-  .done { opacity: 0.6; }
-  .done .q-t { text-decoration: line-through; text-decoration-color: var(--proved); }
+  .q-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dimmer); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; white-space: nowrap; cursor: help; }
+  .q-tag-proved { color: var(--proved); border-color: rgba(47,212,181,0.4); background: rgba(47,212,181,0.08); }
+  .q-tag-shipped { color: var(--partial); border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.08); }
+  .q-tag-blocked { color: #ff8fa0; border-color: rgba(255,143,160,0.4); background: rgba(255,143,160,0.07); }
+
+  /* only proved earns the line through — see the comment at the generator */
+  .q-proved { opacity: 0.55; border-color: rgba(47,212,181,0.22); }
+  .q-proved .q-t { text-decoration: line-through; text-decoration-color: var(--proved); text-decoration-thickness: 2px; }
+  .q-proved .q-n { color: var(--proved); }
+
+  /* shipped-but-unproved is deliberately NOT struck through, and says so */
+  .q-shipped { border-left: 3px solid var(--partial); }
+  .q-blocked { border-left: 3px solid rgba(255,143,160,0.5); }
+  .q-blocked .q-t, .q-blocked .q-d { opacity: 0.82; }
+
+  /* ── timeline ─────────────────────────────────────── */
+  .timeline { list-style: none; margin: 0; padding: 0 0 0 4px; display: grid; gap: 0; }
+
+  .tl { display: grid; grid-template-columns: 1.6rem 1fr; gap: 0 16px; position: relative; }
+
+  /* one continuous rail, drawn by the dots' container rather than a pseudo-element per row */
+  .tl::before {
+    content: '';
+    position: absolute;
+    left: 0.52rem;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--line);
+  }
+  .tl:first-child::before { top: 1.1rem; }
+  .tl:last-child::before { bottom: auto; height: 1.1rem; }
+
+  .tl-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ground);
+    border: 2px solid var(--dimmer);
+    margin-top: 0.85rem;
+    position: relative;
+    z-index: 1;
+    justify-self: start;
+    margin-left: 0.19rem;
+  }
+
+  .tl[data-k="proved"] .tl-dot, .tl[data-k="fixed"] .tl-dot { border-color: var(--proved); }
+  .tl[data-k="broke"] .tl-dot { border-color: var(--broken); background: var(--broken); }
+  .tl[data-k="trap"] .tl-dot { border-color: var(--partial); background: var(--partial); }
+  .tl[data-k="measured"] .tl-dot { border-color: var(--untested); }
+  .tl[data-k="rule"] .tl-dot { border-color: var(--accent); }
+  .tl[data-k="built"] .tl-dot { border-color: var(--accent-dim); background: var(--accent-dim); }
+
+  .tl-body { padding: 0 0 22px; min-width: 0; }
+  .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 3px; }
+  .tl-date { font-family: var(--mono); font-size: 0.74rem; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+
+  .tl-kind {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+  .tl-built { color: var(--dim); border-color: var(--line); }
+  .tl-proved, .tl-fixed { color: var(--proved); border-color: rgba(47,212,181,0.4); }
+  .tl-broke { color: var(--broken); border-color: rgba(255,93,93,0.45); }
+  .tl-trap { color: var(--partial); border-color: rgba(245,165,36,0.45); }
+  .tl-measured { color: var(--untested); border-color: rgba(139,127,212,0.42); }
+  .tl-rule { color: var(--accent); border-color: rgba(62,166,255,0.42); }
+
+  .tl-t { font-weight: 600; font-size: 0.98rem; margin: 0 0 3px; }
+  .tl-d { color: var(--dim); font-size: 0.88rem; margin: 0; max-width: 70ch; }
 
   .callout {
     background: linear-gradient(180deg, rgba(255,143,160,0.07), rgba(255,143,160,0.02));
@@ -283,7 +355,7 @@
     </p>
     <p class="provenance">
       <strong>Generated, not written.</strong> Every row, badge and percentage on this page is
-      counted from <code>docs/status/ledger.json</code> by <code>npm run status</code> — that
+      counted from <code>docs/status/ledger.json</code> by <code>node scripts/build-status.mjs</code> — that
       file is the single source of truth for status, and editing this page is lost work.
       <code>ROADMAP.md</code> §0b and §0c come from the same place, so the two cannot disagree.
       <code>RESUME.md</code> is untouched: it answers how something was proved and what it cost
@@ -291,7 +363,7 @@
     </p>
     <ul class="facts">
       <li>Branch <b>feat/mobile-hud</b></li>
-      <li>HEAD <b>b33b110</b></li>
+      <li>HEAD <b>ad361b6</b></li>
       <li><b>893</b> tests · 70 suites</li>
       <li><code>tsc --noEmit</code> <b>clean</b></li>
       <li>OTA <b>verified</b> 2026-08-24</li>
@@ -1342,81 +1414,400 @@
   </section>
 
   <section>
-    <h2>The plan, in order</h2>
+    <h2>How it got here</h2>
     <p class="sec-note">
-      From <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>. App repo only.
-      Every task ends green — 893 tests and a clean <code>tsc</code> is the floor,
-      not the goal.
+      Newest last. The features are the least interesting rows: what this project actually
+      runs on is the <span class="tl-kind tl-measured">Measured</span> and
+      <span class="tl-kind tl-trap">Trap</span> entries — the things that were assumed,
+      turned out false, and cost a session. They are kept because a project relearns a
+      lesson it has already paid for otherwise.
+    </p>
+    <ol class="timeline">
+      <li class="tl" data-k="built">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-10</time>
+            <span class="tl-kind tl-built">Built</span>
+          </div>
+          <p class="tl-t">The HUD, and the shape of the thing</p>
+          <p class="tl-d">19 screens, five tabs, the reactor. One reducer for the link so every tab agrees about what is connected.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="built">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-13</time>
+            <span class="tl-kind tl-built">Built</span>
+          </div>
+          <p class="tl-t">Named places and located answers</p>
+          <p class="tl-d">Coordinates resolved on the phone, because <code>KnownPlace</code> exists nowhere else. Unverified since the fix that touched it.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="built">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-19</time>
+            <span class="tl-kind tl-built">Built</span>
+          </div>
+          <p class="tl-t">The journal, and derived facts only</p>
+          <p class="tl-d">Usage read on the device, rolled up, and shared as a rollup rather than rows. The pattern every later sense copies — and the reason a notification listener is designable at all.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="rule">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-19</time>
+            <span class="tl-kind tl-rule">Rule</span>
+          </div>
+          <p class="tl-t">Every state must name itself</p>
+          <p class="tl-d">It came up five times in one day. The briefing that never ran and the briefing that ran and found nothing to say were indistinguishable from outside, which let a wrong hypothesis stand for a day.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="measured">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-20</time>
+            <span class="tl-kind tl-measured">Measured</span>
+          </div>
+          <p class="tl-t">Background work: measured, not assumed</p>
+          <p class="tl-d"><code>expo-background-task</code> hardcodes <code>setRequiredNetworkType(CONNECTED)</code>, and the uid reads <code>blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY</code> with <code>#netAvail=0</code> in a RARE bucket. <strong>Stopped, not deferred.</strong> Every presence decision since is chosen around this.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="broke">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-21</time>
+            <span class="tl-kind tl-broke">Broke</span>
+          </div>
+          <p class="tl-t">He speaks first — and gets it wrong</p>
+          <p class="tl-d">The first unprompted remark asserted a Saturday shift on a Friday. A bare substring test matched a Mon–Fri work pattern, and the prompt then asserted it as true today. Fixed in the brain the same day; still undeployed.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="broke">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-21</time>
+            <span class="tl-kind tl-broke">Broke</span>
+          </div>
+          <p class="tl-t">The briefing arrives twice</p>
+          <p class="tl-d">Naming Home armed both senders at once — the gateway push and the phone's own task, byte-identical strings so the shade could not tell them apart. The old plan said *keep the local task as a fallback*; it was never gated, so it was a second sender.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="trap">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-21</time>
+            <span class="tl-kind tl-trap">Trap</span>
+          </div>
+          <p class="tl-t">A local build silently breaks OTA</p>
+          <p class="tl-d"><code>prebuild</code> writes the literal <code>file:fingerprint</code> into <code>strings.xml</code>; EAS substitutes the real hash and a local Gradle build does not. The APK then asks for updates matching a placeholder, gets none, and runs its embedded bundle forever. Nothing logs a word. Cost an hour.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="built">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-21</time>
+            <span class="tl-kind tl-built">Built</span>
+          </div>
+          <p class="tl-t">The status panel, and anticipation v1</p>
+          <p class="tl-d">Eight seams, four states, assembled on the device so it reads with nothing connected — which is exactly when it is looked at. Anticipation decides in code from the journal against its own baseline.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="proved">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-24</time>
+            <span class="tl-kind tl-proved">Proved</span>
+          </div>
+          <p class="tl-t">The OTA channel gate closed</p>
+          <p class="tl-d">One command, read-only. Channel Active, branch linked, runtime byte-identical to the installed APK. The fear was an empty channel — the app asks and gets nothing, silently. It is not empty.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="built">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-24</time>
+            <span class="tl-kind tl-built">Built</span>
+          </div>
+          <p class="tl-t">One source of truth for status</p>
+          <p class="tl-d">Three files were carrying status claims and drifting. Now <code>docs/status/ledger.json</code> holds them all and everything else is generated, so a percentage cannot disagree with the row it came from.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="fixed">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-24</time>
+            <span class="tl-kind tl-fixed">Fixed</span>
+          </div>
+          <p class="tl-t">The briefing row stops asserting what it cannot know</p>
+          <p class="tl-d">A workspace-only week ages the upload stamp, and the panel read that as the gateway having lost the schedule. Three states now. The task's gate is untouched — a stale stamp still means the phone posts.</p>
+        </div>
+      </li>
+      <li class="tl" data-k="trap">
+        <div class="tl-dot"></div>
+        <div class="tl-body">
+          <div class="tl-head">
+            <time class="tl-date">2026-08-24</time>
+            <span class="tl-kind tl-trap">Trap</span>
+          </div>
+          <p class="tl-t">An npm script changes the runtime fingerprint</p>
+          <p class="tl-d"><code>packageJson:scripts</code> is a fingerprint input. Adding two convenience scripts moved the runtime from <code>31c64113</code> to <code>3f9be979</code>, and the first OTA publish went to a runtime <strong>no device has</strong> — arriving nowhere, with a success message. Caught by reading the publish output against the installed fingerprint. The scripts were removed; the generator is invoked directly.</p>
+        </div>
+      </li></ol>
+  </section>
+
+  <section>
+    <h2>Every task, and what is actually finished</h2>
+    <p class="sec-note">
+      All 20 of them, blocked ones included. <strong>A title is struck through only
+      when it is proved</strong> — a human has seen it work — which is the same bar the ledger
+      uses. <span class="q-tag q-tag-shipped">Shipped · unproved</span> means code landed, tests
+      green, published, and still nobody has looked: the most recent one was correct in
+      893 tests and unseen on a phone, and striking that through would make this list
+      agree with the tests rather than with reality.
+    </p>
+    <p class="sec-note" style="margin-top:-10px">
+      <strong>1 proved · 1 shipped and unproved ·
+      10 open · 8 blocked elsewhere.</strong>
+      Detail for each in <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>.
     </p>
     <div class="queue">
-      <div class="q done">
+      <div class="q q-proved">
         <span class="q-n">00</span>
         <div>
           <p class="q-t">Confirm the OTA channel</p>
-          <p class="q-d">Was one command and gated every JS-only fix behind it. Channel <code>production</code> is Active, the branch is linked, and the runtime matches the installed APK byte for byte — so a publish does reach the phone.</p>
+          <p class="q-d">Was one command and gated every JS-only fix behind it. Channel <code>production</code> Active, branch linked, runtime byte-identical to the installed APK. <strong>Proved end to end:</strong> the publish that followed landed on the matching runtime, which is the only thing this check ever claimed.</p>
         </div>
-        <span class="q-tag">Done · verified</span>
+        <div class="row-tags">
+          
+          <span class="q-tag q-tag-proved" title="Seen working. Nothing owed.">Proved</span>
+        </div>
       </div>
-      <div class="q done">
+      <div class="q q-shipped">
         <span class="q-n">01</span>
         <div>
           <p class="q-t">The briefing-schedule row stops lying</p>
-          <p class="q-d">A workspace-only week ages the upload stamp, and the panel then asserted the gateway lost the schedule — which the phone cannot know. Now three states: <code>AT THE GATEWAY</code>, <code>CANNOT TELL</code>, <code>ON THIS PHONE</code>. <code>cloudArmedState()</code> sits beside <code>cloudArmed()</code> rather than replacing it, so the task's gate is untouched and a stale stamp still means the phone posts. 10 new tests, and <code>tsc</code> caught a third call site the plan had missed.</p>
+          <p class="q-d">A workspace-only week ages the upload stamp, and the panel asserted the gateway lost the schedule — which the phone cannot know. Three states now: <code>AT THE GATEWAY</code>, <code>CANNOT TELL</code>, <code>ON THIS PHONE</code>. <code>cloudArmedState()</code> sits beside <code>cloudArmed()</code>, so the task's gate is untouched and a stale stamp still means the phone posts. 10 tests; committed <code>d5eff11</code>; published to runtime <code>31c64113</code>. <strong>Owed: one glance at Home.</strong> Until someone reads that row on a phone it is shipped, not proved.</p>
         </div>
-        <span class="q-tag">Shipped · device pass owed</span>
+        <div class="row-tags">
+          <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+          <span class="q-tag q-tag-shipped" title="Code landed and published. No human has seen it yet.">Shipped · unproved</span>
+        </div>
       </div>
-      <div class="q">
+      <div class="q q-open">
         <span class="q-n">02</span>
         <div>
           <p class="q-t">Provider effects that outlive their tree</p>
-          <p class="q-d">An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It has cost six tests and is why the anti-duplicate wiring has none. Cancellation at the source, which the test file itself concluded was the real fix.</p>
+          <p class="q-d">An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It has cost six tests and is why the anti-duplicate wiring has none. Cancellation at the source, which the test file itself concluded was the real fix. Verifiable entirely by the suite: no device needed, so this one can reach <code>proved</code> in a single sitting.</p>
         </div>
-        <span class="q-tag">Ships over the air</span>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div>
-      <div class="q">
+      <div class="q q-open">
         <span class="q-n">03</span>
         <div>
           <p class="q-t">A crash says what it was</p>
-          <p class="q-d">Today a crash restarts in silence. The JS half is catchable, persistable and shippable now; a native crash still needs a service and a build, and stays owed rather than quietly folded in. The record is derived — no chat text, no token — because a crash log is exactly what gets pasted into a chat window.</p>
+          <p class="q-d">Today a crash restarts in silence and <code>adb logcat</code> on the one machine that built the APK is the only diagnosis. The JS half is catchable, persistable and shippable over the air; a native crash still needs a service and a build, and stays owed rather than quietly folded in. The record is derived — no chat text, no token — because a crash log is exactly what gets pasted into a chat window.</p>
         </div>
-        <span class="q-tag">Ships over the air</span>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div>
-      <div class="q">
+      <div class="q q-open">
         <span class="q-n">04</span>
         <div>
           <p class="q-t">He answers out loud</p>
-          <p class="q-d">Voice out is the largest single gap in the chat. The decision of whether and what to speak is pure and tested; the native call sits at the edge. Listening is a device check, not a change.</p>
+          <p class="q-d">Voice out is the largest single gap in the chat, and app-only. The decision of whether and what to speak is pure and testable; the native call sits at the edge. Stop any utterance in flight before starting the next — two voices over each other is worse than none.</p>
         </div>
-        <span class="q-tag">Ships over the air</span>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div>
-      <div class="q">
+      <div class="q q-open">
         <span class="q-n">05</span>
         <div>
           <p class="q-t">He comes back after a reboot</p>
-          <p class="q-d">Free, and the manifest has no <code>RECEIVE_BOOT_COMPLETED</code> today. Goes in a config plugin, never in <code>android/</code> — that directory is regenerated and a hand edit reverts without saying so.</p>
+          <p class="q-d">Free, and the manifest has no <code>RECEIVE_BOOT_COMPLETED</code> today. Goes in a config plugin, never in <code>android/</code> — that directory is regenerated and a hand edit reverts without saying so. Cannot reach <code>proved</code> without a build, an install and an actual reboot.</p>
         </div>
-        <span class="q-tag">Needs a build</span>
+        <div class="row-tags">
+          <span class="dep dep-app-build" title="App repo, but needs a native build or an EAS credentials action rather than an over-the-air publish.">App · build</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div>
-      <div class="q">
+      <div class="q q-open">
         <span class="q-n">06</span>
         <div>
-          <p class="q-t">The notification listener — spec and reducer only</p>
-          <p class="q-d">The step change in presence: event-driven, nearly free, and more context than any polling. It is also gated by the token split, which is brain work. So the drop rules and the pure reducer get built and tested; no service is registered and no permission is asked. Data collected badly cannot be un-collected.</p>
+          <p class="q-t">Speak into the microphone</p>
+          <p class="q-d">The oldest unverified thing in the app. Chat → hold → speak → release, then read <code>brains.usage.audio</code>. If it reads <code>fell_back</code> with <code>last_error_was_quota: false</code> the mime is wrong — the phone records m4a and Google documents <code>audio/aac</code>, not <code>audio/mp4</code>. One line, and it is the complaint that started the feature. Unlock the phone by hand first: <code>adb</code> cannot, and <code>apps_linked: 0</code> behind the keyguard means nothing.</p>
         </div>
-        <span class="q-tag">Gated · token split</span>
+        <div class="row-tags">
+          <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div>
-      <div class="q">
+      <div class="q q-open">
         <span class="q-n">07</span>
         <div>
-          <p class="q-t">Usable by someone who cannot see it well</p>
-          <p class="q-d">Better than the old ledger admitted: contrast is measured and passing, and reduced motion already follows the OS. What is genuinely owed is a TalkBack pass.</p>
+          <p class="q-t">The journal denial path, and the other never-run paths</p>
+          <p class="q-d">Settings → Journal → usage access off → return. It must say *I cannot see your usage*, never *Nothing recorded*. Built, tested, and never once run by a human. Same sitting: the location timeline and anticipation v1, both unexercised for the same reason.</p>
         </div>
-        <span class="q-tag">Part device</span>
+        <div class="row-tags">
+          <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">08</span>
+        <div>
+          <p class="q-t">Usable by someone who cannot see it well</p>
+          <p class="q-d">Better than the old ledger admitted: contrast is measured at 4.78 and 4.68 against a 4.5 bar, and reduced motion already follows the OS with a test on it. What is genuinely owed is the label audit and a TalkBack pass.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-device" title="Needs the phone in hand and unlocked. `adb` can wake the display but cannot unlock it, so the app launches behind the keyguard and never foregrounds — `apps_linked: 0` in that state means nothing.">Phone</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">09</span>
+        <div>
+          <p class="q-t">The photo half of the chat</p>
+          <p class="q-d">A thumbnail instead of the word Photo — a reply about a photo cannot be judged without the photo — plus an in-flight indicator, and a failed send that stays recoverable with its caption. The longest wait in the app and the least visible.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">10</span>
+        <div>
+          <p class="q-t">Appearance surviving a launch</p>
+          <p class="q-d">In-memory only: accent, glow and motion all reset. The ledger claimed this for days, which is its own lesson. Cheap, ships over the air, and the kind of thing a person notices immediately.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">11</span>
+        <div>
+          <p class="q-t">The notification listener</p>
+          <p class="q-d">The step change in presence — event-driven, nearly free, and more context than any polling can buy. <strong>Gated on the token split, which is gateway work:</strong> a listener sees OTPs, balances and private messages, and once that is collected badly no later fix un-collects it. What can be built now is the spec and the pure drop-rule reducer, with no service registered and no permission asked.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">12</span>
+        <div>
+          <p class="q-t">Split APP_TOKEN by capability</p>
+          <p class="q-d">One string gates the socket, push, <code>/app-commute</code> and <code>/app-state</code> alike, and nothing expires. The gateway validates both halves, so it cannot land here. The gate in front of every new sense, not a follow-up.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">13</span>
+        <div>
+          <p class="q-t">Merge fix/durable-state, then deploy</p>
+          <p class="q-d">Until it merges into the gateway branch, <strong>every deploy silently disarms the briefing</strong> — which has already happened twice. Also carries the fix for the false Saturday shift, committed as <code>c86d176</code> and still not live.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">14</span>
+        <div>
+          <p class="q-t">The situation sent to the persona</p>
+          <p class="q-d">Place, battery, link — one field on the envelope. The most character per line of code available anywhere in the plan, and it is a gateway change.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">15</span>
+        <div>
+          <p class="q-t">Delivered and read ticks</p>
+          <p class="q-d">The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it says neither. Needs a per-message id on both sides — and reply-to-a-message wants the same id, so it follows rather than inventing a second identity for a message.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed.">Brain</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">16</span>
+        <div>
+          <p class="q-t">The desk-key handshake, and rotate BRIDGE_SECRET</p>
+          <p class="q-d">18 sealed turns dropped and rising, so the encrypted path has never once worked end to end. The old secret went through a log and still opens <code>/desk-link</code>. <strong>The only item whose cost grows while deferred</strong> — do both in one sitting rather than waiting for the desk twice.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-desk" title="Needs the desk machine on. This laptop has no Python — `python` opens the Microsoft Store.">Desk</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">17</span>
+        <div>
+          <p class="q-t">Run run_harnesses.py</p>
+          <p class="q-d">Never executed by a Python interpreter with the real imports. This laptop has no Python — <code>python</code> opens the Microsoft Store. A duplicated-call SyntaxError already slipped through once and was caught by reading.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-desk" title="Needs the desk machine on. This laptop has no Python — `python` opens the Microsoft Store.">Desk</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-blocked">
+        <span class="q-n">18</span>
+        <div>
+          <p class="q-t">A real release keystore</p>
+          <p class="q-d">Release is signed with Expo's generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other. Fine for one phone, and the blocker on the second.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app-build" title="App repo, but needs a native build or an EAS credentials action rather than an over-the-air publish.">App · build</span>
+          <span class="q-tag q-tag-blocked" title="Cannot be finished from this repo.">Blocked</span>
+        </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">19</span>
+        <div>
+          <p class="q-t">The Iron Man styling pass</p>
+          <p class="q-d">Scope is styling: the logo does not change and no copy changes. The pieces exist and are under-used. Land it on one screen and live with it for a day before propagating — the item most likely to sprawl. The Android glass blur stays last of all: it adds no capability and its failure mode is a segfault that takes the process.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div></div>
   </section>
 
   <footer>
-    <p>Single source of truth: <code>docs/status/ledger.json</code>. Regenerate with <code>npm run status</code>; <code>npm run status:check</code> fails if this file is stale.</p>
+    <p>Single source of truth: <code>docs/status/ledger.json</code>. Regenerate with <code>node scripts/build-status.mjs</code>; <code>node scripts/build-status.mjs --check</code> fails if this file is stale.</p>
     <p>Archaeology — how each thing was proved and what it cost — stays in <code>RESUME.md</code>. What to tap on the device stays in <code>TESTING.md</code>.</p>
     <p>OTA channel <code>production</code> verified 2026-08-24, runtime <code>31c64113d7d13a400eb1c56ef81c4d0d4be3fa17</code>.</p>
   </footer>

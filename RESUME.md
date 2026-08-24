@@ -115,6 +115,51 @@ been on the workspace for two days it should say **`CANNOT TELL`**, not `ON THIS
 and the note should offer that the gateway may still hold the schedule. That promotes the
 row back to `proved`.
 
+### Two npm scripts published an update to a runtime no device has
+
+The first OTA publish of the day succeeded and reached nobody.
+
+```
+Runtime version    3f9be979b76caf2111f38a0dcefc2fa263933343   <- published to this
+                   31c64113d7d13a400eb1c56ef81c4d0d4be3fa17   <- the phone has this
+```
+
+`eas update` printed **`Published!`** and a dashboard link. Nothing was wrong from its
+side: publishing to a new runtime is an ordinary thing to do. The update simply does not
+match any installed build, so the phone will never ask for it.
+
+**Cause, found by dumping the fingerprint sources.** `npx expo-updates
+fingerprint:generate --platform android` lists what it hashes, and outside `node_modules`
+it is short — `.gitignore`, `eas.json`, the icon and splash assets,
+`google-services.json`, both config plugins, `android/`, the two local modules, and four
+contents entries:
+
+```
+expoAutolinkingConfig:android
+expoConfig
+package:react-native
+packageJson:scripts        <- this one
+rncoreAutolinkingConfig:android
+```
+
+**`packageJson:scripts` is a fingerprint input.** Adding `status` and `status:check` to
+`package.json` — two lines that no native code can possibly observe — moved the runtime
+and cut the phone off from every future update.
+
+**Fix, and why this one rather than a rebuild.** The scripts were removed and the
+generator is invoked directly as `node scripts/build-status.mjs`. The fingerprint returned
+to `31c64113…`, verified before republishing. The alternative was keeping `npm run status`
+and building a new APK, which spends a build and an install to buy a shorter command.
+
+**What made it catchable.** Reading the publish output against the fingerprint written
+down in the 08-21 handoff. Without that number recorded, `Published!` is indistinguishable
+from success — which is the same failure shape as the local-build trap: the tooling reports
+what it did, not whether it mattered.
+
+*Now in `AGENTS.md`:* check the fingerprint before touching `package.json`, and read the
+runtime in every publish output against the phone's.
+
+
 
 ---
 
