@@ -16,6 +16,84 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
+
+The morning's work was code and tests. This is the device, and three rows that had been
+claims since they were written are now sightings. **The goal "he reaches you without the
+app being open" went 11 of 20 to 14 of 20 in an afternoon**, and not one line of app code
+changed to do it — what changed was that somebody looked.
+
+Published `01a03dfe` to `production` at runtime `31c64113`, the phone's own, checked
+against the fingerprint before and the Updates row after.
+
+### The three
+
+**`task-heartbeat`.** The row read *"Last ran 4 minutes ago. Nothing was due. 1 run
+recorded."* against a run the log timestamps at 17:51:39. The stamp the task writes is the
+stamp the screen reads.
+
+**`background-work` — the one that mattered.** A run at **18:07 with the app backgrounded
+and the phone disconnected from adb**. Nobody started it; the count went 1 to 2. That row
+had said *"Nothing unattended is running"* since it was written, and it was true until
+this afternoon.
+
+It became possible only after the throttling was lifted: standby bucket **40 (RARE)** to
+**5 (EXEMPTED)** and the app onto the device-idle whitelist, after which `WITHIN_QUOTA`
+went from unsatisfied to satisfied and only the fifteen-minute timer was left. That is
+exactly what the Battery restrictions row asks a person to do in Settings, and it is the
+difference between a registered task and a running one.
+
+**`double-post-gate`.** A run forced inside the phone's own window — 18:30 to 19:00 for a
+19:00 departure, Home reading `AT THE GATEWAY` — exited in 260ms without fetching a
+forecast and posted nothing. The shade held exactly one briefing all evening: the gateway
+push at 17:59:18. Then the stamp said it in words: *"The gateway was briefing, so it stood
+down. 3 runs recorded."* That is the 2026-08-21 defect — both senders firing, the same
+briefing arriving twice — shown not to happen.
+
+Forced rather than waited for, and the distinction is kept on purpose: it settles the gate
+decision, not the scheduling. Scheduling is the 18:07 run.
+
+### Three ways a device session lies to you, all found today
+
+**`monkey` resumes; it does not restart.** So `useFocusEffect` never re-fires and Places
+renders whatever it read when it was last focused. A screenshot after relaunching showed a
+21-minute-old snapshot, and it was read here as a task that had not run — wrongly, and it
+took a second reading to catch. **Navigate away and back before believing the row.**
+
+**`Touchable` is deaf to `adb shell input`.** Four attempts across three methods — `input
+tap`, a held `input swipe`, an explicit `motionevent DOWN/UP` — against RESET, PREVIEW and
+the bell. None fired. It is `Animated.createAnimatedComponent(Pressable)`. A plain
+`SettingsRow` takes a tap normally, which is how Settings → Places opens at all.
+
+**The tab bar does take a held swipe**, where `AGENTS.md` said nothing worked. A 140ms
+`input swipe` on the Settings tab switches tabs; a tap at the same point does nothing.
+
+A fourth, cheaper: the app re-locks on background, and its lock screen is a secure window,
+so every screenshot comes back **black** with a 30KB file size. That reads exactly like a
+crashed render. It is a fingerprint, nothing more.
+
+### What could not be proved, and why — because these are the ones a later session will retry
+
+**`fallback-armed` stays `partial`.** Its name is *"is actually armed, and says so when it
+is not"*. The first half is sighted. The second cannot be induced: the phone re-arms at
+launch and on every visit to Places, so the fix repairs the state faster than anyone can
+photograph it. Covered by tests, not by a sighting, and that is the honest place to leave
+it.
+
+**`activity-detail` stays `partial`.** The full message on tap was confirmed by hand and
+the bell badge cleared, but *day rules* need entries spanning two days on screen and the
+*paged list* needs more than forty before `SEE MORE` appears. Neither was there to look at.
+
+**Queue 5, the reboot, is still owed** and needs no cable: note the run count on Places,
+restart the phone, leave the app closed, read the count again. Higher means WorkManager
+rescheduled at boot.
+
+### The ceiling, stated plainly
+
+**16 of 20 is as far as this repo goes.** `presence`, `anticipate-pocket`, `speaks-first`
+and `gateway-briefing-wording` are gateway rows, and `jarvis-brain` is closed. No amount of
+app-side work moves them; `docs/brain-dependencies.md` has what each costs when it reopens.
+
 ## 🛑 STOP POINT — 2026-08-26, evening. Start here; the 08-24 entry below still stands.
 
 **991 tests, 75 suites, `tsc --noEmit` clean, `build-status.mjs --check` up to date.** All
