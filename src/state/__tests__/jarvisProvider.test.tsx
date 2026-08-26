@@ -578,13 +578,13 @@ describe('what has been read', () => {
  */
 
 /**
- * PARTLY FIXED FAULT in this file — read before adding a test that mounts.
+ * FIXED at the source, 2026-08-26 — read before adding a test that mounts.
  *
- * A provider effect resolving after its test body has finished does so outside any
- * `act`. Enough of those corrupt the act environment, after which every later
- * `render` here returns an **empty tree**: no throw, no warning, queries that find
- * nothing. It reads exactly like a component that failed to mount, and it has now
- * cost six tests.
+ * The fault this note used to describe: a provider effect resolving after its test
+ * body has finished does so outside any `act`. Enough of those corrupt the act
+ * environment, after which every later `render` here returns an **empty tree**: no
+ * throw, no warning, queries that find nothing. It reads exactly like a component
+ * that failed to mount, and it cost six tests.
  *
  * **What was tried, and what it bought (2026-08-21).**
  * - Unmounting every view: necessary, not sufficient.
@@ -594,11 +594,17 @@ describe('what has been read', () => {
  *   suite then ran the heap out — draining chained microtasks lets the provider
  *   re-arm its own effects without bound. Do not simply widen the flush.
  *
- * Four remain and they are still enough to blank a late render. The likely real fix
- * is making the provider's async effects cancellable at the source rather than
- * guarding inside each `.then`, which is a change to production code and wants its
- * own sitting.
+ * **What actually fixed it (2026-08-26).** This note's own conclusion, which was
+ * that the real fix is cancellation at the source rather than a guard inside each
+ * `.then`. `state/live.ts` is that scope; all nine settle sites in the provider now
+ * open one and end it from the effect's cleanup. The inventory that preceded it is
+ * the argument for a primitive: eight sites carried a hand-written `let alive` and
+ * the ninth did not, and nothing in the file could have told you which.
  *
- * Until then: a new provider test that mounts and presses belongs in its own file.
- * See `capabilityIntercept.test.tsx` and `commuteStamp.test.tsx`.
+ * `__tests__/effectCancellation.test.tsx` holds the proof and, more usefully, the
+ * source scan that keeps it true — it fails if a bare `.then` settle reappears
+ * here, which is exactly how the ninth site was able to exist.
+ *
+ * `finish()` below stays. It is cheap, it is orthogonal, and this file's green run
+ * is not the place to find out otherwise.
  */

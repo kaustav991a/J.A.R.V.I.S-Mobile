@@ -16,6 +16,109 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ CLOSED — 2026-08-26. Queue 2, provider effects that outlive their tree.
+
+**916 tests, 72 suites, `tsc --noEmit` clean, generated docs in step.** Up from 903 and
+70. One queue item taken end to end and marked `proved`; no device involved, and none
+needed, which is why this one was picked.
+
+### What was actually wrong, and where the fix belonged
+
+An effect that resolves after its tree is gone sets state on a dead tree. In the app
+that is a wasted render. Under test it happens outside `act`, and enough of those
+corrupt the act environment, after which every later `render` in the file returns an
+**empty tree** — no throw, no warning, queries that find nothing. It reads exactly like
+a component that failed to mount, and it had cost six tests.
+
+The note at the foot of `jarvisProvider.test.tsx` had already reached the right answer
+in 2026-08-21 and recorded it: cancellation **at the source**, not a guard inside each
+`.then`. What it could not do was act on itself. So this session did what that note
+said, rather than re-deriving it.
+
+### The inventory is the whole argument
+
+Nine settle sites in `JarvisProvider`. **Eight carried a hand-written `let alive = true`
+with an `if (!alive) return`. The ninth — `loadShareLocation().then(setShareLocationState)`
+— carried nothing**, and nothing in the file could have told you which was which. The
+defect was never that the guard was wrong; it was that remembering it was a per-site
+decision with no failure mode when forgotten.
+
+`state/live.ts` is the scope: `const l = live()` in the effect body,
+`.then(l.only(handler))`, `return l.end`. **A factory, not a hook, and that is the design
+point** — a provider-lifetime guard cannot cancel a *dependency change*, and the alert
+registration at `[alert?.id, alert]` needs exactly that: when the alert changes, the
+in-flight registration from the previous one must be dropped while the next run stays
+live. So the scope is created per run and ended by that run's cleanup.
+
+All nine sites converted. One keeps a visible `l.alive` branch rather than `l.only`: the
+alert registration has real work to do on a dead run — hand the notification back with
+`dismiss(id)`, because left alone it is a notification for an alert that no longer
+exists. That exception is **named in a test** rather than counted, so a second one cannot
+appear quietly.
+
+### What makes it `proved` rather than written
+
+13 tests. 8 on the scope in `state/__tests__/live.test.ts`, including the one that matters
+most — the guard is evaluated when the wrapper is *called*, not when it was wrapped,
+which is the only ordering that actually occurs and the one a plausible-looking
+implementation gets wrong. 5 in `state/__tests__/effectCancellation.test.tsx`: one mount
+test that unmounts with a load still in flight and asserts the act channel stays silent,
+and four that assert the *shape* of the provider.
+
+**Proved by mutation, which is the part worth trusting.** Reinstating the bare
+`.then(setShareLocationState)` fails the source scan; restoring the guard passes it. So
+the test that keeps this closed has been seen failing on the exact defect it exists for.
+
+Two smaller findings, both recorded where they bite rather than here:
+
+- **`tsconfig.json` sets `types: ["jest"]`,** so a test that reads a source file cannot
+  see Node's globals. Widening that project-wide would let React Native code reach a Node
+  API and still typecheck, so the fix is a `/// <reference types="node" />` scoped to the
+  one file that needs it.
+- **Jest hoists `jest.mock` factories above the file's own consts.** A controllable
+  promise handed to a mock must be named `mock*` or the factory cannot reach it — the
+  error names the variable, which is the only reason it took one run rather than several.
+
+`jarvisProvider.test.tsx`'s note was rewritten to say the fix landed, and the rule is in
+`AGENTS.md`. `finish()` in that file stays: cheap, orthogonal, and its green run is not
+the place to find out otherwise.
+
+---
+
+## 🛑 STOP POINT — 2026-08-26. Start here; the 08-24 entry below still stands.
+
+**903 tests, 70 suites, `tsc --noEmit` clean, `build-status.mjs --check` up to date.** All
+three re-run this session rather than quoted from the last one. `feat/mobile-hud` level
+with `origin` at `60f44a4`, tree clean before the change below.
+
+### The decision that shapes the next stretch
+
+**`jarvis-brain` is closed.** Not blocked, not waiting — deliberately not being opened, so
+the app can be worked without a second repo in the picture. Nothing was pushed to it and
+nothing needs to be; it is clean and level with its remote at `c86d176`.
+
+What that repo owes this one is written down instead of remembered — and, after a first
+attempt that hand-wrote it, **generated**: `docs/brain-dependencies.md` comes out of
+`node scripts/build-status.mjs` like `ROADMAP.md` §0b and the tracker do. The hand-written
+draft lasted about ten minutes before it was the second place a status claim lived, which
+is exactly the failure `NEXT.md` was deleted for. Edit the ledger, never that file.
+
+It carries the `blockedBy: "brain"` rows in long form, what each costs when the brain is
+opened again, and — the part most likely to waste a morning — **the two device-visible
+defects that are already fixed and merely unshipped**: the capitalised `Sir` in every
+reply, and the Saturday-shift assertion on a Monday. Both are `c86d176` sitting on
+`fix/durable-state` un-merged. Do not re-diagnose either from the app side.
+
+### What is actually available to work on
+
+Unblocked, needs nothing outside this repo, roughly ascending in cost: **2** provider
+effect cancellation — one unguarded site, `JarvisProvider.tsx:240`, inventory already
+done; **21** a day boundary in the chat; **10** appearance surviving a launch; **2.5** the
+single out-of-order entry at index 89; then **4** voice out, **9** the photo half, **19**
+styling.
+
+---
+
 ## 🛑 STOP POINT — 2026-08-24, 13:0x. Start here.
 
 **903 tests, 70 suites, `tsc --noEmit` clean, generated docs in step with the ledger.**

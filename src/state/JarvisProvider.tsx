@@ -13,6 +13,7 @@ import { AppState, Platform } from 'react-native';
 import { hudReducer, initialHudState, HudState } from './hudReducer';
 import { clearChat, loadChat, saveChat } from './chatStore';
 import { loadRead, saveRead } from './readStore';
+import { live } from './live';
 import { countable, itemId, timeline } from './activity';
 import { demoFrames, demoReply } from './demoFeed';
 import { useLink } from '../link/useLink';
@@ -237,7 +238,9 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    */
   const [shareLocation, setShareLocationState] = useState(false);
   useEffect(() => {
-    void loadShareLocation().then(setShareLocationState);
+    const l = live();
+    void loadShareLocation().then(l.only(setShareLocationState));
+    return l.end;
   }, []);
 
   /**
@@ -310,15 +313,14 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   const [token, setToken] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    let alive = true;
-    void Promise.all([loadEndpoints(), loadToken()]).then(([e, t]) => {
-      if (!alive) return;
-      setEndpoints(e);
-      setToken(t);
-    });
-    return () => {
-      alive = false;
-    };
+    const l = live();
+    void Promise.all([loadEndpoints(), loadToken()]).then(
+      l.only(([e, t]) => {
+        setEndpoints(e);
+        setToken(t);
+      })
+    );
+    return l.end;
   }, []);
 
   const link = useLink({
@@ -777,7 +779,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       watchNote.current = null;
       return;
     }
-    let alive = true;
+    const l = live();
     void postNow({
       // the one notification in the app with no wit in it, and deliberately so:
       // there is a lock deadline running behind this line, and a dry remark on a
@@ -814,12 +816,14 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         alertWhenOpen: true,
       },
     }).then((id) => {
-      if (alive) watchNote.current = id;
+      // `l.alive` rather than `l.only`: a registration that outlived its run must be
+      // handed back, not dropped. Left un-dismissed it is a notification for an alert
+      // that no longer exists, and the deps here are `[alert?.id, alert]` — so this
+      // fires on every alert change, not only on unmount.
+      if (l.alive) watchNote.current = id;
       else void dismiss(id);
     });
-    return () => {
-      alive = false;
-    };
+    return l.end;
   }, [alert?.id, alert]);
 
   /**
@@ -852,19 +856,16 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    let alive = true;
-    void loadRead().then((ids) => {
-      if (alive) setReadIds((prev) => new Set([...prev, ...ids]));
-    });
-    return () => {
-      alive = false;
-    };
+    const l = live();
+    void loadRead().then(l.only((ids) => setReadIds((prev) => new Set([...prev, ...ids]))));
+    return l.end;
   }, []);
 
   useEffect(() => {
-    let alive = true;
-    void loadChat().then((chat) => {
-      if (!alive || !chat.length) return;
+    const l = live();
+    void loadChat().then(
+      l.only((chat) => {
+        if (!chat.length) return;
       dispatch({ type: 'hydrate', chat });
       /**
        * A restored log has already been seen, so it arrives read.
@@ -876,11 +877,10 @@ export function JarvisProvider({ children }: PropsWithChildren) {
        * that one was delivered while the app was dead and has genuinely not been
        * looked at.
        */
-      remember(chat.map(itemId));
-    });
-    return () => {
-      alive = false;
-    };
+        remember(chat.map(itemId));
+      })
+    );
+    return l.end;
   }, [remember]);
 
   const chat = hud.chat;
@@ -982,10 +982,10 @@ export function JarvisProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (simulated || link.mode !== 'cloud' || link.status !== 'open') return;
-    let alive = true;
-    void registerForPush().then((push) => {
-      if (!alive) return;
-      setPush(push ? 'registered' : 'no-token');
+    const l = live();
+    void registerForPush().then(
+      l.only((push) => {
+        setPush(push ? 'registered' : 'no-token');
       if (!push) return;
       // Silent on failure, and unguarded on purpose. Registering is idempotent
       // server-side — it keys on the address — so re-sending costs one small POST
@@ -998,13 +998,12 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       // and a push addressed to a channel Android does not have is discarded
       // without a word — which is what broke every reply push after this app
       // renamed its everyday channel, eight times over.
-      void api
-        .registerPush(push, Platform.OS, { general: GENERAL_CHANNEL, watch: WATCH_CHANNEL })
-        .catch(() => {});
-    });
-    return () => {
-      alive = false;
-    };
+        void api
+          .registerPush(push, Platform.OS, { general: GENERAL_CHANNEL, watch: WATCH_CHANNEL })
+          .catch(() => {});
+      })
+    );
+    return l.end;
   }, [api, link.mode, link.status, simulated]);
 
   /**
@@ -1035,13 +1034,15 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         at: Date.now(),
       });
 
-    let alive = true;
-    void alertFromLaunch().then((alert) => {
-      if (alive && alert) raise(alert);
-    });
+    const l = live();
+    void alertFromLaunch().then(
+      l.only((alert) => {
+        if (alert) raise(alert);
+      })
+    );
     const off = onAlertTapped(raise);
     return () => {
-      alive = false;
+      l.end();
       off();
     };
   }, []);
@@ -1074,16 +1075,18 @@ export function JarvisProvider({ children }: PropsWithChildren) {
         at: reply.at ?? Date.now(),
       });
 
-    let alive = true;
+    const l = live();
     // the cold-start case: tapped while the app was dead, so no listener ever saw it
-    void replyFromLaunch().then((reply) => {
-      if (!alive || !reply) return;
-      take(reply);
-      // launched BY the notification, so the conversation is the destination.
-      // `openChat` checks the navigator is ready first — on a cold start this
-      // runs before it has mounted, and navigating then is silently dropped
-      openChat();
-    });
+    void replyFromLaunch().then(
+      l.only((reply) => {
+        if (!reply) return;
+        take(reply);
+        // launched BY the notification, so the conversation is the destination.
+        // `openChat` checks the navigator is ready first — on a cold start this
+        // runs before it has mounted, and navigating then is silently dropped
+        openChat();
+      })
+    );
     /**
      * A tapped reply opens the conversation; an arriving one does not.
      *
@@ -1113,10 +1116,11 @@ export function JarvisProvider({ children }: PropsWithChildren) {
      * the same notification twice costs nothing.
      */
     const sweep = () => {
-      void pendingReplies().then((replies) => {
-        if (!alive) return;
-        for (const reply of replies) take(reply);
-      });
+      void pendingReplies().then(
+        l.only((replies) => {
+          for (const reply of replies) take(reply);
+        })
+      );
     };
     sweep();
     const sub = AppState.addEventListener('change', (next) => {
@@ -1124,7 +1128,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
     });
 
     return () => {
-      alive = false;
+      l.end();
       off();
       sub.remove();
     };

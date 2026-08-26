@@ -51,7 +51,7 @@
   "blockers": {
     "brain": {
       "label": "Brain",
-      "detail": "jarvis-brain — a gateway route, a merge, or a deploy. Deliberately not being touched; that repo is clean and fully pushed."
+      "detail": "jarvis-brain — a gateway route, a merge, or a deploy. **Closed as of 2026-08-26 and deliberately not being touched;** that repo is clean and fully pushed. The long form of every row here, and what each costs when it is opened again, is in `docs/brain-dependencies.md`."
     },
     "desk": {
       "label": "Desk",
@@ -72,6 +72,24 @@
     "none": {
       "label": "Done",
       "detail": "Nothing owed."
+    }
+  },
+  "deferred": {
+    "brain": {
+      "label": "Brain",
+      "repo": "jarvis-brain",
+      "since": "2026-08-26",
+      "head": "c86d176 on `fix/durable-state`; `feat/cloud-gateway` is what Render watches",
+      "why": "Closed deliberately, so the app can be worked without a second repo in the picture. Not a blocker that arrived — a decision that was taken. That repo is clean and fully pushed; nothing is waiting to go out of this laptop.",
+      "warnings": [
+        "**Two of the rows below are already fixed and merely unshipped.** They are visible on the phone and will look like live app defects. Do not re-diagnose either from the app side — the fix is `c86d176`, sitting un-merged.",
+        "**Until `fix/durable-state` merges, every deploy silently disarms the briefing.** It has already happened twice, with nothing said anywhere. The merge is the whole of the deploy: `git merge fix/durable-state && git push` from `feat/cloud-gateway`.",
+        "The local checkout of `feat/cloud-gateway` is **42 commits behind its remote**. Work that feels missing from this machine is on GitHub. Fetch before concluding anything about that branch."
+      ],
+      "buildableAnyway": [
+        "**Queue 11, the notification listener** — the spec and the pure drop-rule reducer, with tests, with no service registered and no permission asked. The gating on 12 is a privacy decision, not a sequencing one: a listener sees OTPs, balances and private messages, and once that is collected badly no later fix un-collects it.",
+        "**Queue 20's app half** — derive facts from turns, keep a ledger of what was sent, supersede what changed, send derived facts and never raw rows. `shareFacts` is the proved shape to copy. Consent rule comes first. Only the brain half is blocked: the ask envelope carries **one turn**, so he answers cold even though `chat_turns` holds the history."
+      ]
     }
   },
   "criteria": [
@@ -857,9 +875,9 @@
     {
       "n": 2,
       "title": "Provider effects that outlive their tree",
-      "state": "open",
-      "blockedBy": "app",
-      "detail": "An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It has cost six tests and is why the anti-duplicate wiring has none. Cancellation at the source, which the test file itself concluded was the real fix. Verifiable entirely by the suite: no device needed, so this one can reach `proved` in a single sitting."
+      "state": "proved",
+      "blockedBy": "none",
+      "detail": "**Closed 2026-08-26.** An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It cost six tests. Fixed where `jarvisProvider.test.tsx` said it had to be: at the source, not inside each `.then`. `state/live.ts` is a per-run cancellation scope — a factory rather than a hook, because a provider-lifetime guard cannot cancel a dependency change and the alert registration at `[alert?.id, alert]` needs exactly that. All nine settle sites open one and end it from the effect cleanup; the one that hands a registration back on a dead run keeps its `l.alive` branch, named explicitly in a test so a second exception cannot appear quietly. The inventory is the argument for a primitive: eight sites carried a hand-written `let alive` and the ninth did not, and nothing could have told you which. 13 tests — 8 on the scope, 5 on the provider, including a source scan that fails if a bare settle reappears. Proved by mutation: reinstating the bare `.then` fails the scan, restoring it passes. No device needed, and none used."
     },
     {
       "n": 3,

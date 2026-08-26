@@ -14,7 +14,7 @@ guessing here has cost real time.
 | Read | For |
 | --- | --- |
 | `README.md` | Setting up a machine. Prerequisites, exact SDK/NDK versions, dev builds, adb debugging, and the traps |
-| `docs/status/ledger.json` | **The single source of truth for every status claim.** 77 feature rows, the ten completion criteria, and a typed `blockedBy` on each — `brain` / `desk` / `device` / `app-build` / `app`. Small, so read this rather than the prose. Nothing else in this repo may carry a status claim |
+| `docs/status/ledger.json` | **The single source of truth for every status claim.** Every feature row, the ten completion criteria, and a typed `blockedBy` on each — `brain` / `desk` / `device` / `app-build` / `app`. Small, so read this rather than the prose. Nothing else in this repo may carry a status claim |
 | `ROADMAP.md` | **The plan, and the reasoning behind it.** §10 is the order to do things in. §0b and §0c are **generated** from the ledger above and must not be hand-edited — run `node scripts/build-status.mjs` |
 | `RESUME.md` | **How something was proved, and what it cost to find out.** Append-only archaeology — the measurements, the wrong hypotheses, the sessions they cost. Not the status, not the queue |
 | `TESTING.md` | **What to tap and what should happen**, feature by feature. For a human with the phone in hand. Never says whether something is built |
@@ -23,14 +23,15 @@ guessing here has cost real time.
 | `docs/superpowers/specs/` | The original design |
 | `docs/superpowers/plans/` | The original 15-task plan, **partly superseded** — read "Deviations" in `RESUME.md` first. `2026-08-24-app-completion.md` is the current app-only queue |
 | `docs/completion-tracker.html` | A browser view for a human — percentages, dependency badges, filters by state and by blocker. **Generated**, like §0b: open it, never edit it |
+| `docs/brain-dependencies.md` | Everything blocked on `jarvis-brain`, which is **closed as of 2026-08-26** — the rows, the queue items, and what is dangerous about reopening it. **Generated**, like §0b: read it, never edit it |
 | `src/ws/frames.ts` | The wire contract. The best single file for understanding the data |
 
 ## Before you claim anything works
 
 ```bash
-npm test          # 883 tests, and this number goes stale — trust the run, not the comment
+npm test          # 916 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
-node scripts/build-status.mjs --check  # generated §0b and the tracker still match the ledger
+node scripts/build-status.mjs --check  # §0b, the tracker and brain-dependencies still match the ledger
 ```
 
 All three must pass. Several real bugs here were caught by a test rather than by
@@ -38,8 +39,8 @@ the phone, and several more were only caught *on* the phone — so for anything
 native, say what you actually verified and how.
 
 **When you change what is built, change `docs/status/ledger.json` and run
-`node scripts/build-status.mjs`.** Editing §0b or the tracker directly is lost work — the next
-generate reverts it without saying so. `status:check` is there so a stale table is
+`node scripts/build-status.mjs`.** Editing §0b, the tracker or `docs/brain-dependencies.md`
+directly is lost work — the next generate reverts it without saying so. `status:check` is there so a stale table is
 a failure rather than a discovery.
 
 ## Non-obvious rules this codebase has learned
@@ -47,6 +48,17 @@ a failure rather than a discovery.
 Each is documented at the site that depends on it. Collected here because the cost
 of rediscovering them is high.
 
+- **A promise that settles into provider state goes through `live()`.** An effect
+  resolving after its tree is gone sets state on a dead tree; under test it does so
+  outside `act`, and enough of those corrupt the act environment until every later
+  `render` in the file returns an **empty tree** — no throw, no warning, queries that
+  find nothing. It reads as a component that failed to mount and it cost six tests.
+  `state/live.ts` is a per-run scope: `const l = live()` in the effect body,
+  `.then(l.only(handler))`, `return l.end`. It is a factory and not a hook on purpose —
+  a provider-lifetime guard cannot cancel a **dependency change**, which the alert
+  registration at `[alert?.id, alert]` needs. `effectCancellation.test.tsx` scans the
+  provider and fails on a bare settle, which is how one came to exist unnoticed among
+  eight guarded ones.
 - **Expo Go cannot run this app.** It lacks the native modules and gives no
   diagnosis when it fails. Use a development build for everything.
 - **Adding an npm package** means restarting Metro with `npx expo start -c`. A

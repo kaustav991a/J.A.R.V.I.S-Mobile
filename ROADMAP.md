@@ -8,9 +8,12 @@ queue that had stopped matching the code (`NEXT.md`, 08-20).
 
 ### Single source of truth — the division of labour
 
-Four files, and each answers exactly one question. **Nothing else in this repo may
+Five files, and each answers exactly one question. **Nothing else in this repo may
 carry a plan, a queue, or a status claim.** If you find one, it is stale by
 definition — fold it in here and delete it, which is what happened to `NEXT.md`.
+The fifth is the newest and the one most likely to be misread: it is **generated**,
+so it is a view of the ledger rather than a second copy of it. Editing it by hand is
+the `NEXT.md` mistake again, and `--check` will say so.
 
 | File | The one question it answers | Shape |
 | --- | --- | --- |
@@ -18,6 +21,7 @@ definition — fold it in here and delete it, which is what happened to `NEXT.md
 | `RESUME.md` | **How something was proved, and what it cost to find out** | append-only record; never a plan |
 | `AGENTS.md` | **How to work in this codebase** | rules and traps; never a status |
 | `TESTING.md` | **What a human taps, and what should happen** | per-feature checks; never a status |
+| `docs/brain-dependencies.md` | **What is owed by `jarvis-brain`, and why it is parked** | **generated** from the ledger; never edited, never a status |
 
 So: a status claim anywhere outside §0b is a bug. A queue anywhere outside §10 is a
 bug. `RESUME.md` keeps the archaeology — the measurements, the wrong hypotheses and
@@ -845,6 +849,12 @@ has landed and been lived with.
 
 Collected so the backend can be scoped in one pass. Script CRUD and run history are
 in §3.5; the rest:
+
+> **`jarvis-brain` is closed as of 2026-08-26** — deliberately not being touched. The 19
+> ledger rows and 5 queue items blocked there, and the two device-visible defects that are
+> already fixed-but-unshipped, are collected in `docs/brain-dependencies.md`, generated
+> from the ledger by `node scripts/build-status.mjs`. Do not re-diagnose them from the app
+> side, and do not edit that file — edit the ledger.
 
 - **Presence**, so the app can say the desk is awake but idle rather than inferring
   it from socket state.
