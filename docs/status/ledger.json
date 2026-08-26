@@ -677,9 +677,9 @@
         {
           "id": "background-work",
           "name": "Any background work running unattended",
-          "status": "none",
-          "blockedBy": "device",
-          "note": "**Measured on `84f40716`, 2026-08-26.** Standby bucket **40 (RARE)** and not on the device-idle whitelist, so Android allows roughly one job window a day and cuts the background network for it. Separately and worse, there is currently no registered job for this uid at all — see `fallback-armed`. Nothing unattended is running, and nothing was saying so.",
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "**Proved on `84f40716`, 2026-08-26 at 18:07.** The task ran with the app backgrounded and the phone disconnected from adb — nobody started it, and the count on Places moved from 1 to 2 with the stamp reading `Nothing was due`. Getting there needed the throttling lifted first: standby bucket **40 (RARE)** to **5 (EXEMPTED)** and the app added to the device-idle whitelist, after which `WITHIN_QUOTA` went from unsatisfied to satisfied and only the 15-minute timer remained. That is what the Battery restrictions row asks a person to do in Settings. Before that, measured the same day: roughly one job window a day and `Network: blocked=REASON_APP_STANDBY`.",
           "goal": "reachable"
         },
         {

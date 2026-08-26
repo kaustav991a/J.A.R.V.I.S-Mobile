@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**40 of 85 rows are proved on the phone** (47%). 60 have code (71%). 33 cannot be finished in this repo: 20 on the brain, 2 on the desk, 11 on the phone.
+**41 of 85 rows are proved on the phone** (48%). 61 have code (72%). 32 cannot be finished in this repo: 20 on the brain, 2 on the desk, 10 on the phone.
 
 ### Transport, pairing, security
 
@@ -284,7 +284,7 @@ in §2; `—` — not built.
 
 ### Memory and the journal
 
-*3 proved of 13.*
+*4 proved of 13.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -297,7 +297,7 @@ in §2; `—` — not built.
 | Chat history sent with the ask | — | Brain | The envelope carries one turn. |
 | Journal: usage source, rollup, fact sharing | proved |  | Derived facts only, never rows — the pattern every later sense copies. |
 | The journal’s denial path | proved |  | Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction. |
-| Any background work running unattended | — | Phone | **Measured on `84f40716`, 2026-08-26.** Standby bucket **40 (RARE)** and not on the device-idle whitelist, so Android allows roughly one job window a day and cuts the background network for it. Separately and worse, there is currently no registered job for this uid at all — see `fallback-armed`. Nothing unattended is running, and nothing was saying so. |
+| Any background work running unattended | proved |  | **Proved on `84f40716`, 2026-08-26 at 18:07.** The task ran with the app backgrounded and the phone disconnected from adb — nobody started it, and the count on Places moved from 1 to 2 with the stamp reading `Nothing was due`. Getting there needed the throttling lifted first: standby bucket **40 (RARE)** to **5 (EXEMPTED)** and the app added to the device-idle whitelist, after which `WITHIN_QUOTA` went from unsatisfied to satisfied and only the 15-minute timer remained. That is what the Battery restrictions row asks a person to do in Settings. Before that, measured the same day: roughly one job window a day and `Network: blocked=REASON_APP_STANDBY`. |
 | The commute task body exercised by a test | proved |  | 10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate. |
 | Location timeline | partial | Phone | Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen. |
 | Call log, archive import | — | App · build | Native build, and fatal for a store listing. |
