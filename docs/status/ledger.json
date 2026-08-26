@@ -584,9 +584,9 @@
         {
           "id": "double-post-gate",
           "name": "The local task gated so it cannot double-post",
-          "status": "partial",
-          "blockedBy": "device",
-          "note": "The stamp works and carries 6 tests on the decision plus 3 on the wiring; the gate cases were checked by removing the gate and watching them go red. The duplicate itself cannot be checked until a departure window. Leave both unswiped and read the tags — a pushed one carries `tag=FCM-Notification:*`, a local post does not. The *display* half of the stamp's limitation is closed as of 2026-08-24: the panel no longer reads a stale stamp as the gateway having lost the schedule. The gate's own behaviour is unchanged and deliberately so — a stale stamp still means the phone posts.",
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "**Proved on `84f40716`, 2026-08-26 at 18:31:15.** A run forced inside the phone own departure window (18:30–19:00 for a 19:00 departure) while Home read `AT THE GATEWAY`: it exited in 260ms without fetching a forecast and posted nothing. The shade held exactly one briefing all evening — the gateway push at 17:59:18 — where 2026-08-21 saw both senders fire and the same briefing arrive twice. Forced rather than waited for, which settles the gate decision and not the scheduling; scheduling is proved separately by the unattended run at 18:07.",
           "goal": "reachable"
         },
         {

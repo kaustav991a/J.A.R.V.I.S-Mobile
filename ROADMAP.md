@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**41 of 85 rows are proved on the phone** (48%). 61 have code (72%). 32 cannot be finished in this repo: 20 on the brain, 2 on the desk, 10 on the phone.
+**42 of 85 rows are proved on the phone** (49%). 61 have code (72%). 31 cannot be finished in this repo: 20 on the brain, 2 on the desk, 9 on the phone.
 
 ### Transport, pairing, security
 
@@ -261,7 +261,7 @@ in §2; `—` — not built.
 
 ### Notifications and being spoken to
 
-*11 proved of 16.*
+*12 proved of 16.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -279,7 +279,7 @@ in §2; `—` — not built.
 | He speaks first, once a day | broken | Brain | Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. |
 | Briefings visible in the Activity panel | proved |  | They had been filtered out entirely. |
 | Read / unread per entry, surviving a restart | proved |  |  |
-| The local task gated so it cannot double-post | partial | Phone | The stamp works and carries 6 tests on the decision plus 3 on the wiring; the gate cases were checked by removing the gate and watching them go red. The duplicate itself cannot be checked until a departure window. Leave both unswiped and read the tags — a pushed one carries `tag=FCM-Notification:*`, a local post does not. The *display* half of the stamp's limitation is closed as of 2026-08-24: the panel no longer reads a stale stamp as the gateway having lost the schedule. The gate's own behaviour is unchanged and deliberately so — a stale stamp still means the phone posts. |
+| The local task gated so it cannot double-post | proved |  | **Proved on `84f40716`, 2026-08-26 at 18:31:15.** A run forced inside the phone own departure window (18:30–19:00 for a 19:00 departure) while Home read `AT THE GATEWAY`: it exited in 260ms without fetching a forecast and posted nothing. The shade held exactly one briefing all evening — the gateway push at 17:59:18 — where 2026-08-21 saw both senders fire and the same briefing arrive twice. Forced rather than waited for, which settles the gate decision and not the scheduling; scheduling is proved separately by the unattended run at 18:07. |
 | Full message on tap, day rules, paged list | partial | Phone | Shipped, and the box was collapsing to one line on the phone. Fixed and republished, awaiting a second look. |
 
 ### Memory and the journal
