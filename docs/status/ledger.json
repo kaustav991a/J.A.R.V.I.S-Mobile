@@ -470,6 +470,14 @@
       "name": "Notifications and being spoken to",
       "rows": [
         {
+          "id": "task-heartbeat",
+          "name": "Whether the background task is running, not merely registered",
+          "status": "untested",
+          "blockedBy": "device",
+          "goal": "reachable",
+          "note": "`getStatusAsync()` answers a different question from the one being asked: it reports `Available` on a phone with no registered job at all. The task now writes a heartbeat on every one of its seven exit paths, and `healthFrom` turns registration, availability and that stamp into one of five readings — `off`, `blocked`, `never-ran`, `stale`, `alive`. `never-ran` is the one the old screen could not produce, and `off` is what would have shown the unarmed fallback above on any day of the last week. 21 tests. On Places; not yet seen on a phone, because it ships in an update the device has not taken."
+        },
+        {
           "id": "push-sleeping",
           "name": "Push to a sleeping phone",
           "status": "proved",
@@ -524,6 +532,14 @@
           "blockedBy": "none",
           "note": "It arrives. It also arrived twice — the gate is built but no departure window has run since.",
           "goal": "reachable"
+        },
+        {
+          "id": "fallback-armed",
+          "name": "The phone fallback is actually armed, and says so when it is not",
+          "status": "broken",
+          "blockedBy": "app",
+          "goal": "reachable",
+          "note": "**Found on `84f40716`, 2026-08-26.** Briefings are arriving on time — 7 PM and 7 AM — and Home reports `AT THE GATEWAY`, so the gateway is the sender. The phone is meant to be the fallback behind it. With the app foregrounded and `syncCommuteTask` run at launch (`App.tsx:131`), `dumpsys jobscheduler` lists **657 registered jobs and none for this uid** — the fallback is not armed. Nothing anywhere says so, and the failure is silent at all three levels by construction: `setCommuteTask` catches and returns `false`, `syncCommuteTask` passes that up, and `App.tsx` discards it with `void`. This is the state `syncCommuteTask` own comment calls the worst available — the switch reads ON with nothing behind it — and it is invisible precisely because the gateway is covering for it."
         },
         {
           "id": "briefing-content",
@@ -663,7 +679,7 @@
           "name": "Any background work running unattended",
           "status": "none",
           "blockedBy": "device",
-          "note": "**Cannot**, and measured twice rather than assumed: `expo-background-task` hardcodes `setRequiredNetworkType(CONNECTED)` and the uid reads `blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY` with `#netAvail=0` in a RARE bucket. Stopped, not deferred. Everything in §3.1 is chosen around this.",
+          "note": "**Measured on `84f40716`, 2026-08-26.** Standby bucket **40 (RARE)** and not on the device-idle whitelist, so Android allows roughly one job window a day and cuts the background network for it. Separately and worse, there is currently no registered job for this uid at all — see `fallback-armed`. Nothing unattended is running, and nothing was saying so.",
           "goal": "reachable"
         },
         {
@@ -1060,8 +1076,8 @@
       "n": 5,
       "title": "He comes back after a reboot",
       "state": "open",
-      "blockedBy": "app-build",
-      "detail": "Free, and the manifest has no `RECEIVE_BOOT_COMPLETED` today. Goes in a config plugin, never in `android/` — that directory is regenerated and a hand edit reverts without saying so. Cannot reach `proved` without a build, an install and an actual reboot.",
+      "blockedBy": "device",
+      "detail": "**The premise was wrong, corrected 2026-08-26 on the device.** This said the manifest had no `RECEIVE_BOOT_COMPLETED` and wanted a config plugin. It had been measured against `android/app/src/main/AndroidManifest.xml` — the app half — rather than the merged one. `adb shell dumpsys package` on the installed APK says `RECEIVE_BOOT_COMPLETED: granted=true`. `expo-notifications` 57.0.10 declares it, `expo-task-manager` declares a receiver on `BOOT_COMPLETED`, and `expo-background-task` schedules through WorkManager, which persists its own queue and reschedules at boot. **There is nothing to build.** What is owed is a check nobody has run: note the run count on Places, reboot, leave the app closed, see whether it moves.",
       "goal": "reachable"
     },
     {

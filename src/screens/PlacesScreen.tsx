@@ -23,7 +23,10 @@ import {
   saveCommute,
 } from '../lib/commute';
 import type { CommuteSettings, Departure } from '../lib/commute';
-import { commuteTaskAvailable, previewBriefing, setCommuteTask } from '../lib/commuteTask';
+import { commuteTaskAvailable, commuteTaskHealth, previewBriefing, setCommuteTask } from '../lib/commuteTask';
+import { healthLine } from '../lib/taskHealth';
+import type { HealthReading } from '../lib/taskHealth';
+import { live } from '../state/live';
 import { haptic } from '../lib/haptics';
 
 /**
@@ -43,12 +46,16 @@ export function PlacesScreen() {
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [bgReady, setBgReady] = useState(true);
+  const [health, setHealth] = useState<HealthReading | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      void loadKnown().then(setPlaces);
-      void loadCommute().then(setCommute);
-      void commuteTaskAvailable().then(setBgReady);
+      const l = live();
+      void loadKnown().then(l.only(setPlaces));
+      void loadCommute().then(l.only(setCommute));
+      void commuteTaskAvailable().then(l.only(setBgReady));
+      void commuteTaskHealth().then(l.only(setHealth));
+      return l.end;
     }, [])
   );
 
@@ -333,6 +340,30 @@ export function PlacesScreen() {
        * from code: it is a permission the user grants. So the screen says so and
        * offers the door rather than reporting a healthy background task.
        */}
+      {/**
+       * Whether it is running, as opposed to registered.
+       *
+       * The row below this one explains that Android can throttle the task into
+       * never running; this one says whether it has. `getStatusAsync()` reports
+       * Available on a phone the briefing never reaches, so a screen showing only
+       * that has been saying "healthy" about a feature that had not run in days.
+       * Only a stamp written by the task itself can distinguish them, because only
+       * a run can write one.
+       *
+       * It is also how "did he come back after the reboot?" gets answered without
+       * `adb logcat` on the one machine that built the APK: note the count, reboot,
+       * leave the app closed, and come back to see whether it moved.
+       */}
+      <View style={styles.row}>
+        <Ionicons name="pulse-outline" size={19} color={COLOR.dim} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Background briefing</Text>
+          <Text style={styles.rowSub} testID="commute-health">
+            {health ? healthLine(health) : 'Checking.'}
+          </Text>
+        </View>
+      </View>
+
       <View style={styles.row}>
         <Ionicons name="battery-charging-outline" size={19} color={COLOR.dim} />
         <View style={styles.rowText}>

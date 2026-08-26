@@ -19,6 +19,8 @@ import {
 } from './commute';
 import type { Departure } from './commute';
 import { currentFix, hasLocation, loadShareLocation } from './place';
+import { healthFrom, noteRun, readHeartbeat } from './taskHealth';
+import type { HealthReading } from './taskHealth';
 import { loadKnown } from './knownPlaces';
 
 /**
@@ -113,6 +115,9 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
     const now = new Date();
     const departure = dueDeparture(now, settings);
     if (!departure) {
+      // the ordinary wake, and the one that proves the task is alive at all — a phone
+      // where only this branch ever fires is a healthy task with nothing to do
+      await noteRun('idle');
       await catchUpJournal();
       return BackgroundTask.BackgroundTaskResult.Success;
     }
@@ -121,6 +126,7 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
     // the same umbrella three times teaches you to swipe without reading — and
     // this is per departure, so the morning cannot silence the evening
     if (await alreadyBriefed(departure.placeId, today)) {
+      await noteRun('idle');
       await catchUpJournal();
       return BackgroundTask.BackgroundTaskResult.Success;
     }
@@ -136,12 +142,16 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
      * for why the stale case resolves toward posting rather than toward silence.
      */
     if (await cloudArmed(now)) {
+      await noteRun('stood-down');
       await catchUpJournal();
       return BackgroundTask.BackgroundTaskResult.Success;
     }
 
     const at = await coordsFor(departure);
-    if (!at) return BackgroundTask.BackgroundTaskResult.Failed;
+    if (!at) {
+      await noteRun('failed');
+      return BackgroundTask.BackgroundTaskResult.Failed;
+    }
 
     const outcome = await commuteBriefing(at.lat, at.lon, departure, now);
 
@@ -159,7 +169,13 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
      * Returning `Failed` without marking leaves the day open for the next run, and
      * tells Android this attempt did not do its work.
      */
-    if (outcome.state === 'unavailable') return BackgroundTask.BackgroundTaskResult.Failed;
+    if (outcome.state === 'unavailable') {
+      // the common case on this phone, whose background network is cut — and the
+      // reading that separates "throttled, never wakes" from "wakes and cannot reach
+      // the forecast", which used to look identical from outside
+      await noteRun('failed');
+      return BackgroundTask.BackgroundTaskResult.Failed;
+    }
 
     /**
      * Both a warning and an all-clear are posted, and only the failure is silent.
@@ -181,9 +197,13 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
       data: { kind: 'commute', placeId: departure.placeId },
     });
     await markBriefed(departure.placeId, today);
+    await noteRun('briefed');
     await catchUpJournal();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
+    // it woke and fell over. Recorded, because a task that throws every time looks
+    // exactly like a task that never runs unless something says otherwise
+    await noteRun('failed');
     return BackgroundTask.BackgroundTaskResult.Failed;
   }
 });
@@ -226,6 +246,42 @@ export async function syncCommuteTask(): Promise<boolean> {
 }
 
 /** whether the OS is currently prepared to run background work at all */
+/**
+ * Whether Android currently holds a registration for the briefing.
+ *
+ * Separate from `commuteTaskAvailable`, which answers whether background work is
+ * permitted at all. The two disagree often enough to matter: permitted-and-not-
+ * registered is a switch that is off, and registered-and-permitted-but-never-run is
+ * throttling. Only asking both can tell them apart.
+ */
+export async function commuteTaskRegistered(): Promise<boolean> {
+  try {
+    return await TaskManager.isTaskRegisteredAsync(COMMUTE_TASK);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The one reading worth putting on a screen.
+ *
+ * Composed here rather than in the screen so the three facts are always gathered
+ * together — a screen that read availability without the heartbeat is exactly the
+ * screen that spent four days reporting a healthy task that had not run.
+ */
+export async function commuteTaskHealth(now: number = Date.now()): Promise<HealthReading> {
+  const [settings, registered, available, beat] = await Promise.all([
+    loadCommute(),
+    commuteTaskRegistered(),
+    commuteTaskAvailable(),
+    readHeartbeat(),
+  ]);
+  // what was asked for, read separately from what Android is holding — the two
+  // disagreeing is the whole reason this reading exists
+  const wanted = settings.departures.some((d) => d.on);
+  return healthFrom({ wanted, registered, available, beat, now });
+}
+
 export async function commuteTaskAvailable(): Promise<boolean> {
   try {
     return (await BackgroundTask.getStatusAsync()) === BackgroundTask.BackgroundTaskStatus.Available;

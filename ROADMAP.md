@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**39 of 83 rows are proved on the phone** (47%). 58 have code (70%). 32 cannot be finished in this repo: 20 on the brain, 2 on the desk, 10 on the phone.
+**39 of 85 rows are proved on the phone** (46%). 60 have code (71%). 33 cannot be finished in this repo: 20 on the brain, 2 on the desk, 11 on the phone.
 
 ### Transport, pairing, security
 
@@ -261,10 +261,11 @@ in §2; `—` — not built.
 
 ### Notifications and being spoken to
 
-*10 proved of 14.*
+*10 proved of 16.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
+| Whether the background task is running, not merely registered | untested | Phone | `getStatusAsync()` answers a different question from the one being asked: it reports `Available` on a phone with no registered job at all. The task now writes a heartbeat on every one of its seven exit paths, and `healthFrom` turns registration, availability and that stamp into one of five readings — `off`, `blocked`, `never-ran`, `stale`, `alive`. `never-ran` is the one the old screen could not produce, and `off` is what would have shown the unarmed fallback above on any day of the last week. 21 tests. On Places; not yet seen on a phone, because it ships in an update the device has not taken. |
 | Push to a sleeping phone | proved |  | It buzzed. Reaches a dead app and is exempt from the background-execution block. |
 | Both notification channels exist on the device | proved |  | Confirmed by adb, neither deleted. |
 | The desk alert outranks an everyday one | proved |  | Importance 5 against 3. |
@@ -272,6 +273,7 @@ in §2; `—` — not built.
 | A notification tap opens Chat | proved |  |  |
 | A desk-watch alert reaching a closed app | proved |  | Tapping it opens the alert screen. |
 | A pushed departure briefing, unprompted | proved |  | It arrives. It also arrived twice — the gate is built but no departure window has run since. |
+| The phone fallback is actually armed, and says so when it is not | broken | App | **Found on `84f40716`, 2026-08-26.** Briefings are arriving on time — 7 PM and 7 AM — and Home reports `AT THE GATEWAY`, so the gateway is the sender. The phone is meant to be the fallback behind it. With the app foregrounded and `syncCommuteTask` run at launch (`App.tsx:131`), `dumpsys jobscheduler` lists **657 registered jobs and none for this uid** — the fallback is not armed. Nothing anywhere says so, and the failure is silent at all three levels by construction: `setCommuteTask` catches and returns `false`, `syncCommuteTask` passes that up, and `App.tsx` discards it with `void`. This is the state `syncCommuteTask` own comment calls the worst available — the switch reads ON with nothing behind it — and it is invisible precisely because the gateway is covering for it. |
 | Briefing content, thresholds, quiet-day announcement | proved |  | Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. **The wording rotates as of 2026-08-26** — a persisted cursor per slot in `briefingVoice.ts` spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. **Only the phone-sent briefing is affected;** when the gateway is armed it writes its own text. |
 | Rotating wording in the gateway-sent briefing | — | Brain | The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. |
 | He speaks first, once a day | broken | Brain | Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. |
@@ -295,7 +297,7 @@ in §2; `—` — not built.
 | Chat history sent with the ask | — | Brain | The envelope carries one turn. |
 | Journal: usage source, rollup, fact sharing | proved |  | Derived facts only, never rows — the pattern every later sense copies. |
 | The journal’s denial path | proved |  | Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction. |
-| Any background work running unattended | — | Phone | **Cannot**, and measured twice rather than assumed: `expo-background-task` hardcodes `setRequiredNetworkType(CONNECTED)` and the uid reads `blocked=REASON_APP_BACKGROUND\|REASON_APP_STANDBY` with `#netAvail=0` in a RARE bucket. Stopped, not deferred. Everything in §3.1 is chosen around this. |
+| Any background work running unattended | — | Phone | **Measured on `84f40716`, 2026-08-26.** Standby bucket **40 (RARE)** and not on the device-idle whitelist, so Android allows roughly one job window a day and cuts the background network for it. Separately and worse, there is currently no registered job for this uid at all — see `fallback-armed`. Nothing unattended is running, and nothing was saying so. |
 | The commute task body exercised by a test | proved |  | 10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate. |
 | Location timeline | partial | Phone | Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen. |
 | Call log, archive import | — | App · build | Native build, and fatal for a store listing. |
