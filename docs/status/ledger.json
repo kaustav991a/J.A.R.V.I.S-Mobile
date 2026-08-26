@@ -92,6 +92,73 @@
       ]
     }
   },
+  "goals": [
+    {
+      "id": "reachable",
+      "title": "He reaches you without the app being open",
+      "criteria": [
+        3
+      ],
+      "unlocks": "The difference between an assistant and an app you remember to check. Push, both channels and the departure briefing are proved; what is missing is continuous presence — surviving a reboot, and the notification listener that would let him notice something rather than wait to be asked."
+    },
+    {
+      "id": "conversation",
+      "title": "A conversation you can trust",
+      "criteria": [
+        1,
+        2
+      ],
+      "unlocks": "Every state naming itself, and nothing arriving twice or lying once. The chat works end to end; the gap is that a wrong line is currently indistinguishable from a right one — a duplicate, a capitalised Sir, a weekday invented out of a stored pattern."
+    },
+    {
+      "id": "voice",
+      "title": "He speaks, and he listens",
+      "criteria": [
+        4
+      ],
+      "unlocks": "The oldest unverified thing here, and the largest single gap in the chat. Until both halves land it is a beautifully built text box, which is not what was asked for."
+    },
+    {
+      "id": "situated",
+      "title": "He knows where and when he is",
+      "criteria": [
+        5
+      ],
+      "unlocks": "One field on the persona envelope turns a generic answer into a situated one — place, battery, link. The roadmap calls it the most character per line of code available anywhere in the plan."
+    },
+    {
+      "id": "memory",
+      "title": "He remembers, and it survives a deploy",
+      "criteria": [
+        6
+      ],
+      "unlocks": "Today he learns four things and all of them are about the handset. Nothing you say is ever promoted to something he knows, and what the gateway does hold is wiped by the next deploy."
+    },
+    {
+      "id": "acts",
+      "title": "He acts on your behalf, with the brakes on",
+      "criteria": [],
+      "unlocks": "Approve-and-deny governance, the desk-watch countdown and opening an app by name are proved. What is missing is everything needing the gateway to hold state: scripts beyond listing them, run history, and rules you declare once."
+    },
+    {
+      "id": "security",
+      "title": "A compromised token does not expose a life",
+      "criteria": [
+        7
+      ],
+      "unlocks": "The gate in front of every new sense rather than a follow-up to them. One string still gates the socket, push, the commute route and app state alike, and nothing expires — so the notification listener cannot responsibly be built until this is."
+    },
+    {
+      "id": "product",
+      "title": "It behaves like a real product",
+      "criteria": [
+        8,
+        9,
+        10
+      ],
+      "unlocks": "A crash you can see, a second device that is possible, and an app usable by someone who cannot see it well. Shipping a fix within the hour is already solved; noticing that a fix is needed is not."
+    }
+  ],
   "criteria": [
     {
       "n": 1,
@@ -173,56 +240,64 @@
           "name": "LAN probe → cloud fallback → WebSocket, reconnect",
           "status": "proved",
           "blockedBy": "none",
-          "note": "One reducer serves every tab."
+          "note": "One reducer serves every tab.",
+          "goal": "conversation"
         },
         {
           "id": "one-socket",
           "name": "One socket per launch; chat survives force-stop",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "conversation"
         },
         {
           "id": "pair-rotate",
           "name": "Pairing token in SecureStore, with rotation",
           "status": "proved",
           "blockedBy": "none",
-          "note": "New accepted, old refused 403."
+          "note": "New accepted, old refused 403.",
+          "goal": "security"
         },
         {
           "id": "biometric",
           "name": "Biometric lock, re-locking on background",
           "status": "proved",
           "blockedBy": "none",
-          "note": "`strong` only — Android rejects `BIOMETRIC_WEAK | DEVICE_CREDENTIAL` outright, and with a passcode fallback enabled no sheet appears and the promise never settles."
+          "note": "`strong` only — Android rejects `BIOMETRIC_WEAK | DEVICE_CREDENTIAL` outright, and with a passcode fallback enabled no sheet appears and the promise never settles.",
+          "goal": "security"
         },
         {
           "id": "desk-key",
           "name": "Desk-key handshake (sealed turns)",
           "status": "untested",
           "blockedBy": "desk",
-          "note": "`has_desk_key: false`. 18 turns dropped and rising, so the encrypted path has never once worked end to end. Sealed-and-dropped is the correct failure and it is still a failure."
+          "note": "`has_desk_key: false`. 18 turns dropped and rising, so the encrypted path has never once worked end to end. Sealed-and-dropped is the correct failure and it is still a failure.",
+          "goal": "security"
         },
         {
           "id": "bridge-secret",
           "name": "`BRIDGE_SECRET` rotation",
           "status": "none",
           "blockedBy": "desk",
-          "note": "The old value went through Render's access log before redaction landed and still opens `/desk-link`. A fake desk was connected with it repeatedly during testing. The only item whose cost grows while deferred."
+          "note": "The old value went through Render's access log before redaction landed and still opens `/desk-link`. A fake desk was connected with it repeatedly during testing. The only item whose cost grows while deferred.",
+          "goal": "security"
         },
         {
           "id": "token-split",
           "name": "Capability-split tokens",
           "status": "none",
           "blockedBy": "brain",
-          "note": "One string gates the socket, push, the commute route and app state alike. A token that can register a push and a token that can read your day must not be the same secret."
+          "note": "One string gates the socket, push, the commute route and app state alike. A token that can register a push and a token that can read your day must not be the same secret.",
+          "goal": "security"
         },
         {
           "id": "token-expiry",
           "name": "Token expiry",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Nothing expires."
+          "note": "Nothing expires.",
+          "goal": "security"
         }
       ]
     },
@@ -234,140 +309,160 @@
           "name": "Text chat, both directions",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "conversation"
         },
         {
           "id": "chat-stream",
           "name": "Replies arrive word by word",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "conversation"
         },
         {
           "id": "chat-markdown",
           "name": "Markdown rendered, not shown as asterisks",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "conversation"
         },
         {
           "id": "chat-order",
           "name": "The chat log in the right order, once each",
           "status": "broken",
           "blockedBy": "app",
-          "note": "**Still broken on the phone after one fix, and the fix was not wasted.** Landed `fd8b31d`: a reply re-entered by the tray sweep with the *same* millisecond is now one entry, not two, and `hydrate` de-duplicates the restored log against itself so old duplicates on disk clear. 6 tests, shipped and applied on the device (`isUpdatePending=true`, `downloadProgress=1.0`). **The screen is still wrong**, which narrows the cause rather than reopening it: the surviving pair must carry *different* timestamps for the same reply — the socket logs it at arrival, the push carries the notification’s own time — so identity on an exact millisecond cannot unify them. Second confirmed symptom: yesterday’s `15:xx` entries render **below** today’s `12:xx` ones, so they were appended today by the sweep while describing yesterday. Next step is the actual `at` values, which need a debug build or a temporary diagnostic — not another fix inferred from a screenshot, having been wrong that way once."
+          "note": "**Still broken on the phone after one fix, and the fix was not wasted.** Landed `fd8b31d`: a reply re-entered by the tray sweep with the *same* millisecond is now one entry, not two, and `hydrate` de-duplicates the restored log against itself so old duplicates on disk clear. 6 tests, shipped and applied on the device (`isUpdatePending=true`, `downloadProgress=1.0`). **The screen is still wrong**, which narrows the cause rather than reopening it: the surviving pair must carry *different* timestamps for the same reply — the socket logs it at arrival, the push carries the notification’s own time — so identity on an exact millisecond cannot unify them. Second confirmed symptom: yesterday’s `15:xx` entries render **below** today’s `12:xx` ones, so they were appended today by the sweep while describing yesterday. Next step is the actual `at` values, which need a debug build or a temporary diagnostic — not another fix inferred from a screenshot, having been wrong that way once.",
+          "goal": "conversation"
         },
         {
           "id": "voice-rule-replies",
           "name": "The voice rule applied to what the model writes",
           "status": "broken",
           "blockedBy": "brain",
-          "note": "**Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it."
+          "note": "**Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it.",
+          "goal": "conversation"
         },
         {
           "id": "unprompted-weekday",
           "name": "No unprompted weekday assertion",
           "status": "broken",
           "blockedBy": "brain",
-          "note": "**Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like."
+          "note": "**Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like.",
+          "goal": "conversation"
         },
         {
           "id": "no-reasoning",
           "name": "Reasoning monologues can never reach the screen",
           "status": "proved",
           "blockedBy": "none",
-          "note": "`_strip_reasoning()`. **Device pass 2026-08-24:** two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only."
+          "note": "`_strip_reasoning()`. **Device pass 2026-08-24:** two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only.",
+          "goal": "conversation"
         },
         {
           "id": "opening-line",
           "name": "The opening line is the real situation",
           "status": "proved",
           "blockedBy": "none",
-          "note": "On-device, no model, no await. **Read again 2026-08-24:** *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.* Note the lowercase `sir` — this line obeys the voice rule, which is what makes the replies below it violating the same rule so visible."
+          "note": "On-device, no model, no await. **Read again 2026-08-24:** *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.* Note the lowercase `sir` — this line obeys the voice rule, which is what makes the replies below it violating the same rule so visible.",
+          "goal": "conversation"
         },
         {
           "id": "capabilities-answer",
           "name": "“What can you do”, answered without a round trip",
           "status": "proved",
           "blockedBy": "none",
-          "note": "On-device, so it answers with everything even offline."
+          "note": "On-device, so it answers with everything even offline.",
+          "goal": "conversation"
         },
         {
           "id": "capabilities-screen",
           "name": "A Capabilities screen listing the same thing",
           "status": "proved",
           "blockedBy": "none",
-          "note": "One list, two surfaces. Read back over adb."
+          "note": "One list, two surfaces. Read back over adb.",
+          "goal": "conversation"
         },
         {
           "id": "status-panel",
           "name": "A status panel naming every seam",
           "status": "partial",
           "blockedBy": "device",
-          "note": "Eight rows, four states, assembled on the device so it is readable with nothing connected at all — which is exactly when it will be looked at. **Read on the phone again 2026-08-24, on the new bundle:** all eight rows render, the caption counts `1 OFF` for the sleeping desk alone, and the briefing row reads `AT THE GATEWAY` while the link is cloud. Named gap: the third briefing state added that day, `CANNOT TELL`, cannot be reached on a cloud-linked phone — the stamp is fresh, so it would take two days of workspace-only sessions or a debug build to see it."
+          "note": "Eight rows, four states, assembled on the device so it is readable with nothing connected at all — which is exactly when it will be looked at. **Read on the phone again 2026-08-24, on the new bundle:** all eight rows render, the caption counts `1 OFF` for the sleeping desk alone, and the briefing row reads `AT THE GATEWAY` while the link is cloud. Named gap: the third briefing state added that day, `CANNOT TELL`, cannot be reached on a cloud-linked phone — the stamp is fresh, so it would take two days of workspace-only sessions or a debug build to see it.",
+          "goal": "conversation"
         },
         {
           "id": "push-address",
           "name": "Whether the gateway holds a push address",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Nothing exposed this before, and it is the most diagnostic fact in the app."
+          "note": "Nothing exposed this before, and it is the most diagnostic fact in the app.",
+          "goal": "conversation"
         },
         {
           "id": "photo-preview",
           "name": "Photo preview and caption before sending",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "conversation"
         },
         {
           "id": "photo-marker",
           "name": "A photo answering with its own lookup marker",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Shared by the text and vision paths."
+          "note": "Shared by the text and vision paths.",
+          "goal": "conversation"
         },
         {
           "id": "photo-thumb",
           "name": "A thumbnail in the chat instead of the word “Photo”",
           "status": "none",
           "blockedBy": "app",
-          "note": "A reply about a photo cannot be judged without the photo."
+          "note": "A reply about a photo cannot be judged without the photo.",
+          "goal": "conversation"
         },
         {
           "id": "photo-inflight",
           "name": "Photo-in-flight indicator; a failed send stays recoverable",
           "status": "none",
           "blockedBy": "app",
-          "note": "The longest wait in the app, and the least visible."
+          "note": "The longest wait in the app, and the least visible.",
+          "goal": "conversation"
         },
         {
           "id": "ticks",
           "name": "Sent / delivered / read ticks",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Only the gateway can say delivered and read, and it says neither. Needs a per-message id on both sides. The largest fully-specified thing left."
+          "note": "Only the gateway can say delivered and read, and it says neither. Needs a per-message id on both sides. The largest fully-specified thing left.",
+          "goal": "conversation"
         },
         {
           "id": "reply-to",
           "name": "Reply to a message",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Wants the same per-message id as the ticks, so it follows them rather than inventing a second identity for a message."
+          "note": "Wants the same per-message id as the ticks, so it follows them rather than inventing a second identity for a message.",
+          "goal": "conversation"
         },
         {
           "id": "mic-in",
           "name": "Microphone in",
           "status": "untested",
           "blockedBy": "device",
-          "note": "`brains.usage.audio` is 0. The oldest unverified thing here. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`."
+          "note": "`brains.usage.audio` is 0. The oldest unverified thing here. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`.",
+          "goal": "voice"
         },
         {
           "id": "voice-out",
           "name": "Voice out",
           "status": "none",
           "blockedBy": "app",
-          "note": "The largest single gap in the chat, and app-only — `expo-speech`."
+          "note": "The largest single gap in the chat, and app-only — `expo-speech`.",
+          "goal": "voice"
         }
       ]
     },
@@ -379,98 +474,112 @@
           "name": "Push to a sleeping phone",
           "status": "proved",
           "blockedBy": "none",
-          "note": "It buzzed. Reaches a dead app and is exempt from the background-execution block."
+          "note": "It buzzed. Reaches a dead app and is exempt from the background-execution block.",
+          "goal": "reachable"
         },
         {
           "id": "channels-exist",
           "name": "Both notification channels exist on the device",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Confirmed by adb, neither deleted."
+          "note": "Confirmed by adb, neither deleted.",
+          "goal": "reachable"
         },
         {
           "id": "channel-rank",
           "name": "The desk alert outranks an everyday one",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Importance 5 against 3."
+          "note": "Importance 5 against 3.",
+          "goal": "reachable"
         },
         {
           "id": "channels-cleaned",
           "name": "Renamed channels are deleted rather than left behind",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Six old channels all confirmed deleted. This app has renamed its everyday channel eight times, and every rename silently broke replies until the gateway was told."
+          "note": "Six old channels all confirmed deleted. This app has renamed its everyday channel eight times, and every rename silently broke replies until the gateway was told.",
+          "goal": "reachable"
         },
         {
           "id": "tap-opens-chat",
           "name": "A notification tap opens Chat",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "reachable"
         },
         {
           "id": "deskwatch-closed",
           "name": "A desk-watch alert reaching a closed app",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Tapping it opens the alert screen."
+          "note": "Tapping it opens the alert screen.",
+          "goal": "reachable"
         },
         {
           "id": "briefing-push",
           "name": "A pushed departure briefing, unprompted",
           "status": "proved",
           "blockedBy": "none",
-          "note": "It arrives. It also arrived twice — the gate is built but no departure window has run since."
+          "note": "It arrives. It also arrived twice — the gate is built but no departure window has run since.",
+          "goal": "reachable"
         },
         {
           "id": "briefing-content",
           "name": "Briefing content, thresholds, quiet-day announcement",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. **The wording rotates as of 2026-08-26** — a persisted cursor per slot in `briefingVoice.ts` spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. **Only the phone-sent briefing is affected;** when the gateway is armed it writes its own text."
+          "note": "Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. **The wording rotates as of 2026-08-26** — a persisted cursor per slot in `briefingVoice.ts` spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. **Only the phone-sent briefing is affected;** when the gateway is armed it writes its own text.",
+          "goal": "reachable"
         },
         {
           "id": "gateway-briefing-wording",
           "name": "Rotating wording in the gateway-sent briefing",
           "status": "none",
           "blockedBy": "brain",
-          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes."
+          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes.",
+          "goal": "reachable"
         },
         {
           "id": "speaks-first",
           "name": "He speaks first, once a day",
           "status": "broken",
           "blockedBy": "brain",
-          "note": "Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids."
+          "note": "Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids.",
+          "goal": "reachable"
         },
         {
           "id": "briefings-visible",
           "name": "Briefings visible in the Activity panel",
           "status": "proved",
           "blockedBy": "none",
-          "note": "They had been filtered out entirely."
+          "note": "They had been filtered out entirely.",
+          "goal": "reachable"
         },
         {
           "id": "read-unread",
           "name": "Read / unread per entry, surviving a restart",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "reachable"
         },
         {
           "id": "double-post-gate",
           "name": "The local task gated so it cannot double-post",
           "status": "partial",
           "blockedBy": "device",
-          "note": "The stamp works and carries 6 tests on the decision plus 3 on the wiring; the gate cases were checked by removing the gate and watching them go red. The duplicate itself cannot be checked until a departure window. Leave both unswiped and read the tags — a pushed one carries `tag=FCM-Notification:*`, a local post does not. The *display* half of the stamp's limitation is closed as of 2026-08-24: the panel no longer reads a stale stamp as the gateway having lost the schedule. The gate's own behaviour is unchanged and deliberately so — a stale stamp still means the phone posts."
+          "note": "The stamp works and carries 6 tests on the decision plus 3 on the wiring; the gate cases were checked by removing the gate and watching them go red. The duplicate itself cannot be checked until a departure window. Leave both unswiped and read the tags — a pushed one carries `tag=FCM-Notification:*`, a local post does not. The *display* half of the stamp's limitation is closed as of 2026-08-24: the panel no longer reads a stale stamp as the gateway having lost the schedule. The gate's own behaviour is unchanged and deliberately so — a stale stamp still means the phone posts.",
+          "goal": "reachable"
         },
         {
           "id": "activity-detail",
           "name": "Full message on tap, day rules, paged list",
           "status": "partial",
           "blockedBy": "device",
-          "note": "Shipped, and the box was collapsing to one line on the phone. Fixed and republished, awaiting a second look."
+          "note": "Shipped, and the box was collapsing to one line on the phone. Fixed and republished, awaiting a second look.",
+          "goal": "reachable"
         }
       ]
     },
@@ -482,91 +591,104 @@
           "name": "Facts stored and recalled",
           "status": "partial",
           "blockedBy": "brain",
-          "note": "14 facts known. Volunteered exactly once, wrongly."
+          "note": "14 facts known. Volunteered exactly once, wrongly.",
+          "goal": "memory"
         },
         {
           "id": "facts-from-talking",
           "name": "Anything he learns from what you actually say",
           "status": "none",
           "blockedBy": "app",
-          "note": "**The largest gap in the memory story, and it was not in this ledger until 2026-08-24.** `shareFacts` derives from the journal rollup and named places only — four keys, all about the handset: `phone:screen-time`, `phone:pickups`, `phone:top-apps`, plus the places. **Nothing reads the conversation.** How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past `CHAT_CAP` (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in `chat_turns`, so this is not data loss — it is that no turn is ever promoted to a fact."
+          "note": "**The largest gap in the memory story, and it was not in this ledger until 2026-08-24.** `shareFacts` derives from the journal rollup and named places only — four keys, all about the handset: `phone:screen-time`, `phone:pickups`, `phone:top-apps`, plus the places. **Nothing reads the conversation.** How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past `CHAT_CAP` (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in `chat_turns`, so this is not data loss — it is that no turn is ever promoted to a fact.",
+          "goal": "memory"
         },
         {
           "id": "chat-window",
           "name": "A chat log that is not a one-day window",
           "status": "partial",
           "blockedBy": "app",
-          "note": "`CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets."
+          "note": "`CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets.",
+          "goal": "memory"
         },
         {
           "id": "one-assistant",
           "name": "One assistant across desk, phone and chat",
           "status": "partial",
           "blockedBy": "brain",
-          "note": "App and chat share one history. A desk answering with its own brain bypasses it, so those turns never join the shared history."
+          "note": "App and chat share one history. A desk answering with its own brain bypasses it, so those turns never join the shared history.",
+          "goal": "memory"
         },
         {
           "id": "rolling-memory",
           "name": "Rolling memory durable across restarts",
           "status": "partial",
           "blockedBy": "brain",
-          "note": "In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified."
+          "note": "In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified.",
+          "goal": "memory"
         },
         {
           "id": "durable-state",
           "name": "Deploy-durable gateway state",
           "status": "untested",
           "blockedBy": "brain",
-          "note": "Committed on `fix/durable-state`, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing."
+          "note": "Committed on `fix/durable-state`, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing.",
+          "goal": "memory"
         },
         {
           "id": "chat-history",
           "name": "Chat history sent with the ask",
           "status": "none",
           "blockedBy": "brain",
-          "note": "The envelope carries one turn."
+          "note": "The envelope carries one turn.",
+          "goal": "memory"
         },
         {
           "id": "journal",
           "name": "Journal: usage source, rollup, fact sharing",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Derived facts only, never rows — the pattern every later sense copies."
+          "note": "Derived facts only, never rows — the pattern every later sense copies.",
+          "goal": "memory"
         },
         {
           "id": "journal-denial",
           "name": "The journal’s denial path",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction."
+          "note": "Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction.",
+          "goal": "memory"
         },
         {
           "id": "background-work",
           "name": "Any background work running unattended",
           "status": "none",
           "blockedBy": "device",
-          "note": "**Cannot**, and measured twice rather than assumed: `expo-background-task` hardcodes `setRequiredNetworkType(CONNECTED)` and the uid reads `blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY` with `#netAvail=0` in a RARE bucket. Stopped, not deferred. Everything in §3.1 is chosen around this."
+          "note": "**Cannot**, and measured twice rather than assumed: `expo-background-task` hardcodes `setRequiredNetworkType(CONNECTED)` and the uid reads `blocked=REASON_APP_BACKGROUND|REASON_APP_STANDBY` with `#netAvail=0` in a RARE bucket. Stopped, not deferred. Everything in §3.1 is chosen around this.",
+          "goal": "reachable"
         },
         {
           "id": "commute-task-tested",
           "name": "The commute task body exercised by a test",
           "status": "proved",
           "blockedBy": "none",
-          "note": "10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate."
+          "note": "10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate.",
+          "goal": "reachable"
         },
         {
           "id": "timeline",
           "name": "Location timeline",
           "status": "partial",
           "blockedBy": "device",
-          "note": "Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen."
+          "note": "Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen.",
+          "goal": "situated"
         },
         {
           "id": "call-log",
           "name": "Call log, archive import",
           "status": "none",
           "blockedBy": "app-build",
-          "note": "Native build, and fatal for a store listing."
+          "note": "Native build, and fatal for a store listing.",
+          "goal": "memory"
         }
       ]
     },
@@ -578,98 +700,112 @@
           "name": "Named places, location sharing, located answers",
           "status": "partial",
           "blockedBy": "device",
-          "note": "Unverified since the fix that touched it."
+          "note": "Unverified since the fix that touched it.",
+          "goal": "situated"
         },
         {
           "id": "weather-distance",
           "name": "Weather and distance from measured figures",
           "status": "partial",
           "blockedBy": "brain",
-          "note": "The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so."
+          "note": "The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so.",
+          "goal": "situated"
         },
         {
           "id": "situation-block",
           "name": "The situation sent to the persona",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Place, battery, link — one field. The highest character-per-line change available anywhere in the plan."
+          "note": "Place, battery, link — one field. The highest character-per-line change available anywhere in the plan.",
+          "goal": "situated"
         },
         {
           "id": "open-app",
           "name": "Opening an app on the phone by name",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Confirmed twice over: by `topResumedActivity` and by the target app’s own launch event. Needed a native build."
+          "note": "Confirmed twice over: by `topResumedActivity` and by the target app’s own launch event. Needed a native build.",
+          "goal": "acts"
         },
         {
           "id": "governance",
           "name": "Governance: parked actions, approve and deny",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Desk actions only."
+          "note": "Desk actions only.",
+          "goal": "acts"
         },
         {
           "id": "deskwatch-clock",
           "name": "Desk-watch countdown, silence locks",
           "status": "proved",
           "blockedBy": "none",
-          "note": "The desk owns the clock; the phone’s countdown is a readout, never a decision timer. Do not move it."
+          "note": "The desk owns the clock; the phone’s countdown is a readout, never a decision timer. Do not move it.",
+          "goal": "acts"
         },
         {
           "id": "scripts-list",
           "name": "Scripts: list",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "acts"
         },
         {
           "id": "scripts-crud",
           "name": "Scripts: create, update, delete, run by id",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Which is why editing is disabled."
+          "note": "Which is why editing is disabled.",
+          "goal": "acts"
         },
         {
           "id": "run-history",
           "name": "Run history",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Reports currently invents “Last run: 2h ago” from a fixture."
+          "note": "Reports currently invents “Last run: 2h ago” from a fixture.",
+          "goal": "acts"
         },
         {
           "id": "presence",
           "name": "Presence — awake but idle",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Inferred from socket state today."
+          "note": "Inferred from socket state today.",
+          "goal": "reachable"
         },
         {
           "id": "declared-rules",
           "name": "Declared rules (“tell me if I haven’t…”)",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Spec written and awaiting review. Its presence half rests on a measurement that no longer holds."
+          "note": "Spec written and awaiting review. Its presence half rests on a measurement that no longer holds.",
+          "goal": "acts"
         },
         {
           "id": "anticipate-v1",
           "name": "Anticipation v1 — noticed when you open the app",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Decided in code from the journal against its own baseline and the next departure. At most one a day, never the same subject twice running, silent by default. **Device pass 2026-08-24:** the WATCHING panel read `2 OF 3 READY`, and its counters had advanced since 08-21 — `4 MORE DAYS` to `3 MORE DAYS`, and Today from `SPOKEN` to `LISTENING`. The day gate and the baseline counters are therefore working across days, not merely rendering. It was confirmed speaking on 08-21; whether a given remark is *worth* making is a separate question from whether the machinery runs."
+          "note": "Decided in code from the journal against its own baseline and the next departure. At most one a day, never the same subject twice running, silent by default. **Device pass 2026-08-24:** the WATCHING panel read `2 OF 3 READY`, and its counters had advanced since 08-21 — `4 MORE DAYS` to `3 MORE DAYS`, and Today from `SPOKEN` to `LISTENING`. The day gate and the baseline counters are therefore working across days, not merely rendering. It was confirmed speaking on 08-21; whether a given remark is *worth* making is a separate question from whether the machinery runs.",
+          "goal": "situated"
         },
         {
           "id": "anticipate-pocket",
           "name": "Anticipation that finds you in your pocket",
           "status": "none",
           "blockedBy": "brain",
-          "note": "Needs the gateway push or a foreground service — the phone measurably cannot do it alone."
+          "note": "Needs the gateway push or a foreground service — the phone measurably cannot do it alone.",
+          "goal": "reachable"
         },
         {
           "id": "anticipate-habit",
           "name": "Anticipation from learned habit rather than a written rule",
           "status": "none",
           "blockedBy": "device",
-          "note": "Needs the senses and weeks of baseline. Not shortenable by code."
+          "note": "Needs the senses and weeks of baseline. Not shortenable by code.",
+          "goal": "situated"
         }
       ]
     },
@@ -681,98 +817,112 @@
           "name": "19 screens, full suite and clean typecheck",
           "status": "proved",
           "blockedBy": "none",
-          "note": "The number written in a doc goes stale — trust the run, not the comment."
+          "note": "The number written in a doc goes stale — trust the run, not the comment.",
+          "goal": "product"
         },
         {
           "id": "release-apk",
           "name": "Standalone release APK, no bundler attached",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "product"
         },
         {
           "id": "haptics-motion",
           "name": "Haptics, and an animation switch that works",
           "status": "proved",
           "blockedBy": "none",
-          "note": ""
+          "note": "",
+          "goal": "product"
         },
         {
           "id": "ota",
           "name": "OTA updates",
           "status": "proved",
           "blockedBy": "none",
-          "note": "**Verified 2026-08-24.** Channel Active, branch linked, runtime matching the installed APK, latest group is HEAD. A **local** build still receives nothing unless the fingerprint is baked by hand — `prebuild` writes the literal placeholder and nothing logs a word about it."
+          "note": "**Verified 2026-08-24.** Channel Active, branch linked, runtime matching the installed APK, latest group is HEAD. A **local** build still receives nothing unless the fingerprint is baked by hand — `prebuild` writes the literal placeholder and nothing logs a word about it.",
+          "goal": "product"
         },
         {
           "id": "contrast",
           "name": "Contrast checked against WCAG AA",
           "status": "proved",
           "blockedBy": "none",
-          "note": "4.78 over the floor and 4.68 over the navy crown, against a bar of 4.5."
+          "note": "4.78 over the floor and 4.68 over the navy crown, against a bar of 4.5.",
+          "goal": "product"
         },
         {
           "id": "theme-removed",
           "name": "A theme choice that did nothing — removed",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Dark and System were identical. A setting that does nothing is worse than an absent one."
+          "note": "Dark and System were identical. A setting that does nothing is worse than an absent one.",
+          "goal": "product"
         },
         {
           "id": "arm64",
           "name": "arm64-only build",
           "status": "proved",
           "blockedBy": "none",
-          "note": "A config plugin, registered — so `prebuild` cannot silently revert it, which is this project’s most expensive recurring bug class. Roughly 35 MB against 100.7 MB across four ABIs. **The old ledger listed this as owed; it is done.**"
+          "note": "A config plugin, registered — so `prebuild` cannot silently revert it, which is this project’s most expensive recurring bug class. Roughly 35 MB against 100.7 MB across four ABIs. **The old ledger listed this as owed; it is done.**",
+          "goal": "product"
         },
         {
           "id": "reduce-motion",
           "name": "Motion defaulted from the OS",
           "status": "untested",
           "blockedBy": "device",
-          "note": "Implemented at `src/theme/appearance.tsx:89` and spied on in a test; a deliberate toggle outranks it permanently. **The old ledger called this untested for want of code; it has code and a test, and owes only a device pass.**"
+          "note": "Implemented at `src/theme/appearance.tsx:89` and spied on in a test; a deliberate toggle outranks it permanently. **The old ledger called this untested for want of code; it has code and a test, and owes only a device pass.**",
+          "goal": "product"
         },
         {
           "id": "light-theme",
           "name": "Light theme",
           "status": "broken",
           "blockedBy": "app",
-          "note": "Broken by design — “System” behaves identically to Dark. Decide or remove."
+          "note": "Broken by design — “System” behaves identically to Dark. Decide or remove.",
+          "goal": "product"
         },
         {
           "id": "appearance-persist",
           "name": "Appearance surviving a launch",
           "status": "none",
           "blockedBy": "app",
-          "note": "In-memory only. Accent, glow and motion all reset. The ledger claimed this for days."
+          "note": "In-memory only. Accent, glow and motion all reset. The ledger claimed this for days.",
+          "goal": "product"
         },
         {
           "id": "crash-reporting",
           "name": "Crash and error reporting",
           "status": "none",
           "blockedBy": "app",
-          "note": "A native crash is silent — no red box, nothing an error boundary sees — so `adb logcat` on the one machine that built the APK is the only diagnosis. The JS half is shippable over the air; the native half needs a service and a build."
+          "note": "A native crash is silent — no red box, nothing an error boundary sees — so `adb logcat` on the one machine that built the APK is the only diagnosis. The JS half is shippable over the air; the native half needs a service and a build.",
+          "goal": "product"
         },
         {
           "id": "keystore",
           "name": "A real release keystore",
           "status": "none",
           "blockedBy": "app-build",
-          "note": "Signed with Expo’s generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other."
+          "note": "Signed with Expo’s generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other.",
+          "goal": "product"
         },
         {
           "id": "screen-reader",
           "name": "Screen-reader pass",
           "status": "none",
           "blockedBy": "device",
-          "note": "Targets are floored at 44–64px and roles are set; nothing has been checked with TalkBack."
+          "note": "Targets are floored at 44–64px and roles are set; nothing has been checked with TalkBack.",
+          "goal": "product"
         },
         {
           "id": "tablet",
           "name": "Tablet and landscape",
           "status": "none",
           "blockedBy": "app",
-          "note": "Locked to portrait. The reactor and the 2×2 grid need a breakpoint before a tablet is claimed."
+          "note": "Locked to portrait. The reactor and the 2×2 grid need a breakpoint before a tablet is claimed.",
+          "goal": "product"
         }
       ]
     }
@@ -863,168 +1013,192 @@
       "title": "Confirm the OTA channel",
       "state": "proved",
       "blockedBy": "none",
-      "detail": "Was one command and gated every JS-only fix behind it. Channel `production` Active, branch linked, runtime byte-identical to the installed APK. **Proved end to end:** the publish that followed landed on the matching runtime, which is the only thing this check ever claimed."
+      "detail": "Was one command and gated every JS-only fix behind it. Channel `production` Active, branch linked, runtime byte-identical to the installed APK. **Proved end to end:** the publish that followed landed on the matching runtime, which is the only thing this check ever claimed.",
+      "goal": "product"
     },
     {
       "n": 1,
       "title": "The briefing-schedule row stops lying",
       "state": "shipped",
       "blockedBy": "device",
-      "detail": "A workspace-only week ages the upload stamp, and the panel asserted the gateway lost the schedule — which the phone cannot know. Three states now: `AT THE GATEWAY`, `CANNOT TELL`, `ON THIS PHONE`. `cloudArmedState()` sits beside `cloudArmed()`, so the task gate is untouched and a stale stamp still means the phone posts. 10 tests; committed `d5eff11`; published to runtime `31c64113`. **On the phone 2026-08-24:** the new bundle is live (the update server serves it for this exact runtime and the app reports nothing newer), the panel renders, and the briefing row reads `AT THE GATEWAY` correctly while the link is cloud. **Still owed:** the new `CANNOT TELL` state itself is unreachable on a cloud-linked phone — the stamp is fresh — so it needs two days of workspace-only sessions or a debug build."
+      "detail": "A workspace-only week ages the upload stamp, and the panel asserted the gateway lost the schedule — which the phone cannot know. Three states now: `AT THE GATEWAY`, `CANNOT TELL`, `ON THIS PHONE`. `cloudArmedState()` sits beside `cloudArmed()`, so the task gate is untouched and a stale stamp still means the phone posts. 10 tests; committed `d5eff11`; published to runtime `31c64113`. **On the phone 2026-08-24:** the new bundle is live (the update server serves it for this exact runtime and the app reports nothing newer), the panel renders, and the briefing row reads `AT THE GATEWAY` correctly while the link is cloud. **Still owed:** the new `CANNOT TELL` state itself is unreachable on a cloud-linked phone — the stamp is fresh — so it needs two days of workspace-only sessions or a debug build.",
+      "goal": "reachable"
     },
     {
       "n": 2.5,
       "title": "The chat log in the right order, once each",
       "state": "open",
       "blockedBy": "app",
-      "detail": "One fix landed and shipped — exact-millisecond duplicates and self-duplicating restores are gone, with 6 tests. The screen is still wrong, and the remaining cause is now narrow: the same reply logged by the socket and by the push carries two different timestamps, and yesterday’s entries are being appended today by the tray sweep. Needs the real `at` values before more code: a debug build, or a temporary diagnostic behind a flag."
+      "detail": "One fix landed and shipped — exact-millisecond duplicates and self-duplicating restores are gone, with 6 tests. The screen is still wrong, and the remaining cause is now narrow: the same reply logged by the socket and by the push carries two different timestamps, and yesterday’s entries are being appended today by the tray sweep. Needs the real `at` values before more code: a debug build, or a temporary diagnostic behind a flag.",
+      "goal": "conversation"
     },
     {
       "n": 2,
       "title": "Provider effects that outlive their tree",
       "state": "proved",
       "blockedBy": "none",
-      "detail": "**Closed 2026-08-26.** An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It cost six tests. Fixed where `jarvisProvider.test.tsx` said it had to be: at the source, not inside each `.then`. `state/live.ts` is a per-run cancellation scope — a factory rather than a hook, because a provider-lifetime guard cannot cancel a dependency change and the alert registration at `[alert?.id, alert]` needs exactly that. All nine settle sites open one and end it from the effect cleanup; the one that hands a registration back on a dead run keeps its `l.alive` branch, named explicitly in a test so a second exception cannot appear quietly. The inventory is the argument for a primitive: eight sites carried a hand-written `let alive` and the ninth did not, and nothing could have told you which. 13 tests — 8 on the scope, 5 on the provider, including a source scan that fails if a bare settle reappears. Proved by mutation: reinstating the bare `.then` fails the scan, restoring it passes. No device needed, and none used."
+      "detail": "**Closed 2026-08-26.** An effect resolving after its test body corrupts the act environment, after which every later render returns an empty tree — no throw, no warning. It cost six tests. Fixed where `jarvisProvider.test.tsx` said it had to be: at the source, not inside each `.then`. `state/live.ts` is a per-run cancellation scope — a factory rather than a hook, because a provider-lifetime guard cannot cancel a dependency change and the alert registration at `[alert?.id, alert]` needs exactly that. All nine settle sites open one and end it from the effect cleanup; the one that hands a registration back on a dead run keeps its `l.alive` branch, named explicitly in a test so a second exception cannot appear quietly. The inventory is the argument for a primitive: eight sites carried a hand-written `let alive` and the ninth did not, and nothing could have told you which. 13 tests — 8 on the scope, 5 on the provider, including a source scan that fails if a bare settle reappears. Proved by mutation: reinstating the bare `.then` fails the scan, restoring it passes. No device needed, and none used.",
+      "goal": "product"
     },
     {
       "n": 3,
       "title": "A crash says what it was",
       "state": "open",
       "blockedBy": "app",
-      "detail": "Today a crash restarts in silence and `adb logcat` on the one machine that built the APK is the only diagnosis. The JS half is catchable, persistable and shippable over the air; a native crash still needs a service and a build, and stays owed rather than quietly folded in. The record is derived — no chat text, no token — because a crash log is exactly what gets pasted into a chat window."
+      "detail": "Today a crash restarts in silence and `adb logcat` on the one machine that built the APK is the only diagnosis. The JS half is catchable, persistable and shippable over the air; a native crash still needs a service and a build, and stays owed rather than quietly folded in. The record is derived — no chat text, no token — because a crash log is exactly what gets pasted into a chat window.",
+      "goal": "product"
     },
     {
       "n": 4,
       "title": "He answers out loud",
       "state": "open",
       "blockedBy": "app",
-      "detail": "Voice out is the largest single gap in the chat, and app-only. The decision of whether and what to speak is pure and testable; the native call sits at the edge. Stop any utterance in flight before starting the next — two voices over each other is worse than none."
+      "detail": "Voice out is the largest single gap in the chat, and app-only. The decision of whether and what to speak is pure and testable; the native call sits at the edge. Stop any utterance in flight before starting the next — two voices over each other is worse than none.",
+      "goal": "voice"
     },
     {
       "n": 5,
       "title": "He comes back after a reboot",
       "state": "open",
       "blockedBy": "app-build",
-      "detail": "Free, and the manifest has no `RECEIVE_BOOT_COMPLETED` today. Goes in a config plugin, never in `android/` — that directory is regenerated and a hand edit reverts without saying so. Cannot reach `proved` without a build, an install and an actual reboot."
+      "detail": "Free, and the manifest has no `RECEIVE_BOOT_COMPLETED` today. Goes in a config plugin, never in `android/` — that directory is regenerated and a hand edit reverts without saying so. Cannot reach `proved` without a build, an install and an actual reboot.",
+      "goal": "reachable"
     },
     {
       "n": 6,
       "title": "Speak into the microphone",
       "state": "open",
       "blockedBy": "device",
-      "detail": "The oldest unverified thing in the app. Chat → hold → speak → release, then read `brains.usage.audio`. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`. One line, and it is the complaint that started the feature. Unlock the phone by hand first: `adb` cannot, and `apps_linked: 0` behind the keyguard means nothing."
+      "detail": "The oldest unverified thing in the app. Chat → hold → speak → release, then read `brains.usage.audio`. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`. One line, and it is the complaint that started the feature. Unlock the phone by hand first: `adb` cannot, and `apps_linked: 0` behind the keyguard means nothing.",
+      "goal": "voice"
     },
     {
       "n": 7,
       "title": "The journal denial path, and the other never-run paths",
       "state": "open",
       "blockedBy": "device",
-      "detail": "Settings → Journal → usage access off → return. It must say *I cannot see your usage*, never *Nothing recorded*. Built, tested, and never once run by a human. Same sitting: the location timeline and anticipation v1, both unexercised for the same reason."
+      "detail": "Settings → Journal → usage access off → return. It must say *I cannot see your usage*, never *Nothing recorded*. Built, tested, and never once run by a human. Same sitting: the location timeline and anticipation v1, both unexercised for the same reason.",
+      "goal": "memory"
     },
     {
       "n": 8,
       "title": "Usable by someone who cannot see it well",
       "state": "open",
       "blockedBy": "device",
-      "detail": "Better than the old ledger admitted: contrast is measured at 4.78 and 4.68 against a 4.5 bar, and reduced motion already follows the OS with a test on it. What is genuinely owed is the label audit and a TalkBack pass."
+      "detail": "Better than the old ledger admitted: contrast is measured at 4.78 and 4.68 against a 4.5 bar, and reduced motion already follows the OS with a test on it. What is genuinely owed is the label audit and a TalkBack pass.",
+      "goal": "product"
     },
     {
       "n": 9,
       "title": "The photo half of the chat",
       "state": "open",
       "blockedBy": "app",
-      "detail": "A thumbnail instead of the word Photo — a reply about a photo cannot be judged without the photo — plus an in-flight indicator, and a failed send that stays recoverable with its caption. The longest wait in the app and the least visible."
+      "detail": "A thumbnail instead of the word Photo — a reply about a photo cannot be judged without the photo — plus an in-flight indicator, and a failed send that stays recoverable with its caption. The longest wait in the app and the least visible.",
+      "goal": "conversation"
     },
     {
       "n": 10,
       "title": "Appearance surviving a launch",
       "state": "open",
       "blockedBy": "app",
-      "detail": "In-memory only: accent, glow and motion all reset. The ledger claimed this for days, which is its own lesson. Cheap, ships over the air, and the kind of thing a person notices immediately."
+      "detail": "In-memory only: accent, glow and motion all reset. The ledger claimed this for days, which is its own lesson. Cheap, ships over the air, and the kind of thing a person notices immediately.",
+      "goal": "product"
     },
     {
       "n": 11,
       "title": "The notification listener",
       "state": "blocked",
       "blockedBy": "brain",
-      "detail": "The step change in presence — event-driven, nearly free, and more context than any polling can buy. **Gated on the token split, which is gateway work:** a listener sees OTPs, balances and private messages, and once that is collected badly no later fix un-collects it. What can be built now is the spec and the pure drop-rule reducer, with no service registered and no permission asked."
+      "detail": "The step change in presence — event-driven, nearly free, and more context than any polling can buy. **Gated on the token split, which is gateway work:** a listener sees OTPs, balances and private messages, and once that is collected badly no later fix un-collects it. What can be built now is the spec and the pure drop-rule reducer, with no service registered and no permission asked.",
+      "goal": "reachable"
     },
     {
       "n": 12,
       "title": "Split APP_TOKEN by capability",
       "state": "blocked",
       "blockedBy": "brain",
-      "detail": "One string gates the socket, push, `/app-commute` and `/app-state` alike, and nothing expires. The gateway validates both halves, so it cannot land here. The gate in front of every new sense, not a follow-up."
+      "detail": "One string gates the socket, push, `/app-commute` and `/app-state` alike, and nothing expires. The gateway validates both halves, so it cannot land here. The gate in front of every new sense, not a follow-up.",
+      "goal": "security"
     },
     {
       "n": 13,
       "title": "Merge fix/durable-state, then deploy",
       "state": "blocked",
       "blockedBy": "brain",
-      "detail": "Until it merges into the gateway branch, **every deploy silently disarms the briefing** — which has already happened twice. Also carries the fix for the false Saturday shift, committed as `c86d176` and still not live."
+      "detail": "Until it merges into the gateway branch, **every deploy silently disarms the briefing** — which has already happened twice. Also carries the fix for the false Saturday shift, committed as `c86d176` and still not live.",
+      "goal": "memory"
     },
     {
       "n": 14,
       "title": "The situation sent to the persona",
       "state": "blocked",
       "blockedBy": "brain",
-      "detail": "Place, battery, link — one field on the envelope. The most character per line of code available anywhere in the plan, and it is a gateway change."
+      "detail": "Place, battery, link — one field on the envelope. The most character per line of code available anywhere in the plan, and it is a gateway change.",
+      "goal": "situated"
     },
     {
       "n": 15,
       "title": "Delivered and read ticks",
       "state": "blocked",
       "blockedBy": "brain",
-      "detail": "The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it says neither. Needs a per-message id on both sides — and reply-to-a-message wants the same id, so it follows rather than inventing a second identity for a message."
+      "detail": "The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it says neither. Needs a per-message id on both sides — and reply-to-a-message wants the same id, so it follows rather than inventing a second identity for a message.",
+      "goal": "conversation"
     },
     {
       "n": 16,
       "title": "The desk-key handshake, and rotate BRIDGE_SECRET",
       "state": "blocked",
       "blockedBy": "desk",
-      "detail": "18 sealed turns dropped and rising, so the encrypted path has never once worked end to end. The old secret went through a log and still opens `/desk-link`. **The only item whose cost grows while deferred** — do both in one sitting rather than waiting for the desk twice."
+      "detail": "18 sealed turns dropped and rising, so the encrypted path has never once worked end to end. The old secret went through a log and still opens `/desk-link`. **The only item whose cost grows while deferred** — do both in one sitting rather than waiting for the desk twice.",
+      "goal": "security"
     },
     {
       "n": 17,
       "title": "Run run_harnesses.py",
       "state": "blocked",
       "blockedBy": "desk",
-      "detail": "Never executed by a Python interpreter with the real imports. This laptop has no Python — `python` opens the Microsoft Store. A duplicated-call SyntaxError already slipped through once and was caught by reading."
+      "detail": "Never executed by a Python interpreter with the real imports. This laptop has no Python — `python` opens the Microsoft Store. A duplicated-call SyntaxError already slipped through once and was caught by reading.",
+      "goal": "product"
     },
     {
       "n": 18,
       "title": "A real release keystore",
       "state": "blocked",
       "blockedBy": "app-build",
-      "detail": "Release is signed with Expo's generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other. Fine for one phone, and the blocker on the second."
+      "detail": "Release is signed with Expo's generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other. Fine for one phone, and the blocker on the second.",
+      "goal": "product"
     },
     {
       "n": 19,
       "title": "The Iron Man styling pass",
       "state": "open",
       "blockedBy": "app",
-      "detail": "Scope is styling: the logo does not change and no copy changes. The pieces exist and are under-used. Land it on one screen and live with it for a day before propagating — the item most likely to sprawl. The Android glass blur stays last of all: it adds no capability and its failure mode is a segfault that takes the process."
+      "detail": "Scope is styling: the logo does not change and no copy changes. The pieces exist and are under-used. Land it on one screen and live with it for a day before propagating — the item most likely to sprawl. The Android glass blur stays last of all: it adds no capability and its failure mode is a segfault that takes the process.",
+      "goal": "product"
     },
     {
       "n": 20,
       "title": "Promote what he is told into what he knows",
       "state": "open",
       "blockedBy": "app",
-      "detail": "Today he learns four things, all about the phone: screen time, pickups, top apps, plus named places. He learns **nothing** from what you say — the only route from a sentence to a durable fact is typing it into the Memory screen yourself. Meanwhile the chat window holds about a day and rolls silently. The pattern to copy already exists and is proved: `shareFacts` derives, keeps a ledger of what it already sent, supersedes what changed, and — critically — sends **derived facts, never raw rows**. A turn-to-fact pass wants the same shape and the same restraint, plus a rule about consent, because quietly distilling everything a person says is a different product from one that remembers what it was told."
+      "detail": "Today he learns four things, all about the phone: screen time, pickups, top apps, plus named places. He learns **nothing** from what you say — the only route from a sentence to a durable fact is typing it into the Memory screen yourself. Meanwhile the chat window holds about a day and rolls silently. The pattern to copy already exists and is proved: `shareFacts` derives, keeps a ledger of what it already sent, supersedes what changed, and — critically — sends **derived facts, never raw rows**. A turn-to-fact pass wants the same shape and the same restraint, plus a rule about consent, because quietly distilling everything a person says is a different product from one that remembers what it was told.",
+      "goal": "memory"
     },
     {
       "n": 21,
       "title": "A day boundary in the chat",
       "state": "open",
       "blockedBy": "app",
-      "detail": "The log renders times with no date, so Saturday noon reads as this morning — it misled a debugging session on 2026-08-24 before the timestamps were read directly. Small, and it is the difference between a log you can trust and one you have to decode."
+      "detail": "The log renders times with no date, so Saturday noon reads as this morning — it misled a debugging session on 2026-08-24 before the timestamps were read directly. Small, and it is the difference between a log you can trust and one you have to decode.",
+      "goal": "conversation"
     },
     {
       "n": 22,
       "title": "The gateway briefing repeats itself too",
       "state": "open",
       "blockedBy": "brain",
-      "detail": "The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time."
+      "detail": "The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time.",
+      "goal": "reachable"
     }
   ]
 }

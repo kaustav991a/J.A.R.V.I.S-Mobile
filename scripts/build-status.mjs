@@ -29,7 +29,33 @@ const DEFERRED = join(ROOT, 'docs', 'brain-dependencies.md');
 const CHECK = process.argv.includes('--check');
 
 const ledger = JSON.parse(readFileSync(LEDGER, 'utf8'));
-const { meta, blockers, deferred, criteria, areas, timeline, queue } = ledger;
+const { meta, blockers, deferred, goals, criteria, areas, timeline, queue } = ledger;
+
+/**
+ * Every row and every task belongs to exactly one goal, and this is checked rather
+ * than assumed.
+ *
+ * A grouped view has one failure mode that matters: a row with no group silently
+ * vanishes from the page while still counting in the totals, so the percentages and
+ * the lists disagree and the page looks complete because something is missing from
+ * it. Throwing here means adding a row without a goal breaks the build instead —
+ * which is the same bargain `--check` already makes for staleness.
+ */
+{
+  const known = new Set(goals.map((g) => g.id));
+  const orphans = [
+    ...areas.flatMap((a) => a.rows).filter((r) => !known.has(r.goal)).map((r) => `row ${r.id}`),
+    ...queue.filter((q) => !known.has(q.goal)).map((q) => `task ${q.n}`),
+  ];
+  if (orphans.length) {
+    throw new Error(
+      'These have no goal in the ledger, and a grouped page would drop them silently:\n  ' +
+        orphans.join('\n  ') +
+        '\nAdd a "goal" naming one of: ' +
+        [...known].join(', ')
+    );
+  }
+}
 
 /** The order is the reading order everywhere: what is wrong first, then what is done. */
 const ORDER = ['broken', 'partial', 'untested', 'proved', 'none'];
@@ -68,6 +94,24 @@ const pct = (n) => Math.round((n / total) * 100);
  * towards "app progress" would flatter the number. `app` and `app-build` are both this
  * repo; `none` means finished.
  */
+/**
+ * The four states the page is organised by, and what each one honestly means.
+ *
+ * The ledger keeps five row states because the distinctions are real; a reader
+ * scanning a goal wants four. `partial`, `untested` and `broken` collapse into one
+ * bucket because they answer the same question — there is code and it is not
+ * finished — and the precise state stays on every chip, so nothing is lost by
+ * looking closer.
+ */
+const BUCKET = {
+  done: { label: 'Completed', hint: 'A human has watched it work on the phone.' },
+  progress: { label: 'In progress', hint: 'Code exists and it is not finished: partial, unexercised or broken.' },
+  todo: { label: 'Not started', hint: 'No code yet.' },
+  queued: { label: 'Queued', hint: 'A task on the plan, with a named blocker.' },
+};
+const bucketOf = (status) =>
+  status === 'proved' ? 'done' : status === 'none' ? 'todo' : 'progress';
+
 const OURS = new Set(['app', 'app-build', 'none']);
 const reachable = allRows.filter((r) => OURS.has(r.blockedBy));
 const blocked = allRows.filter((r) => !OURS.has(r.blockedBy));
@@ -385,6 +429,99 @@ function html() {
     .join('');
 
   /**
+   * The goals, and what each one is actually made of.
+   *
+   * The page used to open on six technical areas — transport, notifications,
+   * platform — which answer "where does this code live" rather than "what is this
+   * for". Someone deciding what to do next is asking the second question, and
+   * assembling that answer meant reading eighty-three rows and holding them in your
+   * head. A goal states the outcome, shows the four states beneath it, and says what
+   * lands when it is finished.
+   *
+   * The areas are still below, unchanged. This is a second lens on the same rows,
+   * not a replacement for them, and both are counted from the same arrays so they
+   * cannot disagree.
+   */
+  const goalBlocks = goals
+    .map((g) => {
+      const rows = allRows.filter((r) => r.goal === g.id);
+      const tasks = queue.filter((q) => q.goal === g.id && q.state !== 'proved' && q.state !== 'shipped');
+      const held = { done: [], progress: [], todo: [] };
+      for (const r of rows) held[bucketOf(r.status)].push(r);
+
+      const n = rows.length;
+      const pcDone = n ? Math.round((held.done.length / n) * 100) : 0;
+
+      // a goal nobody can finish from this repo is worth saying out loud, because it
+      // changes what to do today rather than merely how far along it is
+      const walls = [...new Set(rows.filter((r) => !OURS.has(r.blockedBy)).map((r) => r.blockedBy))];
+
+      const dep = (b) =>
+        b !== 'none' ? '<i class="g-dep dep-' + b + '">' + h(blockers[b].label) + '</i>' : '';
+
+      const chips = (list) =>
+        list
+          .map(
+            (r) =>
+              '<span class="g-item g-' + r.status + '"' +
+              (r.note ? ' title="' + h(plain(r.note)) + '"' : '') + '>' +
+              rich(r.name) + dep(r.blockedBy) + '</span>'
+          )
+          .join('');
+
+      const bucket = (key, list) =>
+        list.length
+          ? '<div class="g-bucket" data-k="' + key + '">' +
+            '<h4 title="' + h(BUCKET[key].hint) + '">' + BUCKET[key].label + ' <b>' + list.length + '</b></h4>' +
+            '<div class="g-items">' + chips(list) + '</div></div>'
+          : '';
+
+      const taskList = tasks.length
+        ? '<div class="g-bucket" data-k="queued">' +
+          '<h4 title="' + h(BUCKET.queued.hint) + '">' + BUCKET.queued.label + ' <b>' + tasks.length + '</b></h4>' +
+          '<div class="g-items">' +
+          tasks
+            .map(
+              (q) =>
+                '<span class="g-item g-task" title="' + h(plain(q.detail)) + '">' +
+                '<i class="g-num">' + String(q.n).padStart(2, '0') + '</i>' +
+                h(q.title) + dep(q.blockedBy) + '</span>'
+            )
+            .join('') +
+          '</div></div>'
+        : '';
+
+      const carries = g.criteria.length
+        ? 'Carries completion ' + (g.criteria.length === 1 ? 'criterion ' : 'criteria ') + g.criteria.join(', ') + '.'
+        : 'Not one of the ten completion criteria — but the app is not itself without it.';
+
+      const wall = walls.length
+        ? ' <b>Cannot be finished here:</b> ' + walls.map((w) => h(blockers[w].label.toLowerCase())).join(', ') + '.'
+        : ' Everything left is in this repo.';
+
+      return '<article class="goal"' + (pcDone === 100 ? ' data-complete="yes"' : '') + '>' +
+        '<div class="g-head"><div>' +
+        '<h3>' + h(g.title) + '</h3>' +
+        '<p class="g-unlocks">' + rich(g.unlocks) + '</p></div>' +
+        '<div class="g-score"><span class="g-pc">' + pcDone + '<span>%</span></span>' +
+        '<span class="g-of">' + held.done.length + ' of ' + n + ' proved</span></div></div>' +
+        '<div class="g-track" role="img" aria-label="' +
+        held.done.length + ' completed, ' + held.progress.length + ' in progress, ' + held.todo.length + ' not started">' +
+        '<i class="done" style="width:' + (held.done.length / n) * 100 + '%"></i>' +
+        '<i class="progress" style="width:' + (held.progress.length / n) * 100 + '%"></i></div>' +
+        '<p class="g-meta">' + carries + wall + '</p>' +
+        bucket('done', held.done) +
+        bucket('progress', held.progress) +
+        bucket('todo', held.todo) +
+        taskList +
+        '</article>';
+    })
+    .join('');
+
+  // named rather than counted, so what is being held out of Completed is visible
+  const shippedUnproved = queue.filter((q) => q.state === 'shipped');
+
+  /**
    * The timeline, newest last.
    *
    * `kind` is not decoration: this project's most useful history is the traps and the
@@ -529,6 +666,77 @@ function html() {
   .track i { display: block; height: 100%; border-radius: 3px; }
 
   section { position: relative; z-index: 1; margin-top: 52px; }
+  /* ── goals ──────────────────────────────────────────────────────────────
+     One card per outcome. The four buckets read top to bottom in the order a
+     person actually wants them — what is done, what is moving, what has not
+     started, what is queued — rather than alphabetically or by count. */
+  .goal-grid { display: grid; gap: 18px; }
+  .goal {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--none);
+    border-radius: 4px;
+    padding: 20px 22px 16px;
+  }
+  /* the edge earns its colour from progress, so a glance down the page is a
+     legitimate summary rather than decoration */
+  .goal[data-complete="yes"] { border-left-color: var(--proved); }
+  .g-head { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; }
+  .g-head h3 { font-family: var(--display); font-size: 1.06rem; font-weight: 500; margin: 0 0 6px; color: var(--text); }
+  .g-unlocks { color: var(--dim); font-size: 0.9rem; line-height: 1.55; margin: 0; max-width: 68ch; }
+  .g-score { text-align: right; flex: none; }
+  .g-pc { display: block; font-family: var(--mono); font-size: 1.6rem; color: var(--proved); line-height: 1; }
+  .g-pc span { font-size: 0.85rem; color: var(--dimmer); }
+  .g-of { display: block; font-size: 0.72rem; color: var(--dimmer); margin-top: 4px; white-space: nowrap; }
+  .g-track {
+    display: flex; height: 4px; border-radius: 2px; overflow: hidden;
+    background: rgba(72,96,125,0.28); margin: 14px 0 10px;
+  }
+  .g-track i.done { background: var(--proved); }
+  .g-track i.progress { background: var(--partial); }
+  .g-meta { font-size: 0.8rem; color: var(--dimmer); margin: 0 0 14px; }
+  .g-meta b { color: #ff8fa0; font-weight: 500; }
+
+  .g-bucket { margin-top: 12px; }
+  .g-bucket h4 {
+    font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--dimmer); font-weight: 400; margin: 0 0 8px; cursor: help;
+  }
+  .g-bucket h4 b { color: var(--text); font-weight: 500; }
+  .g-items { display: flex; flex-wrap: wrap; gap: 7px; }
+  .g-item {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--line); background: rgba(11,21,38,0.6);
+    color: var(--text); border-radius: 3px; padding: 5px 9px; font-size: 0.83rem; line-height: 1.3;
+  }
+  /* the state is on the chip itself, so collapsing partial/unexercised/broken into
+     one bucket loses nothing — look closer and the distinction is still there */
+  .g-item::before { content: ''; width: 5px; height: 5px; border-radius: 50%; flex: none; background: var(--none); }
+  .g-proved { border-color: rgba(47,212,181,0.3); background: rgba(47,212,181,0.06); }
+  .g-proved::before { background: var(--proved); }
+  .g-partial::before { background: var(--partial); }
+  .g-untested::before { background: var(--untested); }
+  .g-broken { border-color: rgba(255,93,93,0.3); }
+  .g-broken::before { background: var(--broken); }
+  .g-task { border-style: dashed; }
+  .g-task::before { display: none; }
+  .g-num { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); font-style: normal; }
+  .g-dep {
+    font-family: var(--mono); font-size: 0.62rem; font-style: normal; text-transform: uppercase;
+    letter-spacing: 0.08em; border: 1px solid currentColor; border-radius: 2px; padding: 1px 4px; opacity: 0.85;
+  }
+
+  .k-done { color: var(--proved); font-weight: 500; }
+  .k-progress { color: var(--partial); font-weight: 500; }
+  .k-todo { color: var(--none); font-weight: 500; }
+  .k-queued { color: var(--accent); font-weight: 500; }
+
+  @media (min-width: 1080px) { .goal-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 620px) {
+    .goal { padding: 16px 14px 12px; }
+    .g-head { flex-direction: column; gap: 10px; }
+    .g-score { text-align: left; }
+  }
 
   h2 {
     font-family: var(--display);
@@ -820,6 +1028,28 @@ function html() {
       <p class="meter-sub">${critPartial} partly met, ${criteria.length - critMet - critPartial} not started. ${critBrain} need the brain, so this repo tops out at ${critCeiling}%.</p>
     </div>
   </div>
+
+  <section class="goals">
+    <h2>What we are building, and how close each one is</h2>
+    <p class="sec-note">
+      Eight goals, with every ledger row and every open task filed under exactly one of
+      them. Each says what lands when it is finished — because <em>47% done</em> is a
+      number, and <em>he cannot yet speak or listen</em> is a decision.
+    </p>
+    <p class="sec-note">
+      Four states, meaning exactly what they say. <b class="k-done">Completed</b> is a human
+      watching it work on the phone, never a passing test. <b class="k-progress">In progress</b>
+      is code that exists and is not finished — partial, unexercised or broken, and the
+      chip says which. <b class="k-todo">Not started</b> is no code. <b class="k-queued">Queued</b>
+      is a task on the plan carrying a named blocker. Hover anything for what it covers.
+    </p>
+    <p class="sec-note">
+      Held out of every Completed list: <b>${shippedUnproved.length}</b> shipped but unproved${shippedUnproved.length ? ` — ${shippedUnproved.map((q) => h(q.title)).join(', ')}` : ''}.
+      Code landed, tests green, published, and still unseen by anyone. The most recently
+      shipped row was correct in 893 tests and had never once been looked at.
+    </p>
+    <div class="goal-grid">${goalBlocks}</div>
+  </section>
 
   <section>
     <h2>The definition of complete</h2>

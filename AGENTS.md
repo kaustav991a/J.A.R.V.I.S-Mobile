@@ -22,7 +22,7 @@ guessing here has cost real time.
 | `docs/cloud-app-link.md` | What the Render gateway owes for cloud failover |
 | `docs/superpowers/specs/` | The original design |
 | `docs/superpowers/plans/` | The original 15-task plan, **partly superseded** — read "Deviations" in `RESUME.md` first. `2026-08-24-app-completion.md` is the current app-only queue |
-| `docs/completion-tracker.html` | A browser view for a human — percentages, dependency badges, filters by state and by blocker. **Generated**, like §0b: open it, never edit it |
+| `docs/completion-tracker.html` | A browser view for a human. **Opens on the eight goals** — every row and open task filed under one, in four states (completed / in progress / not started / queued) with what each goal unlocks. The six technical areas are still below it. **Generated**, like §0b: open it, never edit it. A row with no `goal` fails the build rather than vanishing from the page |
 | `docs/brain-dependencies.md` | Everything blocked on `jarvis-brain`, which is **closed as of 2026-08-26** — the rows, the queue items, and what is dangerous about reopening it. **Generated**, like §0b: read it, never edit it |
 | `src/ws/frames.ts` | The wire contract. The best single file for understanding the data |
 
