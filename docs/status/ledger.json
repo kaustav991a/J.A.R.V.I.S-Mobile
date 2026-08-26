@@ -99,7 +99,7 @@
       "criteria": [
         3
       ],
-      "unlocks": "The difference between an assistant and an app you remember to check. Push, both channels and the departure briefing are proved; what is missing is continuous presence — surviving a reboot, and the notification listener that would let him notice something rather than wait to be asked."
+      "unlocks": "The difference between an assistant and an app you remember to check. Push, both channels and the departure briefing are proved, and since 2026-08-26 the phone fallback arms itself, reads the registration back and names its own refusals. What is missing is continuous presence: the notification listener, which is gated behind the token split — and four checks with the phone in hand, because surviving a reboot turned out to be nothing to build and everything to verify."
     },
     {
       "id": "conversation",
