@@ -16,6 +16,63 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## 🛑 STOP POINT — 2026-08-26, 18:40. Start here; the 08-24 entry below still stands.
+
+**`feat/mobile-hud` at `5a9e1a9`, level with `origin`, tree clean.** 991 tests, 75 suites,
+`tsc --noEmit` clean, `build-status.mjs --check` up to date — all four run at the end of the
+session rather than quoted from its start.
+
+**Published `01a03dfe` to `production` at runtime `31c64113`**, which is the installed APK's
+own. The phone is on it: Settings reads *updated 26 Aug 17:45*.
+
+### Where the day left the goal
+
+**"He reaches you without the app being open" is 14 of 20 — 70%**, from 11 this morning.
+Three rows moved, and none of them by writing app code: `task-heartbeat`, `background-work`
+and `double-post-gate` were all proved by looking at the device. The entry below has the
+measurements.
+
+**16 of 20 is the ceiling from this repo.** `presence`, `anticipate-pocket`, `speaks-first`
+and `gateway-briefing-wording` are gateway rows, and **`jarvis-brain` stays closed** — what
+it owes is generated into `docs/brain-dependencies.md`. Do not re-diagnose the capitalised
+`Sir` or the Saturday-shift assertion from the app side; both are fixed at `c86d176` and
+merely unshipped.
+
+### The state the phone was left in
+
+**Doze whitelist added, standby bucket set to 5 (EXEMPTED)** via adb, from 40 (RARE). This
+is the same thing the Battery restrictions row asks a person to do in Settings, and it is
+why background work runs at all — in RARE this app got roughly one job window a day with
+its network cut. Left on deliberately. `adb shell dumpsys deviceidle whitelist -<pkg>`
+undoes it; the bucket itself drifts back on its own as Android recomputes from usage.
+
+### What to pick up, in order
+
+1. **The reboot check — queue 5, and the only device row still reachable without the brain.**
+   Note the run count on Places, restart the phone, leave the app closed, read the count
+   again. Higher means WorkManager rescheduled at boot. No cable needed; `TESTING.md` 1.9.
+2. **The 7 AM briefing on 27 Aug** is the first departure window where the phone's fallback
+   is genuinely armed underneath the gateway. **Two notifications would mean the stand-down
+   gate failed in a real window** rather than the forced one proved at 18:31 — that is worth
+   knowing quickly.
+3. **`activity-detail`** needs a phone carrying 40+ entries across two days: `SEE MORE` and
+   the day separators have never been seen. The full message on tap was confirmed by hand.
+4. **Then §3 in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+
+**`fallback-armed` stays `partial` on purpose** and should not be quietly promoted: the
+phone re-arms at launch and on every visit to Places, so the unarmed state cannot be induced
+to be photographed. Tests cover that branch.
+
+### Three ways a device session will lie to you
+
+All found today, all now in `AGENTS.md`, and the first one cost a wrong reading in this very
+file before it was caught: **`monkey` resumes rather than restarts**, so `useFocusEffect`
+does not re-fire and Places renders a stale snapshot — navigate away and back before
+believing the row. **`Touchable` is deaf to `adb shell input`** across three methods, so
+RESET, PREVIEW, SETTINGS and the bell need a finger. **The tab bar takes a held swipe**
+(140ms), where a tap does nothing. And the app re-locks on background behind a secure
+window, so screenshots come back black at 30KB — that is a fingerprint prompt, not a crash.
+
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
 
 The morning's work was code and tests. This is the device, and three rows that had been
@@ -93,36 +150,6 @@ rescheduled at boot.
 **16 of 20 is as far as this repo goes.** `presence`, `anticipate-pocket`, `speaks-first`
 and `gateway-briefing-wording` are gateway rows, and `jarvis-brain` is closed. No amount of
 app-side work moves them; `docs/brain-dependencies.md` has what each costs when it reopens.
-
-## 🛑 STOP POINT — 2026-08-26, evening. Start here; the 08-24 entry below still stands.
-
-**991 tests, 75 suites, `tsc --noEmit` clean, `build-status.mjs --check` up to date.** All
-three run this session rather than quoted from the last one. `feat/mobile-hud`, tree clean
-before the change below.
-
-**`jarvis-brain` stays closed**, as decided this morning. Everything here is app-side, and
-what the brain owes is generated into `docs/brain-dependencies.md` — do not re-diagnose the
-capitalised `Sir` or the Saturday-shift assertion from the phone; both are fixed at
-`c86d176` and merely unshipped.
-
-### The goal this session was aimed at
-
-**"He reaches you without the app being open"** — criterion 3 — pushed as far as the app
-repo alone can take it. Where it now stands, and it is worth reading as three separate
-things rather than one:
-
-- **Push, app closed:** proved, and unchanged.
-- **The phone's own fallback:** was not armed at all, and now arms itself, proves it took,
-  and says why when it cannot. Below.
-- **Reboot survival:** nothing to build, and now nothing to plug in either — the check is
-  four taps and a reboot (`TESTING.md` 1.9) instead of `adb logcat` on the one machine that
-  built the APK.
-- **The notification listener:** untouched, and deliberately. It is gated on the token
-  split, which is gateway work — a listener sees OTPs and private messages, and once that
-  is collected badly no later fix un-collects it.
-
-**What is left on this criterion is a phone in hand**, which is why the ledger's
-`blockedBy` moved from `app-build` to `device`.
 
 ## ✅ 2026-08-26, evening. The fallback arms itself, and admits it when it cannot.
 
