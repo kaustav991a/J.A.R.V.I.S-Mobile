@@ -19,7 +19,7 @@ import {
 } from './commute';
 import type { Departure } from './commute';
 import { currentFix, hasLocation, loadShareLocation } from './place';
-import { healthFrom, noteRun, readHeartbeat } from './taskHealth';
+import { healthFrom, noteArm, noteRun, readArm, readHeartbeat } from './taskHealth';
 import type { HealthReading } from './taskHealth';
 import { loadKnown } from './knownPlaces';
 
@@ -209,21 +209,62 @@ TaskManager.defineTask(COMMUTE_TASK, async () => {
 });
 
 /**
- * Ask the system to run the task, or stop asking.
+ * Whether Android ended up in the state it was asked for, and its words if not.
+ *
+ * A bare `false` was what this used to be, and `false` is where the 2026-08-26
+ * defect hid: the caller could not tell a refusal from a registration Android had
+ * quietly declined to keep, and neither could a screen, and neither could anyone
+ * reading the code afterwards.
+ */
+export type ArmResult = {
+  ok: boolean;
+  /** the platform's own message, or the finding when it did not produce one */
+  reason: string | null;
+};
+
+/**
+ * Ask the system to run the task, or stop asking — then check that it did.
  *
  * 15 minutes is the floor Android accepts; it will honour something much longer in
  * practice, which is why the task re-checks the clock instead of trusting when it
  * was woken.
+ *
+ * **The registration is read back afterwards, and that read is the result.**
+ * `registerTaskAsync` resolving means the call did not throw; it does not mean
+ * WorkManager is holding anything. Measured on the device: two departures on, this
+ * having run at launch, `dumpsys jobscheduler` at 657 jobs and none for this uid.
+ * The switch read ON for days and no code disagreed, because nothing had looked.
+ *
+ * Every arming attempt is recorded where a screen can find it later. The failure
+ * happens at launch and is read whenever somebody next opens Places, so a reason
+ * that lives only in this function's return value is a reason nobody sees.
  */
-export async function setCommuteTask(on: boolean): Promise<boolean> {
+export async function setCommuteTask(on: boolean): Promise<ArmResult> {
+  let result: ArmResult;
   try {
     const registered = await TaskManager.isTaskRegisteredAsync(COMMUTE_TASK);
     if (on && !registered) await BackgroundTask.registerTaskAsync(COMMUTE_TASK, { minimumInterval: 15 });
     if (!on && registered) await BackgroundTask.unregisterTaskAsync(COMMUTE_TASK);
-    return true;
-  } catch {
-    return false;
+
+    // the whole point: what is true afterwards, not what the call returned
+    const held = await TaskManager.isTaskRegisteredAsync(COMMUTE_TASK);
+    result =
+      held === on
+        ? { ok: true, reason: null }
+        : {
+            ok: false,
+            reason: on
+              ? 'Android raised no error and holds no registration for it.'
+              : 'Android raised no error and is still holding the registration.',
+          };
+  } catch (e) {
+    result = { ok: false, reason: e instanceof Error ? e.message : String(e) };
   }
+
+  // switching off is not a failure to arm, and recording one here would explain a
+  // deliberate act as a fault the next time somebody reads the screen
+  if (on) await noteArm({ at: Date.now(), ok: result.ok, reason: result.reason });
+  return result;
 }
 
 /**
@@ -240,7 +281,7 @@ export async function setCommuteTask(on: boolean): Promise<boolean> {
  * the user has since switched off, so the two cannot drift apart in either
  * direction. One registration serves every departure; the task picks which.
  */
-export async function syncCommuteTask(): Promise<boolean> {
+export async function syncCommuteTask(): Promise<ArmResult> {
   const { departures } = await loadCommute();
   return setCommuteTask(departures.some((d) => d.on));
 }
@@ -265,21 +306,26 @@ export async function commuteTaskRegistered(): Promise<boolean> {
 /**
  * The one reading worth putting on a screen.
  *
- * Composed here rather than in the screen so the three facts are always gathered
+ * Composed here rather than in the screen so the four facts are always gathered
  * together — a screen that read availability without the heartbeat is exactly the
  * screen that spent four days reporting a healthy task that had not run.
+ *
+ * The arming attempt is the fourth, and it is what turns `unarmed` from a finding
+ * into something a person can act on: refused with a reason, or held and since
+ * dropped, which want different responses.
  */
 export async function commuteTaskHealth(now: number = Date.now()): Promise<HealthReading> {
-  const [settings, registered, available, beat] = await Promise.all([
+  const [settings, registered, available, beat, arm] = await Promise.all([
     loadCommute(),
     commuteTaskRegistered(),
     commuteTaskAvailable(),
     readHeartbeat(),
+    readArm(),
   ]);
   // what was asked for, read separately from what Android is holding — the two
   // disagreeing is the whole reason this reading exists
   const wanted = settings.departures.some((d) => d.on);
-  return healthFrom({ wanted, registered, available, beat, now });
+  return healthFrom({ wanted, registered, available, beat, arm, now });
 }
 
 export async function commuteTaskAvailable(): Promise<boolean> {

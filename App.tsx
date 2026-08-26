@@ -125,10 +125,19 @@ export default function App() {
    * Places screen was the only thing that ever registered the task. Why that is
    * not enough is written at `syncCommuteTask`. Deferred with the rest: it is a
    * native round trip, and the launch animation has already been starved once.
+   *
+   * **The result is no longer thrown away.** `void syncCommuteTask()` was the last
+   * of the three places a failed registration went silent — caught in
+   * `setCommuteTask`, passed up as `false`, discarded here — and between them the
+   * phone spent days with two departures switched on and no job for this uid. The
+   * durable record is written by `setCommuteTask` for the Places screen to read;
+   * this line is the same fact where `adb logcat` can see it during a launch.
    */
   useEffect(() => {
     if (launching) return;
-    void syncCommuteTask();
+    void syncCommuteTask().then(({ ok, reason }) => {
+      if (!ok) console.log(`[jarvis] commute task not armed: ${reason ?? 'no reason given'}`);
+    });
   }, [launching]);
 
   /**

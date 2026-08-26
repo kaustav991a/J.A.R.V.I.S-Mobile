@@ -11,7 +11,8 @@ import {
 } from '../commute';
 import type { CommuteSettings } from '../commute';
 import { TITLES } from '../briefingVoice';
-import { COMMUTE_TASK, syncCommuteTask } from '../commuteTask';
+import { COMMUTE_TASK, commuteTaskHealth, setCommuteTask, syncCommuteTask } from '../commuteTask';
+import { noteArm, readArm } from '../taskHealth';
 
 /**
  * Registering the briefing at launch.
@@ -312,5 +313,107 @@ describe('the briefing task, run', () => {
 
     expect(await taskBody()).toBe(BackgroundTask.BackgroundTaskResult.Failed);
     expect(postNow).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Whether the request to arm it was honoured — which is not what the call tells you.
+ *
+ * On 2026-08-26 the device had two departures switched on, `syncCommuteTask` had run
+ * at launch, and `dumpsys jobscheduler` listed 657 registered jobs with none for this
+ * uid. `registerTaskAsync` resolving proves only that it did not throw. Reading the
+ * registration back is the difference between "asked" and "armed", and the reason
+ * this state could exist for days while the screen said the switch was on.
+ */
+describe('arming, and proving it took', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('reports it is not armed when Android holds nothing after being asked', async () => {
+    // no throw, no registration: the state the phone was actually in
+    registered.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+
+    const result = await setCommuteTask(true);
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/registration/i);
+  });
+
+  it('reports it is armed once Android is holding the registration', async () => {
+    registered.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    expect(await setCommuteTask(true)).toEqual({ ok: true, reason: null });
+  });
+
+  it('keeps the platform’s own words when registering throws', async () => {
+    // the bare `catch { return false }` this replaces threw the one fact away
+    registered.mockResolvedValue(false);
+    register.mockRejectedValueOnce(new Error('TaskManager is not available'));
+
+    const result = await setCommuteTask(true);
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('TaskManager is not available');
+  });
+
+  it('records the attempt where a screen can read it after the app is reopened', async () => {
+    // the failure happens at launch, and the person sees it whenever they next look —
+    // so the reason has to outlive the call that produced it
+    registered.mockResolvedValue(false);
+    register.mockRejectedValueOnce(new Error('TaskManager is not available'));
+
+    await setCommuteTask(true);
+
+    expect(await readArm()).toMatchObject({ ok: false, reason: expect.stringContaining('TaskManager') });
+  });
+
+  it('checks a registration it did not have to make, since one can be dropped later', async () => {
+    // a battery optimiser removing the WorkManager entry looks identical from here to
+    // never having registered, and only a read can tell them apart
+    registered.mockResolvedValue(true);
+
+    expect(await setCommuteTask(true)).toEqual({ ok: true, reason: null });
+    expect(register).not.toHaveBeenCalled();
+    expect(await readArm()).toMatchObject({ ok: true });
+  });
+
+  it('does not record an arming when the switch is being turned off', async () => {
+    // the record answers "why is the fallback not armed", and switching it off is not
+    // a failure to arm — writing one here would explain a deliberate act as a fault
+    registered.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    expect(await setCommuteTask(false)).toEqual({ ok: true, reason: null });
+    expect(await readArm()).toBeNull();
+  });
+
+  it('reports failure when Android is still holding a registration it was told to drop', async () => {
+    registered.mockResolvedValue(true);
+
+    expect((await setCommuteTask(false)).ok).toBe(false);
+  });
+
+  it('carries the launch-time result up through syncCommuteTask', async () => {
+    await saveCommute(withOn('home'));
+    registered.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+
+    expect((await syncCommuteTask()).ok).toBe(false);
+  });
+});
+
+describe('the health reading', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('carries the last arming attempt, so the screen can say why rather than only that', async () => {
+    await saveCommute(withOn('home'));
+    registered.mockResolvedValue(false);
+    await noteArm({ at: 5, ok: false, reason: 'TaskManager is not available' });
+
+    const reading = await commuteTaskHealth(10);
+
+    expect(reading.health).toBe('unarmed');
+    expect(reading.arm?.reason).toContain('TaskManager is not available');
   });
 });

@@ -5,7 +5,9 @@ import {
   forgetHeartbeat,
   healthFrom,
   healthLine,
+  noteArm,
   noteRun,
+  readArm,
   readHeartbeat,
 } from '../taskHealth';
 import type { Heartbeat } from '../taskHealth';
@@ -221,21 +223,95 @@ describe('the stored heartbeat', () => {
    * failed to arrive is the morning gone missing, and the second must never be
    * caused by the first.
    */
+  /**
+   * `jest.spyOn(AsyncStorage, 'setItem').mockRestore()` is how this was written, and
+   * it is a trap: the async-storage jest mock is *already* a `jest.fn`, so restoring
+   * the spy hands back a mock with no implementation at all. Every write for the rest
+   * of the file is then silently dropped and every read returns a stale value — which
+   * is what happened to the four tests below this one when they were added, and it
+   * reads exactly like a storage helper that does not work.
+   *
+   * `mockRejectedValueOnce` on the existing mock refuses one call and leaves the
+   * implementation where it was.
+   */
   it('does not throw when storage refuses, because it runs inside the task', async () => {
-    const spy = jest.spyOn(AsyncStorage, 'setItem').mockRejectedValue(new Error('no space'));
-    try {
-      await expect(noteRun('idle')).resolves.toBeUndefined();
-    } finally {
-      spy.mockRestore();
-    }
+    (AsyncStorage.setItem as jest.Mock).mockRejectedValueOnce(new Error('no space'));
+    await expect(noteRun('idle')).resolves.toBeUndefined();
   });
 
   it('reads as never-run when storage refuses, rather than failing the screen', async () => {
-    const spy = jest.spyOn(AsyncStorage, 'getItem').mockRejectedValue(new Error('unavailable'));
-    try {
-      expect(await readHeartbeat()).toBeNull();
-    } finally {
-      spy.mockRestore();
-    }
+    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error('unavailable'));
+    expect(await readHeartbeat()).toBeNull();
+  });
+});
+
+/**
+ * Why the fallback is not armed, which is a different question from whether it is.
+ *
+ * `unarmed` was found on the device on 2026-08-26 and said one sentence about three
+ * different situations: nothing ever tried, the attempt was refused, and the attempt
+ * was honoured and has since been dropped. They want three different responses —
+ * open the screen, read the platform's complaint, or lift the battery restriction —
+ * and a single sentence sends everybody to the wrong one.
+ */
+describe('the last attempt to arm it', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('is absent until the app has ever tried', async () => {
+    expect(await readArm()).toBeNull();
+  });
+
+  it('remembers the platform’s own words for a refusal', async () => {
+    // the reason was being swallowed by a bare catch in setCommuteTask, which is why
+    // a phone with the switch on and no registration could not say what had happened
+    await noteArm({ at: 500, ok: false, reason: 'TaskManager is not available' });
+
+    expect(await readArm()).toEqual({ at: 500, ok: false, reason: 'TaskManager is not available' });
+  });
+
+  it('keeps only the latest, because a screen asks about now', async () => {
+    await noteArm({ at: 1, ok: false, reason: 'first' });
+    await noteArm({ at: 2, ok: true, reason: null });
+
+    expect(await readArm()).toEqual({ at: 2, ok: true, reason: null });
+  });
+
+  it('is treated as never having tried when the stored shape is older than the code', async () => {
+    // the same rule the heartbeat follows: a record that cannot be described is worse
+    // than no record, because it would be reported as an attempt that did not happen
+    await AsyncStorage.setItem('jarvis_task_arm', JSON.stringify({ ok: true }));
+
+    expect(await readArm()).toBeNull();
+  });
+});
+
+describe('what it tells a person about not being armed', () => {
+  const now = 1_000_000;
+  const unarmed = (arm: Parameters<typeof healthFrom>[0]['arm']) =>
+    healthLine(healthFrom({ wanted: true, registered: false, available: true, beat: null, arm, now }));
+
+  it('names the platform’s reason when arming was refused', () => {
+    expect(unarmed({ at: now, ok: false, reason: 'TaskManager is not available' })).toContain(
+      'TaskManager is not available'
+    );
+  });
+
+  it('says Android dropped it when the last attempt was verified and the registration is gone', () => {
+    // distinct from a refusal, and the likelier one on this phone: WorkManager holds
+    // the entry and a battery optimiser removes it later, with nothing said
+    const said = unarmed({ at: now - 3_600_000, ok: true, reason: null });
+    expect(said).toContain('1 hour ago');
+    expect(said).toMatch(/dropped/i);
+  });
+
+  it('still says the fallback is not armed when nothing has ever tried', () => {
+    expect(unarmed(null)).toContain('not armed');
+  });
+
+  it('carries the attempt into the reading, so a screen can act on it', () => {
+    const arm = { at: now, ok: false, reason: 'no' };
+    expect(healthFrom({ wanted: true, registered: false, available: true, beat: null, arm, now }).arm).toEqual(arm);
   });
 });

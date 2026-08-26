@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Linking, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,9 +24,10 @@ import {
 } from '../lib/commute';
 import type { CommuteSettings, Departure } from '../lib/commute';
 import { commuteTaskAvailable, commuteTaskHealth, previewBriefing, setCommuteTask } from '../lib/commuteTask';
-import { healthLine } from '../lib/taskHealth';
+import { forgetHeartbeat, healthLine } from '../lib/taskHealth';
 import type { HealthReading } from '../lib/taskHealth';
 import { live } from '../state/live';
+import type { Live } from '../state/live';
 import { haptic } from '../lib/haptics';
 
 /**
@@ -48,16 +49,79 @@ export function PlacesScreen() {
   const [bgReady, setBgReady] = useState(true);
   const [health, setHealth] = useState<HealthReading | null>(null);
 
+  /**
+   * The one repair this screen can make, and it makes it once.
+   *
+   * `unarmed` is the state the device was found in on 2026-08-26: two departures
+   * switched on, and no job for this uid in `dumpsys jobscheduler`. Reporting it is
+   * better than the old "Available" badge and is still an answer nobody can act on —
+   * the only way back is to ask Android again, and the app is the only thing that can.
+   *
+   * Once per mount, and the guard is the point rather than an optimisation. A refusal
+   * is a platform decision, so repeating it turns one refusal into a loop that says
+   * the same sentence while the calls keep going. If the second attempt fails, the
+   * reason it failed is what the row then shows.
+   */
+  const rearmed = useRef(false);
+
+  const readHealth = useCallback(async (l: Live) => {
+    const first = await commuteTaskHealth();
+    l.only(setHealth)(first);
+    if (first.health !== 'unarmed' || rearmed.current) return;
+
+    rearmed.current = true;
+    await setCommuteTask(true);
+    l.only(setHealth)(await commuteTaskHealth());
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const l = live();
       void loadKnown().then(l.only(setPlaces));
       void loadCommute().then(l.only(setCommute));
       void commuteTaskAvailable().then(l.only(setBgReady));
-      void commuteTaskHealth().then(l.only(setHealth));
+      void readHealth(l);
       return l.end;
-    }, [])
+    }, [readHealth])
   );
+
+  /**
+   * Start the reboot check.
+   *
+   * WorkManager persists its own queue and reschedules at boot, so the briefing is
+   * *expected* to survive one — and expected is not observed. Confirming it used to
+   * mean `adb logcat` on the one machine that built the APK. Clear the count here,
+   * reboot, leave the app closed, and come back: a count above zero was written by a
+   * run nobody started, which is the whole claim.
+   */
+  const resetRuns = async () => {
+    await forgetHeartbeat();
+    setHealth(await commuteTaskHealth());
+    haptic.good();
+    toast.show('Run count cleared. Reboot, leave the app closed, then look again.');
+  };
+
+  /**
+   * Take the person to the screen that actually decides this.
+   *
+   * `openSettings()` opens the app's own settings page, from which the battery
+   * optimisation list is a menu, a submenu and three taps away — and this row exists
+   * because that list is the difference between an armed task and one Android never
+   * gives a window to: standby bucket 40 (RARE) on this device, not on the idle
+   * whitelist, `Network: blocked=REASON_APP_STANDBY` for this uid.
+   *
+   * The intent needs no permission, unlike `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`,
+   * which is a manifest entry and therefore a new build. It is not guaranteed to
+   * resolve on an OEM build without the activity, so a refusal falls back to the long
+   * way round rather than leaving a button that does nothing.
+   */
+  const liftBatteryRestrictions = async () => {
+    try {
+      await Linking.sendIntent('android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS');
+    } catch {
+      await Linking.openSettings().catch(() => {});
+    }
+  };
 
   const setHere = async (id: string, name: string) => {
     if (!shareLocation) {
@@ -362,6 +426,17 @@ export function PlacesScreen() {
             {health ? healthLine(health) : 'Checking.'}
           </Text>
         </View>
+        <Touchable
+          testID="commute-reset-runs"
+          accessibilityRole="button"
+          accessibilityLabel="Clear the run count to start the reboot check"
+          hitSlop={8}
+          onPress={() => {
+            void resetRuns();
+          }}
+        >
+          <Text style={[styles.action, { color: accent }]}>RESET</Text>
+        </Touchable>
       </View>
 
       <View style={styles.row}>
@@ -376,10 +451,10 @@ export function PlacesScreen() {
         <Touchable
           testID="commute-battery-settings"
           accessibilityRole="button"
-          accessibilityLabel="Open app settings to lift battery restrictions"
+          accessibilityLabel="Open Android's battery optimisation list"
           hitSlop={8}
           onPress={() => {
-            void Linking.openSettings().catch(() => {});
+            void liftBatteryRestrictions();
           }}
         >
           <Text style={[styles.action, { color: accent }]}>SETTINGS</Text>

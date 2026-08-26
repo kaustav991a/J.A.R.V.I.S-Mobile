@@ -27,11 +27,11 @@
   ],
   "meta": {
     "repo": "jarvis-mobile",
-    "read": "2026-08-24",
+    "read": "2026-08-26",
     "branch": "feat/mobile-hud",
-    "head": "ad361b6",
-    "tests": 893,
-    "suites": 70,
+    "head": "f89de82",
+    "tests": 991,
+    "suites": 75,
     "typecheck": "clean",
     "sources": {
       "status": "this file",
@@ -178,8 +178,8 @@
       "n": 3,
       "title": "He can be reached without the app being opened",
       "status": "partial",
-      "blockedBy": "app-build",
-      "detail": "Push is proved — it buzzed. Continuous presence needs BOOT_COMPLETED and the notification listener, and neither exists yet. The listener is itself gated by criterion 7."
+      "blockedBy": "device",
+      "detail": "Push is proved — it buzzed. `BOOT_COMPLETED` turned out to be granted already, measured on the installed APK rather than on the app half of the manifest, so reboot survival is a check rather than a build. The phone fallback was found unarmed on 2026-08-26 and now reads its registration back, records why it failed and repairs itself from Places. What is left in this repo is the notification listener, which is gated by criterion 7; everything else on this criterion is a phone in hand."
     },
     {
       "n": 4,
@@ -475,7 +475,7 @@
           "status": "untested",
           "blockedBy": "device",
           "goal": "reachable",
-          "note": "`getStatusAsync()` answers a different question from the one being asked: it reports `Available` on a phone with no registered job at all. The task now writes a heartbeat on every one of its seven exit paths, and `healthFrom` turns registration, availability and that stamp into one of five readings — `off`, `blocked`, `never-ran`, `stale`, `alive`. `never-ran` is the one the old screen could not produce, and `off` is what would have shown the unarmed fallback above on any day of the last week. 21 tests. On Places; not yet seen on a phone, because it ships in an update the device has not taken."
+          "note": "`getStatusAsync()` answers a different question from the one being asked: it reports `Available` on a phone with no registered job at all. The task writes a heartbeat on every one of its seven exit paths, and `healthFrom` turns registration, availability, that stamp and the last arming attempt into one of six readings — `off`, `unarmed`, `blocked`, `never-ran`, `stale`, `alive`. `unarmed` says three different things depending on the attempt behind it: nothing has ever asked, the platform refused with a reason, or it was held and Android has since dropped it — which want three different responses. 32 tests. On Places; not yet seen on a phone."
         },
         {
           "id": "push-sleeping",
@@ -536,10 +536,10 @@
         {
           "id": "fallback-armed",
           "name": "The phone fallback is actually armed, and says so when it is not",
-          "status": "broken",
-          "blockedBy": "app",
+          "status": "untested",
+          "blockedBy": "device",
           "goal": "reachable",
-          "note": "**Found on `84f40716`, 2026-08-26.** Briefings are arriving on time — 7 PM and 7 AM — and Home reports `AT THE GATEWAY`, so the gateway is the sender. The phone is meant to be the fallback behind it. With the app foregrounded and `syncCommuteTask` run at launch (`App.tsx:131`), `dumpsys jobscheduler` lists **657 registered jobs and none for this uid** — the fallback is not armed. Nothing anywhere says so, and the failure is silent at all three levels by construction: `setCommuteTask` catches and returns `false`, `syncCommuteTask` passes that up, and `App.tsx` discards it with `void`. This is the state `syncCommuteTask` own comment calls the worst available — the switch reads ON with nothing behind it — and it is invisible precisely because the gateway is covering for it."
+          "note": "**Found on `84f40716`, 2026-08-26; fixed the same day.** Briefings were arriving from the gateway while `dumpsys jobscheduler` listed 657 registered jobs and none for this uid — the fallback was not armed, and the failure was silent at all three levels by construction. `setCommuteTask` now **reads the registration back** after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s own words, every attempt is recorded where a screen can read it after a relaunch, and `App.tsx` logs a failure instead of discarding it. Places re-arms once per visit when it finds nothing held, so the switch either heals or names its refusal. 22 tests. Not yet seen on a phone."
         },
         {
           "id": "briefing-content",
@@ -1077,7 +1077,7 @@
       "title": "He comes back after a reboot",
       "state": "open",
       "blockedBy": "device",
-      "detail": "**The premise was wrong, corrected 2026-08-26 on the device.** This said the manifest had no `RECEIVE_BOOT_COMPLETED` and wanted a config plugin. It had been measured against `android/app/src/main/AndroidManifest.xml` — the app half — rather than the merged one. `adb shell dumpsys package` on the installed APK says `RECEIVE_BOOT_COMPLETED: granted=true`. `expo-notifications` 57.0.10 declares it, `expo-task-manager` declares a receiver on `BOOT_COMPLETED`, and `expo-background-task` schedules through WorkManager, which persists its own queue and reschedules at boot. **There is nothing to build.** What is owed is a check nobody has run: note the run count on Places, reboot, leave the app closed, see whether it moves.",
+      "detail": "**The premise was wrong, corrected 2026-08-26 on the device.** This said the manifest had no `RECEIVE_BOOT_COMPLETED` and wanted a config plugin. It had been measured against `android/app/src/main/AndroidManifest.xml` — the app half — rather than the merged one. `adb shell dumpsys package` on the installed APK says `RECEIVE_BOOT_COMPLETED: granted=true`. `expo-notifications` 57.0.10 declares it, `expo-task-manager` declares a receiver on `BOOT_COMPLETED`, and `expo-background-task` schedules through WorkManager, which persists its own queue and reschedules at boot. **There is nothing to build.** What is owed is a check nobody has run, and it no longer needs a cable: RESET on the Background briefing row clears the run count, so the check is reset, reboot, leave the app closed, come back and see whether it moved. `TESTING.md` 1.9.",
       "goal": "reachable"
     },
     {

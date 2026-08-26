@@ -29,7 +29,7 @@ guessing here has cost real time.
 ## Before you claim anything works
 
 ```bash
-npm test          # 944 tests, and this number goes stale — trust the run, not the comment
+npm test          # 991 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
 node scripts/build-status.mjs --check  # §0b, the tracker and brain-dependencies still match the ledger
 ```
@@ -167,6 +167,14 @@ of rediscovering them is high.
   here awaits it — and a state change caused by `fireEvent.press` needs awaiting
   too. A synchronous `getByTestId` straight after a press finds nothing and looks
   like a handler that never fired.
+- **Never `mockRestore()` a spy on AsyncStorage.** `jest-setup.js` installs the
+  library's own jest mock, so `setItem`/`getItem` are *already* `jest.fn`s —
+  `jest.spyOn(AsyncStorage, 'setItem').mockRestore()` hands back a mock with **no
+  implementation**, and from then on every write in that file is silently dropped and
+  every read returns a stale value. It cost four tests in `taskHealth.test.ts`, where
+  it reads exactly like a storage helper that does not work. Use
+  `(AsyncStorage.setItem as jest.Mock).mockRejectedValueOnce(...)` to make one call
+  fail and leave the implementation alone.
 
 ## House style
 

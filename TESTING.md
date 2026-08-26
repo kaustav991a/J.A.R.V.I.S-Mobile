@@ -52,6 +52,24 @@ grep -a -B 30 "Before you leave" shade.txt | grep -a "tag="
 The gateway's push carries `tag=FCM-Notification:*`. A notification the phone posted
 itself does not. Two records, one of each, means both senders fired.
 
+### 1b. Is the phone's fallback armed at all — and does it survive a reboot
+
+The gateway sends the briefings, so it covers for a fallback that is not running and
+these two checks are the only way to see that from the phone. **Places → Background
+briefing** is the row; no cable, no laptop.
+
+| # | Feature | Do this | Pass | Fail |
+| --- | --- | --- | --- | --- |
+| 1.7 | The row says what is true | A departure switched on, open Places | `Last ran …`, with what the run did and a count | `The fallback is not armed`, then a sentence saying why — read it, it is the finding |
+| 1.8 | It repairs itself | Open Places on a phone reading not armed, leave the screen and come back | The row changes to `Last ran…` or `never once run` — either means Android is holding it now | Still not armed, with the platform's refusal quoted. That reason is the bug report |
+| 1.9 | **He comes back after a reboot** | Tap RESET on that row, reboot the phone, **do not open the app**, wait an hour, then open Places | A count above zero. Nobody started that run, so WorkManager rescheduled it at boot | `never once run` after several hours. Then do 1.10 before concluding anything |
+| 1.10 | It is allowed a window at all | Tap SETTINGS on **Battery restrictions**, set this app to Unrestricted, then repeat 1.9 | Android's battery optimisation list opens directly | The app's own settings page opens — the intent did not resolve, so go the long way round |
+
+`never once run` is not the same finding as `not armed`: the first is Android holding
+the registration and never giving it a window, which is 1.10, and the second is
+nothing being held at all. Measured on this phone on 2026-08-26: standby bucket 40
+(RARE), not on the device-idle whitelist, `Network: blocked=REASON_APP_STANDBY`.
+
 ---
 
 ## 2. He speaks first

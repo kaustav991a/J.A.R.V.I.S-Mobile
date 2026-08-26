@@ -16,6 +16,130 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## 🛑 STOP POINT — 2026-08-26, evening. Start here; the 08-24 entry below still stands.
+
+**991 tests, 75 suites, `tsc --noEmit` clean, `build-status.mjs --check` up to date.** All
+three run this session rather than quoted from the last one. `feat/mobile-hud`, tree clean
+before the change below.
+
+**`jarvis-brain` stays closed**, as decided this morning. Everything here is app-side, and
+what the brain owes is generated into `docs/brain-dependencies.md` — do not re-diagnose the
+capitalised `Sir` or the Saturday-shift assertion from the phone; both are fixed at
+`c86d176` and merely unshipped.
+
+### The goal this session was aimed at
+
+**"He reaches you without the app being open"** — criterion 3 — pushed as far as the app
+repo alone can take it. Where it now stands, and it is worth reading as three separate
+things rather than one:
+
+- **Push, app closed:** proved, and unchanged.
+- **The phone's own fallback:** was not armed at all, and now arms itself, proves it took,
+  and says why when it cannot. Below.
+- **Reboot survival:** nothing to build, and now nothing to plug in either — the check is
+  four taps and a reboot (`TESTING.md` 1.9) instead of `adb logcat` on the one machine that
+  built the APK.
+- **The notification listener:** untouched, and deliberately. It is gated on the token
+  split, which is gateway work — a listener sees OTPs and private messages, and once that
+  is collected badly no later fix un-collects it.
+
+**What is left on this criterion is a phone in hand**, which is why the ledger's
+`blockedBy` moved from `app-build` to `device`.
+
+## ✅ 2026-08-26, evening. The fallback arms itself, and admits it when it cannot.
+
+**Two sittings, and the first one never got written down here** — `f89de82` landed the
+heartbeat and this file was not touched, so the home machine would have pulled a `RESUME.md`
+that stopped a commit short. That is the rule this project already has, broken the same day
+it was written. The archaeology it owed is the first half below.
+
+### Half one, `f89de82` — the device contradicted the ledger twice
+
+Chasing this same goal with the phone on `adb`.
+
+**Queue 5 was built on a false premise.** It said the manifest had no
+`RECEIVE_BOOT_COMPLETED` and wanted a config plugin. That had been measured against
+`android/app/src/main/AndroidManifest.xml` — **the app half** — rather than the merged
+manifest. `dumpsys package` on the installed APK says `RECEIVE_BOOT_COMPLETED: granted=true`:
+`expo-notifications` declares it, `expo-task-manager` declares a receiver on
+`BOOT_COMPLETED`, and `expo-background-task` schedules through WorkManager, which persists
+its own queue and reschedules at boot. **There was nothing to build.** A build was queued for
+four days against a file that answers a different question.
+
+**And worse.** Briefings were arriving on time, 7 PM and 7 AM, and Home read `AT THE
+GATEWAY` — so the gateway was sending them. With the app foregrounded and `syncCommuteTask`
+having run at launch, `dumpsys jobscheduler` listed **657 registered jobs and none for this
+uid**. The phone fallback was not armed. It was invisible *precisely because the gateway was
+covering for it*, and silent by construction at all three levels: `setCommuteTask` caught and
+returned `false`, `syncCommuteTask` passed that up, `App.tsx` discarded it with `void`.
+
+So the task now writes a heartbeat on every one of its seven exit paths, recording **what**
+the run did as well as that it happened. `healthFrom` turns four facts into one of six
+readings — it grew a sixth mid-change, because the device found a state the first five could
+not express: wanted-but-not-registered would have printed *"No departure is switched on"* at
+someone with two of them switched on.
+
+Measured on `84f40716`: standby bucket **40 (RARE)**, not on the device-idle whitelist.
+
+### Half two — asked is not armed
+
+The heartbeat made the state visible and left it unrepaired, which is half an answer: the
+screen could say *the fallback is not armed* and the only thing that can arm it is the app.
+
+**`registerTaskAsync` resolving proves the call did not throw.** It does not prove
+WorkManager is holding anything, and the device is the proof: switch on, launch sync run, no
+job. So `setCommuteTask` **reads the registration back** and that read is the result. Three
+outcomes where there used to be a bare `false` — held, refused with the platform's own
+message, or *raised no error and holds no registration*, which is the state the phone was
+actually in and had no words for.
+
+**The reason has to outlive the call that produced it.** The failure happens at launch and is
+read whenever somebody next opens Places, so every arming attempt is recorded to storage.
+`unarmed` now says one of three things, because it was one word covering three situations
+wanting three different responses: nothing has ever asked, the platform refused *and here is
+what it said*, or it was armed and Android has since dropped it — the last being what a
+battery optimiser does, silently.
+
+**Places repairs it, once per visit.** Once is the design and not an optimisation: a refusal
+is a platform decision, and repeating it turns one refusal into a loop that says the same
+sentence while the calls keep going. If the second attempt fails too, its reason is what the
+row shows.
+
+Two smaller things on the same goal, both OTA-safe:
+
+- **RESET on the briefing row** clears the run count, which is the whole reboot check.
+- **Battery restrictions now opens the battery optimisation list**, via
+  `IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, rather than the app's own settings page three taps
+  away from it. The intent needs no permission — `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` is a
+  manifest entry and therefore a new build — and falls back to `openSettings()` on an OEM
+  build without the activity, because a dead button is worse than the long way round.
+
+### The trap this cost an hour to, and it is now in `AGENTS.md`
+
+`jest.spyOn(AsyncStorage, 'setItem').mockRestore()` — four new tests failed with storage that
+round-tripped perfectly in isolation. `jest-setup.js` installs the library's own jest mock,
+so `setItem` is *already* a `jest.fn`: restoring the spy hands back a mock with **no
+implementation**, and every write for the rest of the file is silently dropped while reads
+return stale values. It reads exactly like a helper that does not work.
+`mockRejectedValueOnce` on the existing mock instead.
+
+**`PlacesScreen` had no test file at all** before this. It has one now — six tests, and the
+re-arm, the once-only guard and the reset are in it.
+
+### What this does not prove
+
+Nothing here has been seen on the phone. The ledger rows say `untested` and mean it. In
+order, and all four are one sitting with the phone unlocked in hand:
+
+1. Open Places. Read the Background briefing row — if it says not armed, leave and come back
+   once, and see whether it heals or quotes a refusal.
+2. Battery restrictions → SETTINGS. It should land on Android's optimisation list directly.
+   Set this app to Unrestricted.
+3. RESET, reboot, **leave the app closed**, wait, reopen: a count above zero was written by a
+   run nobody started.
+4. `never once run` after all that is not the same finding as `not armed` — it is the RARE
+   bucket, and step 2 is the answer to it.
+
 ## ✅ 2026-08-26, later. The leaving briefing stops repeating itself.
 
 **944 tests, 73 suites, `tsc --noEmit` clean.** Asked for directly: the two daily

@@ -89,6 +89,59 @@ export async function forgetHeartbeat(): Promise<void> {
   }
 }
 
+/** Where the last attempt to arm the task lives. One record; the current one. */
+const ARM_KEY = 'jarvis_task_arm';
+
+/**
+ * The last time the app asked Android to hold a registration, and what came back.
+ *
+ * `unarmed` says the fallback is not armed. It does not say why, and there are three
+ * whys with three different answers: nothing has ever asked, the ask was refused, or
+ * the ask was honoured and the registration has since been dropped. The first wants
+ * the app opened, the second wants the platform's complaint read, and the third wants
+ * the battery restriction lifted — so one sentence for all three sends two people out
+ * of three to the wrong place.
+ *
+ * **`ok` means verified, not returned.** `registerTaskAsync` resolving proves the call
+ * did not throw; only reading the registration back proves Android is holding it. The
+ * device on 2026-08-26 had a switch reading ON, a call that had evidently not thrown,
+ * and no job for this uid in `dumpsys jobscheduler`.
+ */
+export type ArmAttempt = {
+  at: number;
+  /** whether Android was found to be holding the registration afterwards */
+  ok: boolean;
+  /** the platform's own words when it was not, and `null` when it was */
+  reason: string | null;
+};
+
+/** Record an attempt. Never throws: a lost diagnostic must not cost the briefing. */
+export async function noteArm(a: ArmAttempt): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ARM_KEY, JSON.stringify(a));
+  } catch {
+    // diagnostics are never allowed to cost the thing they diagnose
+  }
+}
+
+/** The last attempt, or `null` if the app has never once tried. */
+export async function readArm(): Promise<ArmAttempt | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ARM_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const { at, ok, reason } = parsed as Partial<ArmAttempt>;
+    // the heartbeat's rule, for the heartbeat's reason: a record that cannot be
+    // described is reported as no record rather than as an attempt that did not happen
+    if (typeof at !== 'number' || !Number.isFinite(at)) return null;
+    if (typeof ok !== 'boolean') return null;
+    return { at, ok, reason: typeof reason === 'string' ? reason : null };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Android's floor is 15 minutes and it honours something much longer in practice,
  * so a task in a good state can be quiet for a while. Six hours is chosen to be
@@ -127,6 +180,15 @@ export type HealthReading = {
   /** ms since the last run, or `null` if it has never run */
   since: number | null;
   beat: Heartbeat | null;
+  /** the last attempt to arm it, which is what `unarmed` needs explaining with */
+  arm: ArmAttempt | null;
+  /**
+   * ms since that attempt, or `null` if there has never been one.
+   *
+   * Carried rather than read from the clock inside `healthLine`, so the sentence
+   * stays a pure function of the reading — the same reason `since` is here.
+   */
+  armAge: number | null;
 };
 
 /**
@@ -146,18 +208,22 @@ export function healthFrom(input: {
   registered: boolean;
   available: boolean;
   beat: Heartbeat | null;
+  /** the last attempt to arm it; optional because most states do not turn on it */
+  arm?: ArmAttempt | null;
   now: number;
 }): HealthReading {
   const { wanted, registered, available, beat, now } = input;
+  const arm = input.arm ?? null;
+  const armAge = arm ? Math.max(0, now - arm.at) : null;
   const since = beat ? Math.max(0, now - beat.at) : null;
 
   // asked for and not held is the defect; not asked for explains everything after it
-  if (!wanted) return { health: 'off', since, beat };
-  if (!registered) return { health: 'unarmed', since, beat };
-  if (!available) return { health: 'blocked', since, beat };
-  if (!beat) return { health: 'never-ran', since: null, beat: null };
+  if (!wanted) return { health: 'off', since, beat, arm, armAge };
+  if (!registered) return { health: 'unarmed', since, beat, arm, armAge };
+  if (!available) return { health: 'blocked', since, beat, arm, armAge };
+  if (!beat) return { health: 'never-ran', since: null, beat: null, arm, armAge };
   // a stamp from the future is a clock that moved, not a run that has not happened
-  return { health: since !== null && since > STALE_AFTER_MS ? 'stale' : 'alive', since, beat };
+  return { health: since !== null && since > STALE_AFTER_MS ? 'stale' : 'alive', since, beat, arm, armAge };
 }
 
 /**
@@ -172,7 +238,7 @@ export function healthLine(r: HealthReading): string {
     case 'off':
       return 'Not scheduled. No departure is switched on.';
     case 'unarmed':
-      return 'Switched on, and Android holds no registration for it. The fallback is not armed.';
+      return `Switched on, and Android holds no registration for it. The fallback is not armed. ${whyUnarmed(r.arm, r.armAge)}`.trim();
     case 'blocked':
       return 'Scheduled, and Android has background work disabled for this app. It cannot run.';
     case 'never-ran':
@@ -183,6 +249,21 @@ export function healthLine(r: HealthReading): string {
       return `Last ran ${ago(r.since ?? 0)}. ${lastDid(r.beat)}`;
   }
 }
+
+/**
+ * The half of `unarmed` that says what to do about it.
+ *
+ * Three situations wearing one word. A refusal quotes the platform rather than
+ * paraphrasing it: the message is the only thing here nobody has guessed at, and a
+ * rewrite of an Android error is a rewrite of the one fact in the sentence.
+ */
+const whyUnarmed = (arm: ArmAttempt | null, age: number | null): string => {
+  if (!arm) return 'Nothing has asked it to yet.';
+  if (!arm.ok) return `Arming it failed ${ago(age ?? 0)}: ${arm.reason ?? 'no reason given'}.`;
+  // the likelier case on this phone, and the one that used to be invisible: the
+  // registration was verified and something removed it afterwards without a word
+  return `It was armed ${ago(age ?? 0)} and Android has since dropped it.`;
+};
 
 const lastDid = (beat: Heartbeat | null): string => {
   if (!beat) return '';
