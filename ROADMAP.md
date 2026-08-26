@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**39 of 82 rows are proved on the phone** (48%). 58 have code (71%). 31 cannot be finished in this repo: 19 on the brain, 2 on the desk, 10 on the phone.
+**39 of 83 rows are proved on the phone** (47%). 58 have code (70%). 32 cannot be finished in this repo: 20 on the brain, 2 on the desk, 10 on the phone.
 
 ### Transport, pairing, security
 
@@ -261,7 +261,7 @@ in §2; `—` — not built.
 
 ### Notifications and being spoken to
 
-*10 proved of 13.*
+*10 proved of 14.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -272,7 +272,8 @@ in §2; `—` — not built.
 | A notification tap opens Chat | proved |  |  |
 | A desk-watch alert reaching a closed app | proved |  | Tapping it opens the alert screen. |
 | A pushed departure briefing, unprompted | proved |  | It arrives. It also arrived twice — the gate is built but no departure window has run since. |
-| Briefing content, thresholds, quiet-day announcement | proved |  | Figures, never the model. |
+| Briefing content, thresholds, quiet-day announcement | proved |  | Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. **The wording rotates as of 2026-08-26** — a persisted cursor per slot in `briefingVoice.ts` spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. **Only the phone-sent briefing is affected;** when the gateway is armed it writes its own text. |
+| Rotating wording in the gateway-sent briefing | — | Brain | The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. |
 | He speaks first, once a day | broken | Brain | Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. |
 | Briefings visible in the Activity panel | proved |  | They had been filtered out entirely. |
 | Read / unread per entry, surviving a restart | proved |  |  |

@@ -29,7 +29,7 @@ guessing here has cost real time.
 ## Before you claim anything works
 
 ```bash
-npm test          # 916 tests, and this number goes stale — trust the run, not the comment
+npm test          # 944 tests, and this number goes stale — trust the run, not the comment
 npm run typecheck # tsc --noEmit
 node scripts/build-status.mjs --check  # §0b, the tracker and brain-dependencies still match the ledger
 ```

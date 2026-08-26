@@ -7,7 +7,7 @@
 >
 > Head: c86d176 on `fix/durable-state`; `feat/cloud-gateway` is what Render watches.
 >
-> **19 ledger rows and 5 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
+> **20 ledger rows and 6 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
 
 ## Read these before touching anything that looks broken
 
@@ -15,7 +15,7 @@
 - **Until `fix/durable-state` merges, every deploy silently disarms the briefing.** It has already happened twice, with nothing said anywhere. The merge is the whole of the deploy: `git merge fix/durable-state && git push` from `feat/cloud-gateway`.
 - The local checkout of `feat/cloud-gateway` is **42 commits behind its remote**. Work that feels missing from this machine is on GitHub. Fetch before concluding anything about that branch.
 
-## The queue items — 5
+## The queue items — 6
 
 ### 11 · The notification listener
 
@@ -37,7 +37,11 @@ Place, battery, link — one field on the envelope. The most character per line 
 
 The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it says neither. Needs a per-message id on both sides — and reply-to-a-message wants the same id, so it follows rather than inventing a second identity for a message.
 
-## The ledger rows — 19
+### 22 · The gateway briefing repeats itself too
+
+The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time.
+
+## The ledger rows — 20
 
 Every row whose blocker is `brain`, in the order §0b renders them.
 
@@ -61,6 +65,7 @@ Every row whose blocker is `brain`, in the order §0b renders them.
 
 | | Status | Why it is here |
 | --- | --- | --- |
+| Rotating wording in the gateway-sent briefing | — | The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. |
 | He speaks first, once a day | broken | Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. |
 
 ### Memory and the journal

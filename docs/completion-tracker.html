@@ -372,22 +372,22 @@
 
   <div class="meters">
     <div class="meter">
-      <span class="meter-num" style="color:var(--proved)">48<span>%</span></span>
+      <span class="meter-num" style="color:var(--proved)">47<span>%</span></span>
       <span class="meter-label">Proved on the phone</span>
-      <div class="track"><i style="width:48%;background:var(--proved)"></i></div>
-      <p class="meter-sub">39 of 82 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
+      <div class="track"><i style="width:47%;background:var(--proved)"></i></div>
+      <p class="meter-sub">39 of 83 ledger rows a human has watched work. Nothing is upgraded by a passing test alone.</p>
     </div>
     <div class="meter">
-      <span class="meter-num" style="color:var(--accent)">71<span>%</span></span>
+      <span class="meter-num" style="color:var(--accent)">70<span>%</span></span>
       <span class="meter-label">Has code</span>
-      <div class="track"><i style="width:71%;background:var(--accent)"></i></div>
+      <div class="track"><i style="width:70%;background:var(--accent)"></i></div>
       <p class="meter-sub">58 rows: proved, partial, unexercised and broken together. The gap to the left is the honesty gap.</p>
     </div>
     <div class="meter">
-      <span class="meter-num" style="color:#ff8fa0">31</span>
+      <span class="meter-num" style="color:#ff8fa0">32</span>
       <span class="meter-label">Blocked outside this repo</span>
-      <div class="track"><i style="width:38%;background:#ff8fa0"></i></div>
-      <p class="meter-sub">19 on the brain, 2 on the desk, 10 on the phone in hand. Marked on every row below.</p>
+      <div class="track"><i style="width:39%;background:#ff8fa0"></i></div>
+      <p class="meter-sub">20 on the brain, 2 on the desk, 10 on the phone in hand. Marked on every row below.</p>
     </div>
     <div class="meter">
       <span class="meter-num">0<span>/10</span></span>
@@ -529,7 +529,7 @@
   </section>
 
   <section>
-    <h2>The ledger — all 82 rows</h2>
+    <h2>The ledger — all 83 rows</h2>
     <p class="sec-note">
       <strong>Proved</strong> — a human has seen it work on the phone.
       <strong>Partial</strong> — works, with a named gap.
@@ -552,7 +552,7 @@
     <div class="controls">
       <span class="controls-label">Blocked on</span>
       <button class="filter" data-k="b" data-f="all" aria-pressed="true">Anything</button>
-      <button class="filter" data-k="b" data-f="brain" aria-pressed="false">Brain (19)</button>
+      <button class="filter" data-k="b" data-f="brain" aria-pressed="false">Brain (20)</button>
       <button class="filter" data-k="b" data-f="desk" aria-pressed="false">Desk (2)</button>
       <button class="filter" data-k="b" data-f="device" aria-pressed="false">Phone (10)</button>
       <button class="filter" data-k="b" data-f="app-build" aria-pressed="false">App · build (2)</button>
@@ -859,9 +859,9 @@
       <div class="area">
         <div class="area-head">
           <h3>Notifications and being spoken to</h3>
-          <span class="area-stat"><b>10</b> proved of 13 · 13 have code</span>
+          <span class="area-stat"><b>10</b> proved of 14 · 13 have code</span>
         </div>
-        <div class="bar" role="img" aria-label="1 broken, 2 partial, 0 unexercised, 10 proved, 0 not built"><i class="broken" style="width:7.6923076923076925%"></i><i class="partial" style="width:15.384615384615385%"></i><i class="proved" style="width:76.92307692307693%"></i></div>
+        <div class="bar" role="img" aria-label="1 broken, 2 partial, 0 unexercised, 10 proved, 1 not built"><i class="broken" style="width:7.142857142857142%"></i><i class="partial" style="width:14.285714285714285%"></i><i class="proved" style="width:71.42857142857143%"></i><i class="none" style="width:7.142857142857142%"></i></div>
         <div class="rows">
           <div class="row" data-s="proved" data-b="none">
             <div>
@@ -936,11 +936,21 @@
           <div class="row" data-s="proved" data-b="none">
             <div>
               <div class="row-name">Briefing content, thresholds, quiet-day announcement</div>
-              <div class="row-note">Figures, never the model.</div>
+              <div class="row-note">Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. <strong>The wording rotates as of 2026-08-26</strong> — a persisted cursor per slot in <code>briefingVoice.ts</code> spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. <strong>Only the phone-sent briefing is affected;</strong> when the gateway is armed it writes its own text.</div>
             </div>
             <div class="row-tags">
               
               <span class="chip proved">Proved</span>
+            </div>
+          </div>
+          <div class="row" data-s="none" data-b="brain">
+            <div>
+              <div class="row-name">Rotating wording in the gateway-sent briefing</div>
+              <div class="row-note">The phone rotates its own wording; the gateway does not. When <code>cloudArmed</code> is true the phone stays silent by design and the gateway posts <code>_briefing_text</code>, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as <code>briefingVoice.ts</code>: a pool per slot and a cursor that survives a deploy, which is why it wants <code>fix/durable-state</code> merged first rather than a second store that a redeploy wipes.</div>
+            </div>
+            <div class="row-tags">
+              <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. **Closed as of 2026-08-26 and deliberately not being touched;** that repo is clean and fully pushed. The long form of every row here, and what each costs when it is opened again, is in `docs/brain-dependencies.md`.">Brain</span>
+              <span class="chip none">Not built</span>
             </div>
           </div>
           <div class="row" data-s="broken" data-b="brain">
@@ -1443,9 +1453,9 @@
         <tbody>
         <tr>
           <td><span class="dep dep-brain">Brain</span></td>
-          <td class="num">19</td>
+          <td class="num">20</td>
           <td>jarvis-brain — a gateway route, a merge, or a deploy. **Closed as of 2026-08-26 and deliberately not being touched;** that repo is clean and fully pushed. The long form of every row here, and what each costs when it is opened again, is in `docs/brain-dependencies.md`.</td>
-          <td class="held">Capability-split tokens · Token expiry · The voice rule applied to what the model writes · No unprompted weekday assertion · Sent / delivered / read ticks · Reply to a message · He speaks first, once a day · Facts stored and recalled · One assistant across desk, phone and chat · Rolling memory durable across restarts · Deploy-durable gateway state · Chat history sent with the ask · Weather and distance from measured figures · The situation sent to the persona · Scripts: create, update, delete, run by id · Run history · Presence — awake but idle · Declared rules (“tell me if I haven’t…”) · Anticipation that finds you in your pocket</td>
+          <td class="held">Capability-split tokens · Token expiry · The voice rule applied to what the model writes · No unprompted weekday assertion · Sent / delivered / read ticks · Reply to a message · Rotating wording in the gateway-sent briefing · He speaks first, once a day · Facts stored and recalled · One assistant across desk, phone and chat · Rolling memory durable across restarts · Deploy-durable gateway state · Chat history sent with the ask · Weather and distance from measured figures · The situation sent to the persona · Scripts: create, update, delete, run by id · Run history · Presence — awake but idle · Declared rules (“tell me if I haven’t…”) · Anticipation that finds you in your pocket</td>
         </tr>
         <tr>
           <td><span class="dep dep-desk">Desk</span></td>
@@ -1621,7 +1631,7 @@
   <section>
     <h2>Every task, and what is actually finished</h2>
     <p class="sec-note">
-      All 23 of them, blocked ones included. <strong>A title is struck through only
+      All 24 of them, blocked ones included. <strong>A title is struck through only
       when it is proved</strong> — a human has seen it work — which is the same bar the ledger
       uses. <span class="q-tag q-tag-shipped">Shipped · unproved</span> means code landed, tests
       green, published, and still nobody has looked: the most recent one was correct in
@@ -1630,7 +1640,7 @@
     </p>
     <p class="sec-note" style="margin-top:-10px">
       <strong>2 proved · 1 shipped and unproved ·
-      12 open · 8 blocked elsewhere.</strong>
+      13 open · 8 blocked elsewhere.</strong>
       Detail for each in <code>docs/superpowers/plans/2026-08-24-app-completion.md</code>.
     </p>
     <div class="queue">
@@ -1886,6 +1896,17 @@
           <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
           <span class="q-tag q-tag-open" title="Not started.">Open</span>
         </div>
+      </div>
+      <div class="q q-open">
+        <span class="q-n">22</span>
+        <div>
+          <p class="q-t">The gateway briefing repeats itself too</p>
+          <p class="q-d">The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants <code>fix/durable-state</code> merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time.</p>
+        </div>
+        <div class="row-tags">
+          <span class="dep dep-brain" title="jarvis-brain — a gateway route, a merge, or a deploy. **Closed as of 2026-08-26 and deliberately not being touched;** that repo is clean and fully pushed. The long form of every row here, and what each costs when it is opened again, is in `docs/brain-dependencies.md`.">Brain</span>
+          <span class="q-tag q-tag-open" title="Not started.">Open</span>
+        </div>
       </div></div>
   </section>
 
@@ -1916,7 +1937,7 @@
     });
     const shown = rows.filter((r) => !r.classList.contains('hide')).length;
     countEl.textContent = shown === rows.length
-      ? `82 rows · 39 proved · 24 not built`
+      ? `83 rows · 39 proved · 25 not built`
       : shown + ' of ' + rows.length + ' rows';
     try { localStorage.setItem('jarvis-status-filter', JSON.stringify(pick)); } catch (e) { /* private window, or site data blocked */ }
   }

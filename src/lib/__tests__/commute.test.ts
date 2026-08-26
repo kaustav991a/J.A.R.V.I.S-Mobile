@@ -16,6 +16,18 @@ import {
   saveCommute,
 } from '../commute';
 import type { CommuteSettings, Departure } from '../commute';
+import { TITLES } from '../briefingVoice';
+
+/**
+ * The wording rotates as of 2026-08-26, so a title is asserted by membership.
+ *
+ * These lines used to be pinned as exact strings, and they passed only because a
+ * fresh cursor draws variant 0 — meaning a test added ABOVE them would have broken
+ * them for no reason anyone would enjoy diagnosing. The table itself is checked in
+ * `briefingVoice.test.ts`; here the question is only whether the briefing used it.
+ */
+const isTitle = (kind: 'warn' | 'clear', label: string, actual: string) =>
+  expect(TITLES[kind].map((f) => f(label))).toContain(actual);
 
 /**
  * The clock labels, the day mask, and which door is due.
@@ -332,7 +344,7 @@ describe('commuteBriefing outcomes', () => {
     const out = await commuteBriefing(22.57, 88.36, home, when);
     expect(out.state).toBe('briefing');
     if (out.state !== 'briefing') throw new Error('narrowing');
-    expect(out.briefing.title).toBe('Before you leave Home, sir');
+    isTitle('warn', 'Home', out.briefing.title);
     expect(out.briefing.body).toContain('umbrella');
     // the window still names both ends with a meridiem, which is the 08-14 fix
     expect(out.briefing.body).toContain('8 AM–11 AM');
@@ -351,7 +363,7 @@ describe('commuteBriefing outcomes', () => {
     serve(payload([mild(8), mild(9), mild(10)]));
     const out = await commuteBriefing(22.57, 88.36, home, when);
     if (out.state !== 'clear') throw new Error('narrowing');
-    expect(out.briefing.title).toBe('Nothing in your way from Home, sir');
+    isTitle('clear', 'Home', out.briefing.title);
     expect(out.briefing.body).toContain('Nothing to carry');
   });
 
@@ -391,7 +403,7 @@ describe('commuteBriefing outcomes', () => {
    */
   const branches: Array<{ name: string; row: (h: number) => Row; figure: string; remark: string }> = [
     { name: 'rain', row: wet, figure: '80% chance', remark: 'umbrella' },
-    { name: 'heat', row: hot, figure: '41°C', remark: 'hospital' },
+    { name: 'heat', row: hot, figure: '41°C', remark: 'Water' },
     { name: 'cold', row: cold, figure: '8°C', remark: 'jacket' },
     { name: 'wind', row: windy, figure: '47 km/h', remark: 'hair' },
   ];
@@ -413,7 +425,74 @@ describe('commuteBriefing outcomes', () => {
     const out = await commuteBriefing(22.57, 88.36, home, when);
     if (out.state !== 'briefing') throw new Error('narrowing');
     expect(out.briefing.body).toContain('Thunderstorms forecast');
+    // the instruction, which every storm variant keeps
+    expect(out.briefing.body).toContain('Leave early or wait it out');
     expect(out.briefing.body).toContain('8 AM–11 AM');
+  });
+
+/**
+   * The complaint this rotation exists for, asserted end to end.
+   *
+   * Two briefings, identical weather, and the wording must differ — both the title
+   * and the remark. It arrives twice a day, every weekday, and the same eleven words
+   * about an umbrella become furniture faster than the forecast changes. A
+   * notification you have stopped reading is indistinguishable from one that never
+   * arrived, which this feature has already learned once from the other direction.
+   */
+  it('does not say the same thing twice when the weather is the same twice', async () => {
+    serve(payload([wet(8), mild(9), mild(10)]));
+    const first = await commuteBriefing(22.57, 88.36, home, when);
+    serve(payload([wet(8), mild(9), mild(10)]));
+    const second = await commuteBriefing(22.57, 88.36, home, when);
+    if (first.state !== 'briefing' || second.state !== 'briefing') throw new Error('narrowing');
+
+    expect(second.briefing.body).not.toBe(first.briefing.body);
+    expect(second.briefing.title).not.toBe(first.briefing.title);
+    // and the figure is identical in both, because a measurement rephrased for
+    // novelty is one you can no longer compare with yesterday's
+    expect(first.briefing.body).toContain('80% chance');
+    expect(second.briefing.body).toContain('80% chance');
+  });
+
+  it('varies the quiet morning too, which is the one most often identical', async () => {
+    serve(payload([mild(8), mild(9), mild(10)]));
+    const first = await commuteBriefing(22.57, 88.36, home, when);
+    serve(payload([mild(8), mild(9), mild(10)]));
+    const second = await commuteBriefing(22.57, 88.36, home, when);
+    if (first.state !== 'clear' || second.state !== 'clear') throw new Error('narrowing');
+
+    expect(second.briefing.title).not.toBe(first.briefing.title);
+    expect(second.briefing.body).not.toBe(first.briefing.body);
+    // the figures are still there to be disagreed with, in both
+    for (const out of [first, second]) expect(out.briefing.body).toContain('5% chance of rain');
+  });
+
+  /**
+   * A lookup that failed must not spend a line.
+   *
+   * Six failed runs would otherwise walk the cursor through the whole pool, and the
+   * next briefing that actually arrived would carry the same wording as the last one
+   * — the exact complaint, reintroduced through the failure path. On the test phone
+   * the headless task has no network at all, so this is the common case and not a
+   * hypothetical.
+   */
+  it('does not spend a line on a lookup that failed', async () => {
+    serve(payload([wet(8), mild(9), mild(10)]));
+    const first = await commuteBriefing(22.57, 88.36, home, when);
+    if (first.state !== 'briefing') throw new Error('narrowing');
+
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = jest
+      .fn()
+      .mockRejectedValue(new Error('Network request failed'));
+    expect((await commuteBriefing(22.57, 88.36, home, when)).state).toBe('unavailable');
+
+    serve(payload([wet(8), mild(9), mild(10)]));
+    const next = await commuteBriefing(22.57, 88.36, home, when);
+    if (next.state !== 'briefing') throw new Error('narrowing');
+
+    // the failure sat between them and took nothing: this is the line that would
+    // have come next anyway
+    expect(next.briefing.body).not.toBe(first.briefing.body);
   });
 
   it('never exclaims, in any branch, including the quiet one', async () => {

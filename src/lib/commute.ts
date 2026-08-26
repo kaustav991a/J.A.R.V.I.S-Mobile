@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { openVoice } from './briefingVoice';
+import type { Slot, Voice } from './briefingVoice';
 
 /**
  * The leaving briefing: what the journey looks like, and what to carry.
@@ -403,7 +405,14 @@ export async function commuteBriefing(
   lat: number,
   lon: number,
   d: Departure,
-  now = new Date()
+  now = new Date(),
+  /**
+   * Where the wording comes from.
+   *
+   * Injected rather than reached for, so a test can hand in a known cursor and
+   * assert the whole rotation. The default is the real one, so no caller changes.
+   */
+  voice?: Voice
 ): Promise<BriefingOutcome> {
   try {
     const url =
@@ -467,28 +476,42 @@ export async function commuteBriefing(
      * path, whose entire job is admitting he does not know — a joke there sounds
      * like an answer.
      */
+    /**
+     * The figure is measured, the remark is drawn, and the join is what enforces
+     * rule 1.
+     *
+     * Every line here used to be one string with both halves in it, which meant the
+     * ordering was a thing a rewrite could get wrong — and the test that guards it
+     * says so explicitly. Now the figure cannot follow the remark, because the
+     * template does not allow it.
+     *
+     * The figures themselves are deliberately NOT varied. A measurement rephrased
+     * for novelty is one you can no longer compare with yesterday's, and comparing
+     * is most of what a morning figure is for.
+     */
+    const v = voice ?? (await openVoice());
     const notes: string[] = [];
+    const say = (figure: string, slot: Slot) => notes.push(`${figure} ${v.remark(slot)}`);
+
     if (storm) {
-      notes.push('Thunderstorms forecast. Leave early or wait it out — either beats the alternative.');
+      say('Thunderstorms forecast.', 'storm');
     }
     if (maxChance >= RAIN_CHANCE || totalMm >= RAIN_MM) {
-      notes.push(
+      say(
         `A ${Math.round(maxChance)}% chance of rain on your way out` +
           (totalMm >= RAIN_MM ? `, around ${totalMm.toFixed(1)} mm` : '') +
-          `. An umbrella, unless you've grown fond of arriving wet.`
+          '.',
+        'rain'
       );
     }
     if (maxTemp !== null && maxTemp >= HOT_C) {
-      notes.push(
-        `It reaches ${Math.round(maxTemp)}°C today. Water, and something for your head — ` +
-          `I would rather not arrange the hospital visit.`
-      );
+      say(`It reaches ${Math.round(maxTemp)}°C today.`, 'hot');
     }
     if (minTemp !== null && minTemp <= COLD_C) {
-      notes.push(`Down to ${Math.round(minTemp)}°C. The jacket you keep ignoring would be appropriate.`);
+      say(`Down to ${Math.round(minTemp)}°C.`, 'cold');
     }
     if (maxWind >= WINDY_KMH) {
-      notes.push(`Gusts to ${Math.round(maxWind)} km/h. Mind the hair.`);
+      say(`Gusts to ${Math.round(maxWind)} km/h.`, 'wind');
     }
 
     // both ends carry the meridiem even when they share one: this label read
@@ -512,27 +535,40 @@ export async function commuteBriefing(
      * buzz attached.
      */
     if (!notes.length) {
-      return {
-        state: 'clear',
+      const clear = {
+        state: 'clear' as const,
         briefing: {
-          title: `Nothing in your way from ${d.label}, sir`,
+          title: v.title('clear', d.label),
           body:
             `Nothing to carry. ${maxTemp === null ? '' : `${Math.round(maxTemp)}°C, `}` +
             `a ${Math.round(maxChance)}% chance of rain, wind ${Math.round(maxWind)} km/h (${window}). ` +
-            `Do try to enjoy it.`,
+            v.remark('clear'),
         },
       };
+      await v.commit();
+      return clear;
     }
 
-    return {
-      state: 'briefing',
+    const briefing = {
+      state: 'briefing' as const,
       briefing: {
-        // named, because two of these arrive in a day and a shade holding both has
-        // to say which door each one is about
-        title: `Before you leave ${d.label}, sir`,
+        // named in every variant, because two of these arrive in a day and a shade
+        // holding both has to say which door each one is about
+        title: v.title('warn', d.label),
         body: `${notes.join(' ')} (${window})`,
       },
     };
+    /**
+     * Committed only on a message that is actually going out.
+     *
+     * The `unavailable` paths return before this, which is the behaviour that
+     * matters: a failed lookup must not burn a line. Six failed runs would
+     * otherwise spend the whole pool and the next real briefing would arrive on the
+     * same wording as the last one — the exact complaint, reintroduced by the
+     * failure path.
+     */
+    await v.commit();
+    return briefing;
   } catch {
     // the common one, and the reason this function stopped returning null: a
     // headless task in Android's RARE standby bucket has its network blocked, so

@@ -428,7 +428,14 @@
           "name": "Briefing content, thresholds, quiet-day announcement",
           "status": "proved",
           "blockedBy": "none",
-          "note": "Figures, never the model."
+          "note": "Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. **The wording rotates as of 2026-08-26** — a persisted cursor per slot in `briefingVoice.ts` spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. **Only the phone-sent briefing is affected;** when the gateway is armed it writes its own text."
+        },
+        {
+          "id": "gateway-briefing-wording",
+          "name": "Rotating wording in the gateway-sent briefing",
+          "status": "none",
+          "blockedBy": "brain",
+          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes."
         },
         {
           "id": "speaks-first",
@@ -1011,6 +1018,13 @@
       "state": "open",
       "blockedBy": "app",
       "detail": "The log renders times with no date, so Saturday noon reads as this morning — it misled a debugging session on 2026-08-24 before the timestamps were read directly. Small, and it is the difference between a log you can trust and one you have to decode."
+    },
+    {
+      "n": 22,
+      "title": "The gateway briefing repeats itself too",
+      "state": "open",
+      "blockedBy": "brain",
+      "detail": "The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time."
     }
   ]
 }

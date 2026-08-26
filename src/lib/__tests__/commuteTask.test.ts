@@ -10,6 +10,7 @@ import {
   saveCommute,
 } from '../commute';
 import type { CommuteSettings } from '../commute';
+import { TITLES } from '../briefingVoice';
 import { COMMUTE_TASK, syncCommuteTask } from '../commuteTask';
 
 /**
@@ -225,7 +226,8 @@ describe('the briefing task, run', () => {
 
     expect(await taskBody()).toBe(BackgroundTask.BackgroundTaskResult.Success);
     expect(postNow).toHaveBeenCalledTimes(1);
-    expect(postNow.mock.calls[0][0].title).toBe('Before you leave Home, sir');
+    // one of the rotating variants, all of which name the place — see `briefingVoice.test.ts`
+    expect(TITLES.warn.map((f) => f('Home'))).toContain(postNow.mock.calls[0][0].title);
   });
 
   it('stands down when the gateway holds the schedule', async () => {

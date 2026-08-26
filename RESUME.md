@@ -16,6 +16,81 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ 2026-08-26, later. The leaving briefing stops repeating itself.
+
+**944 tests, 73 suites, `tsc --noEmit` clean.** Asked for directly: the two daily
+notifications had become wallpaper.
+
+### What was actually there
+
+Every line was a fixed template literal in `commute.ts` — five notes, two titles, one
+quiet-day tail. Twice a day, every weekday, in the same words. *"An umbrella, unless
+you've grown fond of arriving wet"* is a good line once and furniture by the fourth
+morning, and **a notification you have stopped reading is indistinguishable from one
+that never arrived** — which this feature already learned from the other direction on
+2026-08-18, when silence on a quiet morning read as breakage for four days.
+
+### The three decisions that shaped it
+
+**The figures do not vary.** A measurement rephrased for novelty is one you can no
+longer compare with yesterday's, and comparing is most of what a morning figure is
+for. So the split is: figure measured, remark drawn, joined by a template. Rule 1 —
+figure first — is now true *by construction* rather than by review; there is no
+ordering left for a rewrite to get wrong.
+
+**Every variant keeps the actionable word.** `umbrella`, `jacket`, `Water`,
+`Leave early or wait it out`. Android truncates a body in the shade, so a variant
+that kept the joke and dropped the instruction would be a briefing that failed one
+morning in six, unreproducibly. Asserted over the whole table, not over one rendering.
+
+**Rotation, not randomness.** Random repeats — on a pool of six it shows the same line
+twice running about one morning in six, which is the exact complaint. A persisted
+cursor per slot spends the pool before any line returns, and it is deterministic, so
+the sequence can be asserted rather than sampled. One cursor across both departures,
+because the morning and the evening are the two messages most likely to be compared.
+
+The cursor is committed **only on a briefing that actually goes out.** The
+`unavailable` paths return before it. Six failed runs would otherwise walk the pool
+and the next real briefing would arrive on the same wording as the last — the
+complaint, reintroduced through the failure path, and on this phone the headless task
+has no background network so failure is the common case.
+
+### The bug I put in and took out
+
+`depth()` derived a pool's length from its cursor key, and title cursors are stored
+under `title:warn` — so it looked that up in `TITLES`, found nothing, and read
+`.length` of `undefined`. `commuteBriefing` wraps everything in a try, so it surfaced
+as `state: 'unavailable'` on eleven tests: a lookup failure, not a crash. The lesson
+is the fix — the caller already holds the array, so it passes the length instead of
+anything re-deriving it.
+
+### The tests that were passing for the wrong reason
+
+The old suite pinned exact strings — `expect(title).toBe('Before you leave Home, sir')`
+— and after the change they **still passed**, because a fresh cursor draws variant 0.
+That is worse than failing: a test added *above* them would have broken them, and the
+diagnosis would have been miserable. Retied to membership in the table.
+`{ remark: 'hospital' }` became `'Water'` for the same reason: `hospital` was the
+needle, which varies; `Water` is the instruction, which cannot.
+
+30 new tests. The rotation, the table-wide rules, a cursor from a shrunk pool, a
+cursor that is not a number, a store holding nonsense, and storage refusing to read
+or write — one repeated line is a smaller failure than a briefing that did not arrive,
+so neither may throw.
+
+### What this does NOT fix, and it matters
+
+**Only the phone-sent briefing.** When `cloudArmed` is true the phone stays silent by
+design — it is a fallback, not a second sender, which was settled on 2026-08-21 when
+both fired and the briefing arrived twice. The gateway then posts `_briefing_text`,
+a fixed template in the closed repo. **So on a cloud-linked phone the repetition is
+still what arrives.** Recorded rather than left as a surprise: new ledger row
+`gateway-briefing-wording` and queue item 22, both `blockedBy: brain`, and both now in
+the generated `docs/brain-dependencies.md`. It wants `fix/durable-state` merged first,
+since a cursor a redeploy resets would restart the rotation on the same line forever.
+
+---
+
 ## ✅ CLOSED — 2026-08-26. Queue 2, provider effects that outlive their tree.
 
 **916 tests, 72 suites, `tsc --noEmit` clean, generated docs in step.** Up from 903 and
