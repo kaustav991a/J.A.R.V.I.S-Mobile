@@ -472,10 +472,10 @@
         {
           "id": "task-heartbeat",
           "name": "Whether the background task is running, not merely registered",
-          "status": "untested",
-          "blockedBy": "device",
+          "status": "proved",
+          "blockedBy": "none",
           "goal": "reachable",
-          "note": "`getStatusAsync()` answers a different question from the one being asked: it reports `Available` on a phone with no registered job at all. The task writes a heartbeat on every one of its seven exit paths, and `healthFrom` turns registration, availability, that stamp and the last arming attempt into one of six readings — `off`, `unarmed`, `blocked`, `never-ran`, `stale`, `alive`. `unarmed` says three different things depending on the attempt behind it: nothing has ever asked, the platform refused with a reason, or it was held and Android has since dropped it — which want three different responses. 32 tests. On Places; not yet seen on a phone."
+          "note": "**Seen on `84f40716`, 2026-08-26, on update `01a03dfe`.** The row read *“Last ran 4 minutes ago. Nothing was due. 1 run recorded.”* against a run the log timestamps at 17:51:39 — so the stamp the task writes is the stamp the screen reads. `getStatusAsync()` answers a different question and reported `Available` throughout the week this feature had not run. `healthFrom` turns registration, availability, the stamp and the last arming attempt into one of six readings; `unarmed` further splits by that attempt — never asked, refused with a reason, or armed and since dropped. 32 tests."
         },
         {
           "id": "push-sleeping",
@@ -536,10 +536,10 @@
         {
           "id": "fallback-armed",
           "name": "The phone fallback is actually armed, and says so when it is not",
-          "status": "untested",
+          "status": "partial",
           "blockedBy": "device",
           "goal": "reachable",
-          "note": "**Found on `84f40716`, 2026-08-26; fixed the same day.** Briefings were arriving from the gateway while `dumpsys jobscheduler` listed 657 registered jobs and none for this uid — the fallback was not armed, and the failure was silent at all three levels by construction. `setCommuteTask` now **reads the registration back** after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s own words, every attempt is recorded where a screen can read it after a relaunch, and `App.tsx` logs a failure instead of discarding it. Places re-arms once per visit when it finds nothing held, so the switch either heals or names its refusal. 22 tests. Not yet seen on a phone."
+          "note": "**Found unarmed on 2026-08-26, fixed, and the armed half proved on the device the same day.** `setCommuteTask` reads the registration back after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s words, every attempt is recorded for a screen to read after a relaunch, and `App.tsx` logs a failure rather than discarding it. **Proved:** WorkManager holds job `#u0a495/288`, the task executes and writes its stamp, and Places reports it truthfully. **The named gap is the other half — “says so when it is not”.** The phone re-arms itself at launch and on every visit to Places, so the unarmed state cannot be induced on demand; it is covered by tests and by the reading that named it, not by a sighting."
         },
         {
           "id": "briefing-content",

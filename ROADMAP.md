@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**39 of 85 rows are proved on the phone** (46%). 60 have code (71%). 34 cannot be finished in this repo: 20 on the brain, 2 on the desk, 12 on the phone.
+**40 of 85 rows are proved on the phone** (47%). 60 have code (71%). 33 cannot be finished in this repo: 20 on the brain, 2 on the desk, 11 on the phone.
 
 ### Transport, pairing, security
 
@@ -261,11 +261,11 @@ in §2; `—` — not built.
 
 ### Notifications and being spoken to
 
-*10 proved of 16.*
+*11 proved of 16.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
-| Whether the background task is running, not merely registered | untested | Phone | `getStatusAsync()` answers a different question from the one being asked: it reports `Available` on a phone with no registered job at all. The task writes a heartbeat on every one of its seven exit paths, and `healthFrom` turns registration, availability, that stamp and the last arming attempt into one of six readings — `off`, `unarmed`, `blocked`, `never-ran`, `stale`, `alive`. `unarmed` says three different things depending on the attempt behind it: nothing has ever asked, the platform refused with a reason, or it was held and Android has since dropped it — which want three different responses. 32 tests. On Places; not yet seen on a phone. |
+| Whether the background task is running, not merely registered | proved |  | **Seen on `84f40716`, 2026-08-26, on update `01a03dfe`.** The row read *“Last ran 4 minutes ago. Nothing was due. 1 run recorded.”* against a run the log timestamps at 17:51:39 — so the stamp the task writes is the stamp the screen reads. `getStatusAsync()` answers a different question and reported `Available` throughout the week this feature had not run. `healthFrom` turns registration, availability, the stamp and the last arming attempt into one of six readings; `unarmed` further splits by that attempt — never asked, refused with a reason, or armed and since dropped. 32 tests. |
 | Push to a sleeping phone | proved |  | It buzzed. Reaches a dead app and is exempt from the background-execution block. |
 | Both notification channels exist on the device | proved |  | Confirmed by adb, neither deleted. |
 | The desk alert outranks an everyday one | proved |  | Importance 5 against 3. |
@@ -273,7 +273,7 @@ in §2; `—` — not built.
 | A notification tap opens Chat | proved |  |  |
 | A desk-watch alert reaching a closed app | proved |  | Tapping it opens the alert screen. |
 | A pushed departure briefing, unprompted | proved |  | It arrives. It also arrived twice — the gate is built but no departure window has run since. |
-| The phone fallback is actually armed, and says so when it is not | untested | Phone | **Found on `84f40716`, 2026-08-26; fixed the same day.** Briefings were arriving from the gateway while `dumpsys jobscheduler` listed 657 registered jobs and none for this uid — the fallback was not armed, and the failure was silent at all three levels by construction. `setCommuteTask` now **reads the registration back** after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s own words, every attempt is recorded where a screen can read it after a relaunch, and `App.tsx` logs a failure instead of discarding it. Places re-arms once per visit when it finds nothing held, so the switch either heals or names its refusal. 22 tests. Not yet seen on a phone. |
+| The phone fallback is actually armed, and says so when it is not | partial | Phone | **Found unarmed on 2026-08-26, fixed, and the armed half proved on the device the same day.** `setCommuteTask` reads the registration back after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s words, every attempt is recorded for a screen to read after a relaunch, and `App.tsx` logs a failure rather than discarding it. **Proved:** WorkManager holds job `#u0a495/288`, the task executes and writes its stamp, and Places reports it truthfully. **The named gap is the other half — “says so when it is not”.** The phone re-arms itself at launch and on every visit to Places, so the unarmed state cannot be induced on demand; it is covered by tests and by the reading that named it, not by a sighting. |
 | Briefing content, thresholds, quiet-day announcement | proved |  | Thresholds on real figures, never the model. Quiet day announced with its figures rather than silently, after silence was read as breakage for four days. **The wording rotates as of 2026-08-26** — a persisted cursor per slot in `briefingVoice.ts` spends a pool of 6–7 remarks before any line returns, and the titles rotate with it. The figures deliberately do NOT vary: a measurement rephrased for novelty is one you can no longer compare with yesterday. Every variant keeps the actionable word, so Android truncating the shade cannot eat the instruction. 30 tests, and the rules are asserted over the whole table rather than over one rendering. **Only the phone-sent briefing is affected;** when the gateway is armed it writes its own text. |
 | Rotating wording in the gateway-sent briefing | — | Brain | The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. |
 | He speaks first, once a day | broken | Brain | Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. |

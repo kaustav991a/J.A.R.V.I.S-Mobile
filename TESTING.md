@@ -62,13 +62,18 @@ briefing** is the row; no cable, no laptop.
 | --- | --- | --- | --- | --- |
 | 1.7 | The row says what is true | A departure switched on, open Places | `Last ran …`, with what the run did and a count | `The fallback is not armed`, then a sentence saying why — read it, it is the finding |
 | 1.8 | It repairs itself | Open Places on a phone reading not armed, leave the screen and come back | The row changes to `Last ran…` or `never once run` — either means Android is holding it now | Still not armed, with the platform's refusal quoted. That reason is the bug report |
-| 1.9 | **He comes back after a reboot** | Tap RESET on that row, reboot the phone, **do not open the app**, wait an hour, then open Places | A count above zero. Nobody started that run, so WorkManager rescheduled it at boot | `never once run` after several hours. Then do 1.10 before concluding anything |
+| 1.9 | **He comes back after a reboot** | Note the run count, or tap RESET to zero it, then reboot the phone, **do not open the app**, wait an hour, then open Places | A higher count than you noted. Nobody started those runs, so WorkManager rescheduled at boot | The same count after several hours. Then do 1.10 before concluding anything |
 | 1.10 | It is allowed a window at all | Tap SETTINGS on **Battery restrictions**, set this app to Unrestricted, then repeat 1.9 | Android's battery optimisation list opens directly | The app's own settings page opens — the intent did not resolve, so go the long way round |
 
 `never once run` is not the same finding as `not armed`: the first is Android holding
 the registration and never giving it a window, which is 1.10, and the second is
 nothing being held at all. Measured on this phone on 2026-08-26: standby bucket 40
 (RARE), not on the device-idle whitelist, `Network: blocked=REASON_APP_STANDBY`.
+
+**Noting the count beats tapping RESET when a laptop is doing the driving.** RESET is a
+`Touchable`, and `adb shell input` cannot press one — three methods were tried on
+2026-08-26 and none fired. Reading the count and comparing it later needs no taps that
+adb cannot make. Same for PREVIEW in 1.5: that one genuinely needs a finger.
 
 ---
 

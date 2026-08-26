@@ -157,16 +157,30 @@ of rediscovering them is high.
   hand (`npx expo-updates fingerprint:generate --platform android`) before building —
   remembering that `android/` is gitignored and generated, so a later `prebuild` puts
   the placeholder back without saying so.
-- **The tab bar cannot be driven by `adb shell input`.** Every tab node reports
-  `clickable=false` — `GlassTabBar` handles touch through gesture-handler, not Android
-  click semantics — so neither `input tap` nor a held `input swipe` at the right
-  coordinates switches tabs. A `Pressable`/`SettingsRow` accepts `input tap` normally,
-  so in-screen automation works and **tab switching needs a human finger.** Plan device
-  checks to start on the tab you need, or ask for the one tap.
+- **`Touchable` cannot be driven by `adb shell input`; `SettingsRow` can.** Measured on
+  2026-08-26 across three methods — `input tap`, a held `input swipe`, and an explicit
+  `input motionevent DOWN/UP` — against RESET and PREVIEW on Places. None fired: the row
+  text never changed and no notification was posted. `Touchable` is
+  `Animated.createAnimatedComponent(Pressable)`, and synthetic events do not reach it. A
+  plain `Pressable`/`SettingsRow` takes `input tap` normally, which is how Settings →
+  Places opens. So **anything rendered as a `Touchable` — RESET, PREVIEW, SETTINGS,
+  UPDATE, the X on a named place — needs a human finger.** Plan a device check so the
+  taps you cannot make are the ones you ask for.
+- **The tab bar takes a held `input swipe`, not a tap.** `AGENTS.md` said neither worked;
+  a 140ms `input swipe x y x y 140` on the Settings tab switched tabs on 2026-08-26, where
+  a plain `input tap` at the same point did nothing. `GlassTabBar` handles touch through
+  gesture-handler, which wants a press duration rather than an instantaneous down-up.
 - **RNTL 14 renders asynchronously.** `render()` returns a promise — every suite
   here awaits it — and a state change caused by `fireEvent.press` needs awaiting
   too. A synchronous `getByTestId` straight after a press finds nothing and looks
   like a handler that never fired.
+- **`eas update` needs `--platform android` or it fails on web.** The export defaults to
+  `--platform=all`, and the web bundle cannot resolve
+  `expo-sqlite/web/wa-sqlite/wa-sqlite.wasm` — the file is not in `node_modules`. The import
+  chain is `App.tsx → src/lib/commuteTask.ts → journal/store.ts → expo-sqlite`, so anything
+  that reaches the journal drags it in. It fails **after** a full minute of bundling with
+  `Web Bundling failed`, `✖ Export failed`, and nothing about Android, which reads like a
+  broken publish rather than a platform this app does not ship.
 - **Never `mockRestore()` a spy on AsyncStorage.** `jest-setup.js` installs the
   library's own jest mock, so `setItem`/`getItem` are *already* `jest.fn`s —
   `jest.spyOn(AsyncStorage, 'setItem').mockRestore()` hands back a mock with **no
