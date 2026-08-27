@@ -48,6 +48,22 @@ export function turnMark(entry: ChatEntry, now: number, isLast: boolean): TurnMa
        */
       return { label: 'NOT SENT', tone: 'bad', retry: true };
 
+    case 'interrupted':
+      /**
+       * Says what happened, and claims nothing about the outcome.
+       *
+       * The tempting fix was to reuse `failed`, and it is wrong: that label reads
+       * `NOT SENT` and carries a retry justified by nothing having been carried.
+       * A turn interrupted mid-send may have reached the gateway — the window
+       * spans `link.send()` — so `NOT SENT` would be a guess, and a safe-looking
+       * `SEND AGAIN` on `run script X` could run it twice.
+       *
+       * `bad` rather than `waiting`: nothing is coming for it, and it will not
+       * resolve itself. No retry, because this app does not offer one it cannot
+       * promise — the words are there to be copied, which is what its owner did.
+       */
+      return { label: 'INTERRUPTED', tone: 'bad', retry: false };
+
     case 'awaiting':
       /**
        * Carried, and still owed an answer — and deliberately silent.

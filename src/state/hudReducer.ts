@@ -37,7 +37,7 @@ export type ChatEntry = {
    * dropped reply leaves behind, and until now it was indistinguishable on screen
    * from a reply still being written.
    */
-  state?: 'sending' | 'awaiting' | 'failed' | 'answered';
+  state?: 'sending' | 'awaiting' | 'failed' | 'answered' | 'interrupted';
 };
 
 /**
@@ -546,7 +546,23 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
       // Ordered, not merely concatenated. The restored half goes first because a turn
       // can arrive before the disk read finishes, but "before" is about arrival and
       // the log is read as a chronology — see `inOrder`.
-      return { ...state, chat: cap(inOrder([...restored, ...state.chat]), CHAT_CAP) };
+      /**
+       * A restored turn still saying `sending` lost the process that owned it.
+       *
+       * Only the restored half is touched. A turn genuinely in flight in THIS
+       * session is also `sending`, and it has a result coming — accusing it would
+       * be the same lie in the other direction. That is why this is decided by
+       * where the entry came from rather than by how old it is: a slow send on a
+       * bad connection is not an interrupted one, and no threshold can tell them
+       * apart.
+       */
+      const orphaned = restored.map((c) =>
+        c.from === 'user' && c.state === 'sending' ? { ...c, state: 'interrupted' as const } : c
+      );
+      // Ordered, not merely concatenated. The restored half goes first because a turn
+      // can arrive before the disk read finishes, but "before" is about arrival and
+      // the log is read as a chronology — see `inOrder`.
+      return { ...state, chat: cap(inOrder([...orphaned, ...state.chat]), CHAT_CAP) };
     }
     case 'reset':
       return initialHudState;

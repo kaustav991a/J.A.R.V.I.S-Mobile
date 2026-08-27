@@ -516,6 +516,66 @@ describe('a restored log written in the wrong order', () => {
   });
 });
 
+/**
+ * A restored turn still claiming to be sending is orphaned, by definition.
+ *
+ * `sending` is the gap between `local_command` and `turn_sent`/`turn_failed`. Those
+ * dispatches belong to a process, so a turn that survives to a reload still wearing
+ * `sending` has lost the only thing that could ever have moved it — and nothing else
+ * looked at it again. One sat on the device reading `SENDING` for three days.
+ *
+ * Detected on restore rather than by age: it is a fact about which process owned the
+ * send, not a guess about how long a send may take, and a slow in-flight turn in THIS
+ * session must never be accused.
+ */
+describe('a turn restored still claiming to be sending', () => {
+  it('is marked interrupted, because the send it belonged to is gone', () => {
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [{ from: 'user', text: 'thanks Jarvis', at: 1_000, state: 'sending' }],
+    });
+
+    expect(s.chat[0].state).toBe('interrupted');
+  });
+
+  it('leaves a turn that is genuinely in flight in this session alone', () => {
+    let s = hudReducer(initialHudState, { type: 'local_command', text: 'lock the desk', at: 9_000 });
+    expect(s.chat[0].state).toBe('sending');
+
+    s = hudReducer(s, {
+      type: 'hydrate',
+      chat: [{ from: 'user', text: 'older', at: 1_000, state: 'answered' }],
+    });
+
+    expect(s.chat.find((c) => c.text === 'lock the desk')?.state).toBe('sending');
+  });
+
+  it('leaves every other restored state exactly as written', () => {
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [
+        { from: 'user', text: 'a', at: 1_000, state: 'answered' },
+        { from: 'user', text: 'b', at: 2_000, state: 'awaiting' },
+        { from: 'user', text: 'c', at: 3_000, state: 'failed' },
+      ],
+    });
+
+    expect(s.chat.map((c) => c.state)).toEqual(['answered', 'awaiting', 'failed']);
+  });
+
+  it('is not dragged back into waiting by a result that arrives after a relaunch', () => {
+    // `turn_sent` only ever moves a `sending` turn, and an interrupted one is no longer
+    // that — so a late dispatch cannot quietly re-open a turn the app already gave up on
+    let s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [{ from: 'user', text: 'thanks Jarvis', at: 1_000, state: 'sending' }],
+    });
+    s = hudReducer(s, { type: 'turn_sent', at: 1_000 });
+
+    expect(s.chat[0].state).toBe('interrupted');
+  });
+});
+
 describe('a pushed reply that was also carried over the socket', () => {
   const greeting = { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null } as const;
 

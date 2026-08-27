@@ -51,6 +51,34 @@ describe('a turn nothing could carry', () => {
   });
 });
 
+/**
+ * The app died with the send half-made.
+ *
+ * Found on the device 2026-08-27: a `thanks Jarvis` from three days earlier still
+ * reading `SENDING`, because the process that owned the send was killed between
+ * `local_command` and its result, and nothing re-examined the turn on reload. The
+ * operator read it as never sent and re-sent it by hand, which is the only duplicate
+ * in that log.
+ */
+describe('a turn the app was killed in the middle of', () => {
+  const cut = turnMark(mine('interrupted'), NOW, true);
+
+  it('says what happened rather than guessing the outcome', () => {
+    expect(cut?.label).toBe('INTERRUPTED');
+  });
+
+  it('does NOT offer to send it again', () => {
+    // `failed` may offer that because nothing carried the message. This state cannot
+    // make the same promise: the app can die after `link.send()` as well as before it,
+    // and a "run script" sent twice runs twice.
+    expect(cut?.retry).toBe(false);
+  });
+
+  it('reads as wrong, because it needs a decision and will not resolve itself', () => {
+    expect(cut?.tone).toBe('bad');
+  });
+});
+
 describe('a turn that was carried and never answered', () => {
   /**
    * Silent, and that is a decision rather than an omission.
