@@ -172,7 +172,19 @@ export function RootNavigator() {
           id={TABS_ID}
           initialRouteName="Home"
           tabBar={(props) => <GlassTabBar {...props} icons={TAB_ICON} />}
-          screenOptions={{ headerShown: false, sceneStyle: styles.scene }}
+          /**
+           * A tab you come back to is where that tab starts.
+           *
+           * Every tab owns a stack, and a stack remembering where you were is right
+           * while you are in it and wrong the moment you leave: pressing Settings
+           * asks for settings, and being handed the sub-screen you were reading
+           * earlier is an answer to a question nobody asked. Reported from the
+           * device on 2026-08-27 against Settings, and it was true of all five.
+           *
+           * On blur rather than on press, so it also covers the ways of leaving a
+           * tab that are not a tab press — a quick action, a notification tap.
+           */
+          screenOptions={{ headerShown: false, popToTopOnBlur: true, sceneStyle: styles.scene }}
         >
           <Tabs.Screen name="Scripts" component={ScriptsStackScreens} />
           <Tabs.Screen name="Commands" component={CommandsStackScreens} options={{ tabBarLabel: 'Chat' }} />

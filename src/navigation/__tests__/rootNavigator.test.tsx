@@ -125,6 +125,31 @@ describe('RootNavigator', () => {
     expect(await findByTestId('connection-screen')).toBeTruthy();
   });
 
+  /**
+   * A tab you come back to is where that tab starts, not where you left it.
+   *
+   * Reported from the device 2026-08-27: open Settings, tap into one of its rows,
+   * go Home, tap Settings again — and the row you had opened is what appears. Each
+   * tab owns a stack and a stack remembers, which is right while you are IN the tab
+   * and wrong the moment you leave it: pressing Settings asks for settings, and
+   * being shown the sub-screen you were reading twenty minutes ago is an answer to
+   * a question nobody asked.
+   */
+  it('shows the settings list again after leaving the tab and coming back', async () => {
+    const { findByTestId, getByTestId } = await mount();
+    await findByTestId('home-screen');
+
+    fireEvent.press(getByTestId('tab-Settings'));
+    fireEvent.press(await findByTestId('settings-about'));
+    expect(await findByTestId('about-screen')).toBeTruthy();
+
+    fireEvent.press(getByTestId('tab-Home'));
+    await findByTestId('home-screen');
+    fireEvent.press(getByTestId('tab-Settings'));
+
+    expect(await findByTestId('settings-screen')).toBeTruthy();
+  });
+
   it('sends the bell to the activity timeline, inside the Home stack', async () => {
     const { findByTestId } = await mount();
     fireEvent.press(await findByTestId('home-alerts'));
