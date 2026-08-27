@@ -714,9 +714,9 @@
         {
           "id": "places",
           "name": "Named places, location sharing, located answers",
-          "status": "partial",
-          "blockedBy": "device",
-          "note": "Unverified since the fix that touched it.",
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "**Proved on `84f40716`, 2026-08-27, from the Office**, which is the first time this row has been exercised since the fix that touched it. Three things at once. Location sharing on and the header naming `Office` — the label set by standing there, not a geocoder’s guess. *\"how far to home\"* answered **39.3 km by road, about 38 minutes** — so `home` resolved to the place he named, and the route was measured FROM where he was standing rather than from a district. *\"is it raining here\"* answered *\"currently clear at the office, sir, with no rain falling\"* plus a **95%** chance later — figures, and the place named. Asked from the Office deliberately: *\"how far to the office\"* would have answered zero and proved nothing. `TESTING.md` 7.1 and 7.2.",
           "goal": "situated"
         },
         {
@@ -724,7 +724,7 @@
           "name": "Weather and distance from measured figures",
           "status": "partial",
           "blockedBy": "brain",
-          "note": "The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so.",
+          "note": "The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so. **2026-08-27, from the Office:** both lookups answered with real figures — 39.3 km / 38 minutes by road, and a 95% precipitation chance against a clear sky now. So routing and forecast are reaching a server and returning measurements, which is the half that could be checked from the phone. `/health` reports `search: tavily`. **The named gap is unchanged:** that a TAVILY search answers is still unverified, and a silent search failure still looks exactly like a confident answer — the two lookups above are the route and forecast paths, not the search path.",
           "goal": "situated"
         },
         {

@@ -16,10 +16,10 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 11:40. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 12:45. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Nothing shipped today — no app code
-changed, and none needed to. Three things were closed by looking at the phone rather than
+changed, and none needed to. Four rows were closed by looking at the phone rather than
 by writing anything.
 
 ### Where the day left the goal
@@ -30,6 +30,11 @@ still the ceiling from this repo: `fallback-armed` stays `partial` on purpose, a
 rows. **`jarvis-brain` stays closed** — what it owes is generated into
 `docs/brain-dependencies.md`, and `c86d176` is still unpushed and unmerged there.
 
+**"He knows where and when he is" is 2 of 6**, after `places` closed from the Office in the
+afternoon. **`timeline` is one day away** and is the cheapest row left anywhere: WATCHING
+reads `1 MORE DAY`, so a sighting at Office tomorrow gives `usuallyGoneBy` its fourth day
+and the remark becomes speakable. Open the app at Office tomorrow — that is the whole of it.
+
 ### What closed, and what it cost
 
 - **Queue 5, the reboot.** Count 22 before the reboot, app never opened, **28** at the
@@ -39,6 +44,10 @@ rows. **`jarvis-brain` stays closed** — what it owes is generated into
   entries before today.
 - **`double-post-gate` in a real window.** The 07:00 briefing arrived once, from the
   gateway, with the phone armed underneath it and nobody watching.
+- **`places`, from the Office.** `home` resolved to a named place and answered 39.3 km and
+  38 minutes, measured from where he stood; *"is it raining here"* came back with figures and
+  the place named. Asked from the Office on purpose — `TESTING.md` 7.1's own wording would
+  have answered zero.
 
 **The cost was a wrong diagnosis, briefly.** The 07:00 text differed from the evening
 before, was read as the phone's rotation, and the gateway was suspected of having gone
@@ -49,13 +58,16 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **The microphone — queue 6, `§1` in `ROADMAP.md` §10, and the phone is in hand.** The
-   oldest unverified thing in the app. Chat → hold → speak → release, then read
-   `brains.usage.audio`. `fell_back` with `last_error_was_quota` false is a code problem;
+1. **The microphone — queue 6, `§1` in `ROADMAP.md` §10.** The oldest unverified thing in
+   the app, and it needs somewhere you can speak — skipped on the 27th because the phone
+   was in an office. Chat → hold → speak → release, then read `brains.usage.audio`, which
+   read `{gemini_ok: 0, fell_back: 0, last_error: null}` beforehand: no audio turn has ever
+   reached the gateway. `fell_back` with `last_error_was_quota` false is a code problem;
    true is a spent free tier. `§1` must empty before anything in `§3` starts.
-2. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
+2. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds.
+3. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
    both app-side, so both ship over the air.
-3. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+4. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
 
 ### The device, as left
 
@@ -215,6 +227,65 @@ unseen parts were seen at once:
 
 **"He reaches you without the app being open" is 15 of 20**, and 16 remains the ceiling from
 this repo: `fallback-armed` stays `partial` on purpose, and the other four are gateway rows.
+
+
+### Afternoon, from the Office: `places` closed, and §3.2.1 found to be describing an older app
+
+**`places` is proved** — the first time it has been exercised since the fix that touched it,
+and the first location work done from somewhere that is not home. Three readings, one
+sitting. The header named `Office`, which is the label set by standing there rather than a
+geocoder's guess — the drift that made `nameFor` necessary in the first place. *"how far to
+home"* answered **39.3 km by road, about 38 minutes**, so `home` resolved to a named place
+and the route was measured from where he actually stood. *"is it raining here"* answered
+*"currently clear at the office, sir, with no rain falling"* and a **95%** chance later:
+figures, and the place named.
+
+**Asked from the Office deliberately.** `TESTING.md` 7.1 says *"how far to the office"*,
+which from inside the office answers zero and proves nothing. The other named place is the
+test when you are standing in the first one.
+
+`weather-distance` did **not** move, and the note now says why: the route and forecast
+paths answered, which is a different thing from the search path. `/health` reports
+`search: tavily`, and that a Tavily search *answers* remains unseen. A silent search failure
+still looks exactly like a confident answer.
+
+### The mic could not be tested, and the gateway said something anyway
+
+An office is not a place to talk to a phone, so queue 6 waits. But `/health` was read
+before the attempt and is worth recording: `brains.usage.audio` is
+`{gemini_ok: 0, fell_back: 0, last_error: null}`. **Zero audio turns have ever reached the
+gateway** — the first confirmation of that from outside the phone rather than from the app's
+own silence.
+
+### §3.2.1 was describing an app from two weeks ago
+
+Chased while the phone was away, and it changes what the top of §3.2 means.
+
+**What the persona already gets:** `buildAsk` (`ask.ts:94`) sends the local clock with
+offset and weekday, the known places, and a `where` block carrying coordinates, resolved
+place, the label, measured weather and a trail. The **deployed** gateway — not the local
+checkout, which is 42 commits behind — reads all of it in `_decode_where` / `_where_context`
+/ `_match_here` and puts *"He is currently at Office"* and the trail in the prompt. The 39.3
+km answer above is that path working end to end.
+
+**What it does not get:** battery and link state. Battery needs `expo-battery`, a native
+dependency, so it is a new APK rather than an over-the-air fix — and the same wall stops the
+timeline's real weakness being fixed: sightings only happen when the app is opened, because
+`ACCESS_BACKGROUND_LOCATION` is not in `expo-location`'s manifest.
+
+**And one thing that is sent and read by nobody.** The `usage` block — screen-time minutes,
+pickups, top apps, `usual`, `usualPickups`, `days` — rides on every single question. Neither
+`cloud_gateway.py` nor the desk brain reads it; the only `usage` in the deployed file is its
+own health counters. Those figures do reach the persona, but by `/app-fact` as durable facts
+(`facts_known: 17`), which is why nothing looked broken. So it is dead weight on every turn,
+and the decision is whether the gateway should read it or the phone should stop sending it.
+
+### The tab bar, again
+
+Two adb attempts to reach the Chat tab, both no-ops, both at the coordinates a screenshot
+gives. `AGENTS.md` already says a `Touchable` is deaf to `adb shell input`; this is the
+second session to spend attempts confirming it. Scrolling works — `input swipe` on a
+`ScrollView` is fine — so a laptop can read any screen it can reach without a tap.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.

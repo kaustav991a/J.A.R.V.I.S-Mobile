@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**43 of 85 rows are proved on the phone** (51%). 61 have code (72%). 30 cannot be finished in this repo: 20 on the brain, 2 on the desk, 8 on the phone.
+**44 of 85 rows are proved on the phone** (52%). 61 have code (72%). 29 cannot be finished in this repo: 20 on the brain, 2 on the desk, 7 on the phone.
 
 ### Transport, pairing, security
 
@@ -304,12 +304,12 @@ in §2; `—` — not built.
 
 ### Knowing and acting
 
-*5 proved of 14.*
+*6 proved of 14.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
-| Named places, location sharing, located answers | partial | Phone | Unverified since the fix that touched it. |
-| Weather and distance from measured figures | partial | Brain | The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so. |
+| Named places, location sharing, located answers | proved |  | **Proved on `84f40716`, 2026-08-27, from the Office**, which is the first time this row has been exercised since the fix that touched it. Three things at once. Location sharing on and the header naming `Office` — the label set by standing there, not a geocoder’s guess. *"how far to home"* answered **39.3 km by road, about 38 minutes** — so `home` resolved to the place he named, and the route was measured FROM where he was standing rather than from a district. *"is it raining here"* answered *"currently clear at the office, sir, with no rain falling"* plus a **95%** chance later — figures, and the place named. Asked from the Office deliberately: *"how far to the office"* would have answered zero and proved nothing. `TESTING.md` 7.1 and 7.2. |
+| Weather and distance from measured figures | partial | Brain | The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so. **2026-08-27, from the Office:** both lookups answered with real figures — 39.3 km / 38 minutes by road, and a 95% precipitation chance against a clear sky now. So routing and forecast are reaching a server and returning measurements, which is the half that could be checked from the phone. `/health` reports `search: tavily`. **The named gap is unchanged:** that a TAVILY search answers is still unverified, and a silent search failure still looks exactly like a confident answer — the two lookups above are the route and forecast paths, not the search path. |
 | The situation sent to the persona | — | Brain | Place, battery, link — one field. The highest character-per-line change available anywhere in the plan. |
 | Opening an app on the phone by name | proved |  | Confirmed twice over: by `topResumedActivity` and by the target app’s own launch event. Needed a native build. |
 | Governance: parked actions, approve and deny | proved |  | Desk actions only. |
@@ -545,12 +545,21 @@ proves the listener is not enough → accessibility, probably never.
 
 Ordered by what each unlocks, not by effort.
 
-1. **Send what the phone already knows.** The persona gets the date and the time.
-   It gets no place, no battery, no link state, no last-seen — so "should I take an
-   umbrella" triggers a lookup for something the phone is holding, and every answer
-   is written by someone who cannot see out of the window. One field on the outgoing
-   ask, one block in the system prompt. **This is the highest character-per-line
-   change available** and it needs the gateway.
+1. **Send what the phone already knows.** **Rewritten 2026-08-27, because most of what
+   this item asked for has quietly shipped.** `buildAsk` already carries the local clock
+   with its offset and weekday, the named places, and a `where` block — coordinates, the
+   resolved place, the label set by standing there, measured weather, and a trail of
+   recent steps. The deployed gateway reads all of it and puts *"He is currently at
+   Office"* and the trail into the prompt. Proved from the Office on 2026-08-27:
+   *"how far to home"* answered 39.3 km and 38 minutes, measured from where he stood.
+   **What is still missing is battery and link state**, and both are smaller than this
+   item used to claim. **What is worse than missing is the `usage` block:** screen time,
+   pickups, top apps and their baselines ride on *every* question and **nothing reads
+   them** — not the gateway, not the desk. Those figures do reach the persona, but by the
+   other road, as facts written through `/app-fact`. So the work here is: decide whether
+   the gateway should read `usage` or the phone should stop sending it, and add battery
+   and link. Battery needs `expo-battery`, which is a native dependency and therefore a
+   new build rather than an over-the-air fix.
 2. **Location timeline** — arrival and departure at named places, into the journal.
    The prerequisite for anything that reacts to *where he is*.
 3. **Notification stream** — see 3.1. Turns "what is happening today" from a guess

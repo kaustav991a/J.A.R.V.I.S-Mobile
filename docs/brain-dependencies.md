@@ -82,7 +82,7 @@ Every row whose blocker is `brain`, in the order §0b renders them.
 
 | | Status | Why it is here |
 | --- | --- | --- |
-| Weather and distance from measured figures | partial | The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so. |
+| Weather and distance from measured figures | partial | The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so. **2026-08-27, from the Office:** both lookups answered with real figures — 39.3 km / 38 minutes by road, and a 95% precipitation chance against a clear sky now. So routing and forecast are reaching a server and returning measurements, which is the half that could be checked from the phone. `/health` reports `search: tavily`. **The named gap is unchanged:** that a TAVILY search answers is still unverified, and a silent search failure still looks exactly like a confident answer — the two lookups above are the route and forecast paths, not the search path. |
 | The situation sent to the persona | — | Place, battery, link — one field. The highest character-per-line change available anywhere in the plan. |
 | Scripts: create, update, delete, run by id | — | Which is why editing is disabled. |
 | Run history | — | Reports currently invents “Last run: 2h ago” from a fixture. |
