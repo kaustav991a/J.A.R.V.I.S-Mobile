@@ -16,12 +16,12 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 16:10. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 16:30. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
 of them were fixed, then one more app bug was fixed by reading rather than by guessing.
-**1009 tests, 75 suites, `tsc` clean.**
+**1013 tests, 75 suites, `tsc` clean.**
 
 **Four publishes, all at runtime `31c64113`** — the installed APK's own, checked with
 `npx expo-updates fingerprint:generate --platform android` **before every one**, since a moved
@@ -48,6 +48,19 @@ said `SENDING` forever — one from Monday 20:02 had for three days, and re-send
 is where the log's only duplicate came from. It now reads `INTERRUPTED`, seen on the phone.
 **Not marked `failed`**, deliberately: that carries a retry promising nothing was carried,
 and the window spans `link.send()`.
+
+**The memory screen was read, and it solves this morning's worst answer.** All 17 facts are
+durable and correct — and one is not: `Kaustav is currently in Ichapur, West Bengal, India`,
+a time-sensitive claim in a permanent store. That is what `_FAR_RE` reached for when it
+injected no route fact, producing *"you have already arrived at home"* while the header read
+`Office`. **So the invented distance was a stale fact filling a silent gap, not weights** —
+and fixing the regex alone does not fix it. Both are at the top of
+`docs/brain-dependencies.md`.
+
+**`timeline` now says the hour it learned** rather than `Office, ready`. Unproved until the
+fourth day lands, which is tomorrow at Office. **`anticipate-habit` is not work** — the spec
+says no code shortens two to four weeks — but its baseline is biased until background
+location, so it is downstream of queue 23 as well as of the calendar.
 
 **`can the app set alarms?` — no, and it says so honestly.** Specced instead, together with
 the three other things waiting on a native build:
@@ -112,11 +125,15 @@ gateway from the phone side.**
    alarms, battery, background sightings, and the release keystore. **Background location is
    the one to argue separately**, being the only item that changes what the app knows while
    closed. Nothing has been built and nothing should be until it is approved.
-2. **`_FAR_RE`, when the brain reopens — the biggest thing found today.** It answers
-   distance questions with invented numbers whenever the phrasing puts `from` after the
-   destination, which is most natural phrasings. Prefer a `to` destination when both appear
-   and reject `here` / `my location` / `current location`, **with a test per phrasing** —
-   the whole defect is that one phrasing was never tried. `cloud_gateway.py:2757`.
+2. **`_FAR_RE` AND the stale `currently` fact, together** — the biggest thing found today,
+   and they are one bug in two halves. The regex answers distance questions with invented
+   numbers whenever the phrasing puts `from` after the destination, which is most natural
+   phrasings (`cloud_gateway.py:2757`); the fact `Kaustav is currently in Ichapur` is what
+   the model then reaches for. **Fixing either alone leaves the other able to produce the
+   same confident wrong answer.** Prefer a `to` destination when both appear, reject `here`
+   / `my location` / `current location`, **with a test per phrasing** — the whole defect is
+   that one phrasing was never tried — and stop storing time-sensitive claims as permanent
+   facts, which the `where` block already makes redundant.
 3. **The missing transcript turn — diagnosed, and it is gateway work like the last one.**
    `emit()` returns False when the socket has gone; `deliver()` checks it and pushes the
    answer (`:3977`), and the transcript at `:4095` discards the result with no push path.
@@ -668,6 +685,68 @@ this app needs **three** launches, not two. The first fetches, the second still 
 bundle, and only then does an **`Update ready — RESTART`** banner appear at the top of the
 screen. The banner is the honest signal — when it is showing, the bundle on screen is the old
 one, whatever the Settings row says. Look for it before reading anything as evidence.
+
+
+### The memory screen, read at last — and it solves this morning's worst answer
+
+All 17 facts, read on the device. **The store is in better shape than its ledger line
+suggested**: parents, brother, employer and its address, both dogs with sex and dates, the
+PIN code, the marriage year. Durable things, correctly phrased.
+
+**The photo recall is genuine, and the deduction behind it is real work.** A photo of a dog
+never sent before was answered *"That's Puku, Sir. He passed away on the fifth of August last
+year"* — which matches the stored `died on 5 August 2025` exactly. Asked how, it said the
+past tense plus a male Indie left one conclusion, and **that was read here as confabulation
+before the facts were seen.** It is not. Two dogs are stored:
+
+```
+Kaustav has a dog called Kitty, a female black Indie, born around November 2025
+Kaustav had a dog called Puku, a male Indie, who died on 5 August 2025
+```
+
+*"Who he **was**"* selects the dead one; *male* selects Puku over Kitty. The 22:04 answer
+(*"you told me yourself"*) said where the data came from and the 22:05 answer said how it
+chose which record — complementary, not contradictory. **The analysis that called them a
+contradiction was made with one dog's worth of context and was wrong.**
+
+### One row on that screen is a bug, and it is the other half of the `_FAR_RE` failure
+
+```
+Kaustav is currently in Ichapur, West Bengal, India
+```
+
+**A time-sensitive claim in a permanent store.** When `_FAR_RE` extracted `dest="here"` and
+injected no route fact, the model reached for this — and with `Kaustav lives in Ichapur`
+beside it, *"since you're currently in Ichapur, sir, you've already arrived at home"*
+follows perfectly. The phone's own header read `Office` at that moment.
+
+**So this morning's invented distance was not hallucination from weights.** It was a stale
+fact filling a hole a silent lookup failure left, which is worse: it will happen again
+wherever any live path fails quietly, and it will read as confident knowledge rather than as
+a gap. **Fixing the regex alone does not fix it.**
+
+Every other fact on the screen is durable. This one is a snapshot wearing a fact's clothes,
+and it is redundant as well as harmful — the `where` block already carries live location on
+every single turn. Either extraction refuses `currently` / `right now` / `today`, or such
+facts expire. Recorded at the top of `docs/brain-dependencies.md`, beside `_FAR_RE`.
+
+Also on that screen: `Kaustav asked about Marco Polo`. Extraction is storing conversation
+trivia next to load-bearing records.
+
+### Two corrections to notes written earlier today
+
+**adb taps are not as broken as this file said an hour ago.** The Settings tab took a plain
+`input tap` this afternoon, having refused a tap and two held swipes this morning — the tab
+bar is a dial and its hit areas move with it, so a failure there says nothing about the next
+attempt. `SettingsRow` then refused two taps, which contradicts `AGENTS.md`. **The honest
+summary is that tap reliability varies by control and by dial position, and neither "it
+works" nor "it cannot" survives contact.** Home's Chat card has worked every time and is the
+route into the conversation.
+
+**And the deduction correction above.** Two claims made from screenshots today were wrong in
+the same way — reasoning from the part of the state that happened to be visible. Both were
+caught by reading the underlying data instead. That is the same lesson `chat-order` cost
+three attempts to learn.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
