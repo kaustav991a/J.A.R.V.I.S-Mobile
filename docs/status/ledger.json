@@ -578,7 +578,7 @@
           "name": "Read / unread per entry, surviving a restart",
           "status": "proved",
           "blockedBy": "none",
-          "note": "",
+          "note": "**Proved, and then found half-wired on 2026-08-27.** Marks are per entry and survive a restart. What they did NOT survive was reading the chat: there are two unread systems — `readAt`, the timestamp behind Home’s *\"N new replies\"*, and `readIds`, the persisted set behind the bell — and only the Activity panel ever wrote to the second. So reading the conversation cleared its own marker and left the bell counting the very turns it had shown. Fixed at `28d682d`, published as `01a0422d`, **and confirmed gone on the phone the same afternoon.** The same fix closes the case one step earlier: a reply landing while the chat is open is marked read as it arrives, where before the tab bar counted an answer being read on screen.",
           "goal": "reachable"
         },
         {
