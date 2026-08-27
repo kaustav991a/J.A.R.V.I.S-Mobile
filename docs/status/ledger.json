@@ -27,9 +27,9 @@
   ],
   "meta": {
     "repo": "jarvis-mobile",
-    "read": "2026-08-26",
+    "read": "2026-08-27",
     "branch": "feat/mobile-hud",
-    "head": "f89de82",
+    "head": "70aaa73",
     "tests": 991,
     "suites": 75,
     "typecheck": "clean",
@@ -1075,9 +1075,9 @@
     {
       "n": 5,
       "title": "He comes back after a reboot",
-      "state": "open",
-      "blockedBy": "device",
-      "detail": "**The premise was wrong, corrected 2026-08-26 on the device.** This said the manifest had no `RECEIVE_BOOT_COMPLETED` and wanted a config plugin. It had been measured against `android/app/src/main/AndroidManifest.xml` — the app half — rather than the merged one. `adb shell dumpsys package` on the installed APK says `RECEIVE_BOOT_COMPLETED: granted=true`. `expo-notifications` 57.0.10 declares it, `expo-task-manager` declares a receiver on `BOOT_COMPLETED`, and `expo-background-task` schedules through WorkManager, which persists its own queue and reschedules at boot. **There is nothing to build.** What is owed is a check nobody has run, and it no longer needs a cable: RESET on the Background briefing row clears the run count, so the check is reset, reboot, leave the app closed, come back and see whether it moved. `TESTING.md` 1.9.",
+      "state": "proved",
+      "blockedBy": "none",
+      "detail": "**Closed 2026-08-27 on the device, and it cost no code at all.** The phone was rebooted on the night of 26 Aug with the run count on Places at **22**, and the app was not opened afterwards. A briefing arrived at 07:00, and the count read **28** when the app was first opened that morning — six runs nobody started, from a process that had been killed by a reboot. WorkManager rescheduled its own queue at boot, which is exactly the bar `TESTING.md` 1.9 sets. By 10:27 it read 37. The premise this item was written on had already been corrected on 2026-08-26: `dumpsys package` on the installed APK says `RECEIVE_BOOT_COMPLETED: granted=true`, `expo-task-manager` declares a receiver on `BOOT_COMPLETED`, and there was never anything to build here — only a check nobody had run. **The 07:00 run cannot be read after the fact:** the heartbeat keeps one outcome, not a history, so nine later runs have overwritten whatever that one recorded.",
       "goal": "reachable"
     },
     {

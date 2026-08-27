@@ -73,6 +73,56 @@ RESET, PREVIEW, SETTINGS and the bell need a finger. **The tab bar takes a held 
 (140ms), where a tap does nothing. And the app re-locks on background behind a secure
 window, so screenshots come back black at 30KB — that is a fingerprint prompt, not a crash.
 
+## ✅ 2026-08-27, morning. The reboot check, answered by the phone rather than by a cable.
+
+**Queue 5 is closed, and no code was written to close it.** The premise had already been
+corrected on 2026-08-26 — `RECEIVE_BOOT_COMPLETED` was granted all along, measured on the
+installed APK rather than on the app half of the manifest — so what was owed was a check
+nobody had run.
+
+The phone was rebooted on the night of 26 Aug with the run count on Places at **22**. The
+app was not opened afterwards. A briefing arrived at **07:00**, and the count read **28**
+when the app was first opened that morning: six runs, from a process a reboot had killed,
+started by nobody. WorkManager persists its own queue and reschedules at boot, and this is
+that sentence stopping being a citation and starting being a sighting. By 10:27 it read 37.
+
+**Six runs across roughly eight hours, not thirty-two.** The fifteen-minute period is a
+floor, not a promise, and overnight Doze is why. The device-idle whitelist and standby
+bucket 5 set on 2026-08-26 survived the reboot — the whitelist persists, the bucket is
+recomputed from usage — so this is a throttled-but-alive task, which is the healthy
+reading rather than a defect to chase.
+
+### What this run cannot tell us, and it is worth saying out loud
+
+**The 07:00 run's own outcome is unreadable.** `taskHealth` keeps one stamp — `at`,
+`outcome`, `runs` — not a history, so nine later runs overwrote whatever that one recorded.
+The count is durable; the reason is not. Anyone wanting to know *why* a particular run did
+what it did, hours later, is currently out of luck, and that is a design decision rather
+than a bug: the heartbeat was built to answer "is it alive", not "what happened at seven".
+
+**Who sent the 07:00 briefing is still open.** One notification arrived, so the stand-down
+gate did not double-post in a real window — the thing 2026-08-21 cost a day to fix, and the
+thing the forced run at 18:31 could only settle for a forced window. But *which sender*
+stayed quiet is unresolved, and the two candidate readings disagree about the gateway:
+
+- **`cloudArmed` says the phone should have stood down.** The TTL is 48 hours, Home read
+  `AT THE GATEWAY` at 18:30 on the 26th, so at 07:00 the stamp was around twelve hours old.
+  Armed. On that reading the gateway briefed and the phone kept quiet underneath it.
+- **The wording read as different from previous mornings**, which points the other way. The
+  gateway hardcodes the first variant of every line — `Before you leave X, sir` or `Nothing
+  in your way from X, sir`, and `An umbrella, unless you've grown fond of arriving wet.`
+  (`cloud_gateway.py:2275`). Only the phone rotates (`briefingVoice.ts:116`). But "different
+  from previous days" also fits a gateway briefing differing from yesterday's *phone-sent*
+  ones, so it does not decide anything on its own.
+
+**It settles on the title, read from the Activity panel.** Anything outside those two exact
+gateway titles was sent by the phone — which would promote `fallback-armed` from `partial`
+on the strength of a fallback that fired unattended, in a real window, from a rebooted
+phone, and would simultaneously mean the gateway went silent this morning after briefing
+correctly at 17:59:18 the evening before. The notification itself is already gone from
+`dumpsys notification`, so the panel is the only remaining copy.
+
+
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
 
 The morning's work was code and tests. This is the device, and three rows that had been
