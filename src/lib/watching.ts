@@ -1,3 +1,4 @@
+import { clockLabel } from './commute';
 import { ENOUGH_PLACE_DAYS } from './timeline';
 
 /**
@@ -33,6 +34,19 @@ export type WatchFacts = {
   placeDays: number;
   /** the named place he is at, or null */
   place: string | null;
+  /**
+   * The minute of the day he is usually last seen at that place, or null.
+   *
+   * Carried so the row can SAY it. Before this the figure existed, was correct, and
+   * was surfaced in exactly one place — the anticipation remark, which fires only when
+   * he is 45 minutes past it. So on every ordinary day the app had learned an hour and
+   * told nobody, which fails the anticipation doctrine's own third test: a figure you
+   * could disagree with, rather than an adjective.
+   *
+   * Null is a real answer and must stay one. `usuallyGoneBy` returns null below
+   * `ENOUGH_PLACE_DAYS`, and the row must not invent a time to fill the space.
+   */
+  goneBy: number | null;
   /** whether the one remark a day has already been spent */
   spokenToday: boolean;
 };
@@ -80,7 +94,18 @@ export function watching(f: WatchFacts): WatchRow[] {
       // Naming it matters: "4 more days" with no subject reads as a countdown to
       // nothing at all
       ...(f.placeDays >= ENOUGH_PLACE_DAYS
-        ? { ready: true, word: f.place ? `${f.place}, ready` : 'ready' }
+        ? f.goneBy !== null
+          ? {
+              ready: true,
+              // the figure itself, because that is the whole point of having learned it
+              word: clockLabel(Math.floor(f.goneBy / 60), f.goneBy % 60),
+              note: f.place
+                ? `Learned from your last ${f.placeDays} days at ${f.place}.`
+                : `Learned from your last ${f.placeDays} days.`,
+            }
+          : // enough days, and still no median — every sighting landed on one of them.
+            // `ready` because the signal is armed; no time, because there is not one
+            { ready: true, word: f.place ? `${f.place}, ready` : 'ready' }
         : {
             ready: false,
             word: owed(f.placeDays, ENOUGH_PLACE_DAYS),

@@ -30,7 +30,7 @@
     "read": "2026-08-27",
     "branch": "feat/mobile-hud",
     "head": "f025c8c",
-    "tests": 1009,
+    "tests": 1013,
     "suites": 75,
     "typecheck": "clean",
     "sources": {
@@ -704,7 +704,7 @@
           "name": "Location timeline",
           "status": "partial",
           "blockedBy": "device",
-          "note": "Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen.",
+          "note": "Sightings at named places, median last-seen per day, its own 28-day store. Silent for its first four days, by design. **Device pass 2026-08-24:** it is accumulating — the panel reads *Learning your hours at Office* and its countdown had moved from `4 MORE DAYS` to `3 MORE DAYS` since 08-21, which only happens if sightings are being recorded at a named place. Named gap: nothing it has learned has been *used* for anything yet, so its output is still unseen. **The named gap is addressed in code, 2026-08-27.** The app was spending four days learning an hour and then telling nobody: the figure surfaced in exactly one place, the anticipation remark, which fires ONLY when you are 45 minutes past it. So on every ordinary day it had learned something and kept it — failing the anticipation doctrine's own third test, *a figure you could disagree with rather than an adjective*. The WATCHING row now says the hour itself (`6:40 PM`) with a note naming the place and the days behind it, instead of `Office, ready`. `null` stays a real answer: enough days with no median still reads `ready` and invents no time. **Unproved until the fourth day lands** — the row reads `1 MORE DAY` tonight, so opening the app at Office tomorrow is what makes it speak. 4 tests.",
           "goal": "situated"
         },
         {
@@ -829,7 +829,7 @@
           "name": "Anticipation from learned habit rather than a written rule",
           "status": "none",
           "blockedBy": "device",
-          "note": "Needs the senses and weeks of baseline. Not shortenable by code.",
+          "note": "**Blocked by time, not by work, and the spec says so outright:** *\"Two to four weeks of baseline before 'unusual' means anything, and the senses in §3.2 to notice with. No amount of code shortens the first.\"* (`docs/superpowers/specs/2026-08-21-anticipation-design.md`.)\n\n**Two things worth separating, checked 2026-08-27.** First, *more triggers* is not this row. `anticipate-v1` has three — place, screen time, pickups — and a fourth is buildable today, since `rollup.ts` already computes `usual.top` per-app baselines beside `today.top`. That would be a fourth **hand-written rule over measured figures**, which the spec explicitly calls *not the same thing as a machine that learns your habits*. Building it strengthens `anticipate-v1` and leaves this row exactly where it is.\n\nSecond, and not previously recorded: **the baseline this row waits on is currently biased.** Sightings happen only when the app is opened (`timeline.ts` says so), so weeks of it would be weeks of a sample taken whenever he happened to look at his phone. So this is downstream of `ACCESS_BACKGROUND_LOCATION` in queue 23 as well as of the calendar — waiting three more weeks on the present sampling would not produce the baseline this row means.",
           "goal": "situated"
         }
       ]

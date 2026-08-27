@@ -22,7 +22,7 @@ import { cloudArmedState, dayKey } from '../lib/commute';
 import type { CloudArmedState } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
-import { daysSeenAt, loadSeen } from '../lib/timeline';
+import { daysSeenAt, loadSeen, usuallyGoneBy } from '../lib/timeline';
 import { loadSpoken } from '../lib/spokenStore';
 import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
@@ -151,6 +151,9 @@ export function HomeScreen() {
             baselineDays: usage?.days ?? 0,
             placeDays: place ? daysSeenAt(seen, place, now) : 0,
             place,
+            // what it actually learned, so the row can say it rather than call itself
+            // ready — the same figure the anticipation remark uses, from the same call
+            goneBy: place ? usuallyGoneBy(seen, place, now) : null,
             spokenToday: spoken?.day === dayKey(now),
           };
           /**
@@ -168,6 +171,7 @@ export function HomeScreen() {
             prev.baselineDays === next.baselineDays &&
             prev.placeDays === next.placeDays &&
             prev.place === next.place &&
+            prev.goneBy === next.goneBy &&
             prev.spokenToday === next.spokenToday
               ? prev
               : next

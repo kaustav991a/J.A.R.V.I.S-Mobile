@@ -14,6 +14,7 @@ const facts = (over: Partial<WatchFacts> = {}): WatchFacts => ({
   placeDays: 4,
   place: 'Office',
   spokenToday: false,
+  goneBy: null,
   ...over,
 });
 
@@ -54,6 +55,47 @@ describe('the place signal', () => {
     const row = watching(facts({ placeDays: 0, place: null })).find((r) => r.id === 'place');
     expect(row?.ready).toBe(false);
     expect(row?.word).toBe('4 more days');
+  });
+});
+
+/**
+ * What it learned, said out loud.
+ *
+ * The row that closes `timeline`'s named gap: the app was spending four days learning
+ * an hour and then never telling anyone what it had learned. The only place that
+ * figure ever surfaced was the anticipation remark, which fires **only** when you are
+ * 45 minutes past it — so on every ordinary day it was invisible, and an invisible
+ * figure is one nobody can disagree with.
+ *
+ * That is the anticipation doctrine's own third test, applied to the readout rather
+ * than to the remark: *falsifiable — a figure you could disagree with, not an
+ * adjective*. `Office, ready` passed nothing. `6:40 PM` can be wrong out loud.
+ */
+describe('the hour it has learned', () => {
+  it('says the time once it knows one, rather than merely calling itself ready', () => {
+    const row = watching(facts({ goneBy: 18 * 60 + 40 })).find((r) => r.id === 'place');
+    expect(row?.ready).toBe(true);
+    expect(row?.word).toBe('6:40 PM');
+  });
+
+  it('names the place and the days it rests on, so a wrong figure can be argued with', () => {
+    const row = watching(facts({ goneBy: 18 * 60 + 40, placeDays: 6 })).find((r) => r.id === 'place');
+    expect(row?.note).toContain('Office');
+    expect(row?.note).toContain('6 days');
+  });
+
+  it('still counts down while it is short of days, whatever it thinks it has seen', () => {
+    const row = watching(facts({ placeDays: 3, goneBy: 18 * 60 + 40 })).find((r) => r.id === 'place');
+    expect(row?.ready).toBe(false);
+    expect(row?.word).toBe('1 more day');
+  });
+
+  it('does not claim an hour it has not got, even with the days behind it', () => {
+    // enough days at the place, but every sighting on one of them — `usuallyGoneBy`
+    // returns null and the row must not invent a time to fill the space
+    const row = watching(facts({ goneBy: null })).find((r) => r.id === 'place');
+    expect(row?.ready).toBe(true);
+    expect(row?.word).toBe('Office, ready');
   });
 });
 
