@@ -465,6 +465,57 @@ describe('a turn stamped earlier than the one before it', () => {
   });
 });
 
+/**
+ * The log already on disk was written in the wrong order, and has to be repaired.
+ *
+ * `place()` fixes what arrives from here on and cannot touch what is already saved:
+ * a relaunch restores the file as written. Every phone carrying this bug has a log
+ * on disk in arrival order, so a fix that only guards new entries **reads exactly
+ * like a fix that did not work** — the same sentence `hydrate` already carries
+ * about duplicates, one row over.
+ */
+describe('a restored log written in the wrong order', () => {
+  it('comes back in the order things happened', () => {
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [
+        { from: 'jarvis', text: 'Today at noon, sir.', at: 5_000 },
+        // swept in later, but it was said last night
+        { from: 'jarvis', text: 'Last night, sir.', at: 1_000 },
+      ],
+    });
+
+    expect(s.chat.map((c) => c.text)).toEqual(['Last night, sir.', 'Today at noon, sir.']);
+  });
+
+  it('keeps a question above the answer that shares its millisecond', () => {
+    const s = hudReducer(initialHudState, {
+      type: 'hydrate',
+      chat: [
+        { from: 'user', text: 'you there?', at: 2_000 },
+        { from: 'jarvis', text: 'Always, sir.', at: 2_000 },
+      ],
+    });
+
+    expect(s.chat.map((c) => c.text)).toEqual(['you there?', 'Always, sir.']);
+  });
+
+  it('orders a restored log against turns this session already has', () => {
+    // the socket answered before the disk read finished
+    let s = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'status', status: 'speaking', message: 'Just now, sir.', user: null },
+      at: 9_000,
+    });
+    s = hudReducer(s, {
+      type: 'hydrate',
+      chat: [{ from: 'jarvis', text: 'Earlier, sir.', at: 3_000 }],
+    });
+
+    expect(s.chat.map((c) => c.text)).toEqual(['Earlier, sir.', 'Just now, sir.']);
+  });
+});
+
 describe('a pushed reply that was also carried over the socket', () => {
   const greeting = { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null } as const;
 

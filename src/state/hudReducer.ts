@@ -222,6 +222,24 @@ const holdsTurn = (chat: ChatEntry[], turn: { from: ChatEntry['from']; text: str
  * arrival order, so an answer stamped in the same millisecond as its question still
  * follows it rather than jumping ahead of it.
  */
+/**
+ * The same order, imposed on a whole log rather than on one arrival.
+ *
+ * `place()` guards what arrives from here on and cannot reach what is already
+ * saved — a relaunch restores the file exactly as it was written, and every phone
+ * carrying the arrival-order bug has a log on disk in the wrong order. A fix that
+ * only guards new entries **reads exactly like a fix that did not work**, which is
+ * the sentence `hydrate` already carries about duplicates.
+ *
+ * Stable, and explicitly so rather than by trusting the engine: ties keep their
+ * existing order, so a question stays above the answer that shares its millisecond.
+ */
+const inOrder = (chat: ChatEntry[]): ChatEntry[] =>
+  chat
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => a.c.at - b.c.at || a.i - b.i)
+    .map(({ c }) => c);
+
 const place = (chat: ChatEntry[], entry: ChatEntry): ChatEntry[] => {
   let i = chat.length;
   while (i > 0 && chat[i - 1].at > entry.at) i--;
@@ -525,7 +543,10 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
         kept.push(c);
         return true;
       });
-      return { ...state, chat: cap([...restored, ...state.chat], CHAT_CAP) };
+      // Ordered, not merely concatenated. The restored half goes first because a turn
+      // can arrive before the disk read finishes, but "before" is about arrival and
+      // the log is read as a chronology — see `inOrder`.
+      return { ...state, chat: cap(inOrder([...restored, ...state.chat]), CHAT_CAP) };
     }
     case 'reset':
       return initialHudState;
