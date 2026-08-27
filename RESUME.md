@@ -16,7 +16,7 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 14:35. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 14:50. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
@@ -31,11 +31,17 @@ app was force-stopped so the next launch fetches it.
 **Both fixes confirmed gone on the phone**, on that update. The bell clears when the chat is
 read, and a tab reopens at its own root.
 
-**The microphone works, and the transcriber is what does not.** `brains.usage.audio` moved
-off zero for the first time — `gemini_ok: 1`, no fallback, no error — so the audio path is
-proved end to end and the mime worry was unfounded. *"hi jarvis"* came back as **"ki
-service"**, and the reply was correct Benglish for that question. `mic-in` is `partial`,
-queue 6 is `blocked` on the brain, and **§1 is now empty of anything this repo can do.**
+**The microphone works.** `brains.usage.audio` went from all zeros to `gemini_ok: 2`, no
+fallback, no error — the audio path is proved and the mime worry was unfounded. `mic-in` is
+`partial` (one transcript came back wrong, one never rendered), queue 6 is `blocked` on the
+brain, and **§1 is now empty of anything this repo can do.**
+
+**`weather-distance` is `broken`, and it is one regex.** `_FAR_RE` accepts `to|from|until`
+before the destination, so *"how far is home **from here**"* extracts `dest="here"`, no route
+fact reaches the model, and it invents one — confidently, with a number and a train. It
+answers correctly for *"how far **to** home"*, which is why every previous check passed.
+**Found by typing, not by speaking:** a voice answer looked like a transcription failure
+until the identical typed question reproduced it exactly.
 
 ### Where the day left the goal
 
@@ -77,16 +83,20 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **Say a whole sentence to it**, before concluding anything about the transcriber. The
-   one sample is *"hi jarvis"* — two words, one a proper noun the prompt never names, which
-   is close to the worst case for a Bengali-primed transcriber. If a sentence comes back
-   clean, the fix is a prompt line rather than a rethink. Thirty seconds, and it needs a
-   finger: `adb` cannot press the mic.
-2. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds, and it is
+1. **`_FAR_RE`, when the brain reopens — the biggest thing found today.** It answers
+   distance questions with invented numbers whenever the phrasing puts `from` after the
+   destination, which is most natural phrasings. Prefer a `to` destination when both appear
+   and reject `here` / `my location` / `current location`, **with a test per phrasing** —
+   the whole defect is that one phrasing was never tried. `cloud_gateway.py:2757`.
+2. **The missing transcript turn**, which is app-side and the only undiagnosed thing left
+   here. The second spoken clip produced a reply and no `You sent` turn; the first produced
+   both. Not an empty transcript, since the gateway answered rather than saying it heard
+   nothing. Needs another clip and a look at whether the socket held.
+3. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds, and it is
    the last row in either goal that this repo can close on its own.
-3. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
+4. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
    both app-side, so both ship over the air.
-4. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+5. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
 
 ### The device, as left
 
@@ -411,6 +421,67 @@ the assistant is called, which is a gateway change and waits with the rest.
 
 So `mic-in` goes to `partial` rather than `proved`, and queue 6 to `blocked` on the brain
 rather than open on the device. The device half is done.
+
+
+### The wrong answer was not the microphone. It is one regex, and it has been there all along.
+
+A spoken *"how far is home from here"* came back with *"since you're currently in Ichapur,
+sir, you've already arrived at home"* — which read as the transcriber mangling a second clip
+after mangling the first. **It was not.** Typing the identical question reproduced it
+exactly: *"approximately 23 kilometers from the office to Ichapur, sir. A local train from
+Bidhannagar Road should get you there in about 30 minutes."* No microphone involved, same
+invention.
+
+**The cause is `_FAR_RE`, `cloud_gateway.py:2757`:**
+
+```python
+r"\b(?:how far|distance|how long)\b.{0,20}?\b(?:to|from|until)\s+(?P<dest>[\w\s',.&-]{2,60})"
+```
+
+`from` is one of the accepted prepositions, so in *"how far is home **from here**"* the
+match lands on `from` and **`dest` comes out as `"here"`**. Nothing in `known` is called
+"here", geocoding it returns junk, and `_local_lookups` therefore adds **no route fact at
+all**. The model, asked a distance question with no distance in its context, answered from
+its weights and its stored facts — and did it confidently, with a number, a place and a
+train.
+
+| Phrasing | `dest` | Answer |
+| --- | --- | --- |
+| `how far to home` | `home` | **39.3 km, 38 minutes** — correct, and this is what 12:41 asked |
+| `how far is home from here` | **`here`** | 23 km to Ichapur by local train — invented |
+| `how far is home` | *no match* | would also fall through |
+
+**Why it survived this long.** It works on the phrasing a test script uses and fails on the
+phrasing a person uses. Every previous check of this feature — including this morning's, at
+12:41 — happened to say *"how far **to** home"*. The one time it was asked naturally, it
+lied.
+
+This is the exact failure this row was already carrying a warning about, for search rather
+than routing: *"a silent search failure looks exactly like hallucination."* The warning was
+right and pointed at the wrong function.
+
+**Not fixed here.** It is gateway code and `jarvis-brain` is closed. The fix also is not
+simply deleting `from`: *"how far from home to the office"* is a real question that needs
+it. Preferring a `to` destination when both appear, and rejecting `here` / `my location` /
+`current location` as destinations, is the shape — and it wants a test per phrasing, since
+the whole defect is that one phrasing was never tried.
+
+### What voice actually did, on the second clip
+
+`gemini_ok` reached **2**, `fell_back` still **0**. Cleared of the wrong answer, and left
+with one defect of its own: **the transcript never rendered as a user turn**, where the
+first clip's did. Not an empty transcript — `frames.ts:203` drops those, and an empty one
+would have made the gateway answer *"I couldn't hear anything in that"* instead of replying.
+Undiagnosed, and deliberately not folded into the regex finding.
+
+### adb cannot drive this app's UI, beyond scrolling
+
+`AGENTS.md` records `Touchable` as deaf to `adb shell input`. This session found the same of
+a **`TextInput`**: a tap on the composer did not focus it, `input text` went nowhere and
+`keyevent 66` sent nothing, with no keyboard ever appearing. `input swipe` on a `ScrollView`
+still works, which is how every screen in this session was read. So a laptop can navigate
+nothing and read everything — plan device sessions accordingly, and do not spend attempts
+rediscovering it.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
