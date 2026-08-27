@@ -1190,7 +1190,7 @@
       "title": "A real release keystore",
       "state": "blocked",
       "blockedBy": "app-build",
-      "detail": "Release is signed with Expo's generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other. Fine for one phone, and the blocker on the second.",
+      "detail": "Release is signed with Expo's generated debug keystore, which is why a local APK and an EAS-signed one cannot replace each other. Fine for one phone, and the blocker on the second. **Folded into queue 23 on 2026-08-27** — it is free during a build that is happening anyway, and the spec sequences it with the other three.",
       "goal": "product"
     },
     {
@@ -1224,6 +1224,14 @@
       "blockedBy": "brain",
       "detail": "The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time.",
       "goal": "reachable"
+    },
+    {
+      "n": 23,
+      "title": "The next native build — alarms, battery, background sightings, keystore",
+      "state": "blocked",
+      "blockedBy": "app-build",
+      "goal": "acts",
+      "detail": "**Specced 2026-08-27, awaiting approval: `docs/superpowers/specs/2026-08-27-next-native-build-design.md`.** Prompted by *\"can the app set alarms?\"* — it cannot, and it says so honestly in the log. `AlarmClock.ACTION_SET_ALARM` would be perhaps forty lines, **and it cannot be published**: `android.permissions` is a fingerprint input, so one permission moves the runtime and a publish then reaches no device at all.\n\nSo the unit of work is the APK, not the feature, and **three other things have been waiting for one**: `expo-battery` for the missing half of §3.2.1, `ACCESS_BACKGROUND_LOCATION` for the `timeline` row's structural weakness (sightings only happen when the app is opened), and the real release keystore from queue 18, which is free during a build that is happening anyway. Spending a build on alarms alone and finding the next item a week later is the failure the spec exists to prevent.\n\n**Background location is the one to argue separately** — it is the only item that changes what the app knows while closed. The alarm design is deliberately narrow: recognised on the phone rather than by the model (`asOpenAppCommand`'s rule, since a model asked to set an alarm can only say it did), ambiguity declines — *\"set an alarm for 6:30\"* is twice a day and asks — and `EXTRA_SKIP_UI` stays false so a human confirms what a regex parsed."
     }
   ]
 }

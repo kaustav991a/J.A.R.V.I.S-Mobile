@@ -16,18 +16,24 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 15:40. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 16:10. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
 of them were fixed, then one more app bug was fixed by reading rather than by guessing.
-**1002 tests, 75 suites, `tsc` clean.**
+**1009 tests, 75 suites, `tsc` clean.**
 
-**Two publishes, both at runtime `31c64113`** — the installed APK's own, checked with
-`npx expo-updates fingerprint:generate --platform android` **before** each, since a moved
-fingerprint publishes to a runtime no device has and says nothing. `01a0422d` carried the
-bell and the tab root, both since confirmed on the phone. **`01a04293` carries the chat
-order and has NOT been looked at** — the app was force-stopped so the next launch fetches it.
+**Four publishes, all at runtime `31c64113`** — the installed APK's own, checked with
+`npx expo-updates fingerprint:generate --platform android` **before every one**, since a moved
+fingerprint publishes to a runtime no device has and says nothing. `01a0422d` (bell, tab
+root), `01a04293` and `01a0429e` (chat order, in two halves), `01a042b3` (the interrupted
+turn). **Everything shipped today has been seen on the phone**, which is not usual and is the
+point.
+
+**Three launches, not two.** The first fetches, the second still runs the old bundle, and only
+then does an **`Update ready — RESTART`** banner appear. While that banner shows, what is on
+screen is the OLD code whatever else says otherwise — it cost a wrong reading today before it
+was noticed.
 
 **The bell and the tab root are confirmed gone on the phone.** The bell clears when the chat
 is read, and a tab reopens at its own root.
@@ -37,11 +43,17 @@ than from one screen. Two fixes were needed: `place()` for what arrives, `inOrde
 was already on disk — shipping only the first would have left the phone identical and read as
 a third failure.
 
-**One new bug came out of closing it.** A turn interrupted mid-send says `SENDING` forever —
-one from Monday 20:02 still does. It is why the log's only same-text pair exists: the
-operator re-sent by hand. **Do not "fix" it by marking it `failed`** — that advertises a
-retry as safe, and a turn killed in the `await` window before `link.send()` might have been
-carried. `chat-stuck-sending`.
+**One new bug came out of closing it, and it is closed too.** A turn interrupted mid-send
+said `SENDING` forever — one from Monday 20:02 had for three days, and re-sending it by hand
+is where the log's only duplicate came from. It now reads `INTERRUPTED`, seen on the phone.
+**Not marked `failed`**, deliberately: that carries a retry promising nothing was carried,
+and the window spans `link.send()`.
+
+**`can the app set alarms?` — no, and it says so honestly.** Specced instead, together with
+the three other things waiting on a native build:
+`docs/superpowers/specs/2026-08-27-next-native-build-design.md`, queue 23. The feature is
+forty lines and **unpublishable** — `android.permissions` is a fingerprint input, so one
+permission moves the runtime and the publish reaches nothing. The unit of work is the APK.
 
 **The microphone works.** `brains.usage.audio` went from all zeros to `gemini_ok: 2`, no
 fallback, no error — the audio path is proved and the mime worry was unfounded. `mic-in` is
@@ -95,10 +107,11 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **`chat-stuck-sending`**, which is app-side, ships over the air, and needs a decision
-   rather than code: what a turn interrupted mid-send should SAY. Not `failed` (promises a
-   safe retry it cannot support) and not `awaiting` (asserts it was carried). A display
-   rule in `turnMark`, which already takes `now`, is the cheap shape.
+1. **Approve or amend queue 23**, the next native build —
+   `docs/superpowers/specs/2026-08-27-next-native-build-design.md`. Four things ride on it:
+   alarms, battery, background sightings, and the release keystore. **Background location is
+   the one to argue separately**, being the only item that changes what the app knows while
+   closed. Nothing has been built and nothing should be until it is approved.
 2. **`_FAR_RE`, when the brain reopens — the biggest thing found today.** It answers
    distance questions with invented numbers whenever the phrasing puts `from` after the
    destination, which is most natural phrasings. Prefer a `to` destination when both appear
