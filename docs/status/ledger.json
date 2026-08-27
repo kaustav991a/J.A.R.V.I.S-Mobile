@@ -29,7 +29,7 @@
     "repo": "jarvis-mobile",
     "read": "2026-08-27",
     "branch": "feat/mobile-hud",
-    "head": "70aaa73",
+    "head": "98a539d",
     "tests": 991,
     "suites": 75,
     "typecheck": "clean",
@@ -539,7 +539,7 @@
           "status": "partial",
           "blockedBy": "device",
           "goal": "reachable",
-          "note": "**Found unarmed on 2026-08-26, fixed, and the armed half proved on the device the same day.** `setCommuteTask` reads the registration back after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s words, every attempt is recorded for a screen to read after a relaunch, and `App.tsx` logs a failure rather than discarding it. **Proved:** WorkManager holds job `#u0a495/288`, the task executes and writes its stamp, and Places reports it truthfully. **The named gap is the other half — “says so when it is not”.** The phone re-arms itself at launch and on every visit to Places, so the unarmed state cannot be induced on demand; it is covered by tests and by the reading that named it, not by a sighting."
+          "note": "**Found unarmed on 2026-08-26, fixed, and the armed half proved on the device the same day.** `setCommuteTask` reads the registration back after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s words, every attempt is recorded for a screen to read after a relaunch, and `App.tsx` logs a failure rather than discarding it. **Proved:** WorkManager holds job `#u0a495/288`, the task executes and writes its stamp, and Places reports it truthfully. **The named gap is the other half — “says so when it is not”.** The phone re-arms itself at launch and on every visit to Places, so the unarmed state cannot be induced on demand; it is covered by tests and by the reading that named it, not by a sighting. **2026-08-27 did not move this and is worth recording as such.** The 07:00 window was the first real one with the phone armed underneath a live gateway, and the phone correctly stayed silent — so the fallback still has not been seen to POST anything. Standing down is the gate’s proof, not this row’s."
         },
         {
           "id": "briefing-content",
@@ -554,7 +554,7 @@
           "name": "Rotating wording in the gateway-sent briefing",
           "status": "none",
           "blockedBy": "brain",
-          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes.",
+          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. **Seen rather than reasoned about, 2026-08-27.** The Office briefing at 17:59 on the 26th and the Home briefing at 07:00 on the 27th carry the identical remark — *\"An umbrella, unless you’ve grown fond of arriving wet.\"* — and differ only in their figures, 51% against 65% with a storm line added. Two mornings, one sentence. It also cost a diagnosis: the changed figures read as rotated wording from the phone, and the gateway was briefly suspected of having gone silent.",
           "goal": "reachable"
         },
         {
@@ -586,15 +586,15 @@
           "name": "The local task gated so it cannot double-post",
           "status": "proved",
           "blockedBy": "none",
-          "note": "**Proved on `84f40716`, 2026-08-26 at 18:31:15.** A run forced inside the phone own departure window (18:30–19:00 for a 19:00 departure) while Home read `AT THE GATEWAY`: it exited in 260ms without fetching a forecast and posted nothing. The shade held exactly one briefing all evening — the gateway push at 17:59:18 — where 2026-08-21 saw both senders fire and the same briefing arrive twice. Forced rather than waited for, which settles the gate decision and not the scheduling; scheduling is proved separately by the unattended run at 18:07.",
+          "note": "**Proved on `84f40716`, 2026-08-26 at 18:31:15.** A run forced inside the phone own departure window (18:30–19:00 for a 19:00 departure) while Home read `AT THE GATEWAY`: it exited in 260ms without fetching a forecast and posted nothing. The shade held exactly one briefing all evening — the gateway push at 17:59:18 — where 2026-08-21 saw both senders fire and the same briefing arrive twice. Forced rather than waited for, which settles the gate decision and not the scheduling; scheduling is proved separately by the unattended run at 18:07. **Held in a REAL window on 2026-08-27.** The 07:00 Home departure, with the phone rebooted the night before and the app never opened: exactly one notification arrived, and it was the gateway's. That is the same decision the 18:31 run settled by force, taken this time by a headless run nobody was watching.",
           "goal": "reachable"
         },
         {
           "id": "activity-detail",
           "name": "Full message on tap, day rules, paged list",
-          "status": "partial",
-          "blockedBy": "device",
-          "note": "Shipped, and the box was collapsing to one line on the phone. Fixed and republished, awaiting a second look.",
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "**Proved on `84f40716`, 2026-08-27**, on a timeline finally long enough to exercise every part of the row at once. The full message on tap: the 07:00 briefing whole, in a box that no longer collapses to a line — the defect this row was left `partial` for. The `Yesterday` rule separating two days, which had never been seen. And the paging: `SEE n MORE` revealed twelve at a time (`PAGE = 12`, `ActivityScreen.tsx:27`), the count fell by twelve a tap, the last page held four, and the button then removed itself rather than sitting there offering nothing. `TESTING.md` 3.2, 3.9 and 3.10.",
           "goal": "reachable"
         }
       ]

@@ -16,6 +16,54 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## 🛑 STOP POINT — 2026-08-27, 11:40. Start here; the 08-26 entry below still stands.
+
+**`feat/mobile-hud`, tree clean, ahead of `origin`.** Nothing shipped today — no app code
+changed, and none needed to. Three things were closed by looking at the phone rather than
+by writing anything.
+
+### Where the day left the goal
+
+**"He reaches you without the app being open" is 15 of 20**, from 14 last night. `16` is
+still the ceiling from this repo: `fallback-armed` stays `partial` on purpose, and
+`presence`, `anticipate-pocket`, `speaks-first` and `gateway-briefing-wording` are gateway
+rows. **`jarvis-brain` stays closed** — what it owes is generated into
+`docs/brain-dependencies.md`, and `c86d176` is still unpushed and unmerged there.
+
+### What closed, and what it cost
+
+- **Queue 5, the reboot.** Count 22 before the reboot, app never opened, **28** at the
+  first launch next morning. WorkManager reschedules its own queue at boot.
+- **`activity-detail`.** Full message on tap, the `Yesterday` rule, and `SEE n MORE` paging
+  twelve at a time down to a four-row last page. The panel simply had never held enough
+  entries before today.
+- **`double-post-gate` in a real window.** The 07:00 briefing arrived once, from the
+  gateway, with the phone armed underneath it and nobody watching.
+
+**The cost was a wrong diagnosis, briefly.** The 07:00 text differed from the evening
+before, was read as the phone's rotation, and the gateway was suspected of having gone
+silent. It had not: the remark was word-for-word identical and only the *figures* had
+moved. `GET /health` on the gateway settled it in one request — `departures: 2`,
+`push_targets: 1`, `app_link: true`. **Reach for that endpoint before theorising about the
+gateway from the phone side.**
+
+### What to pick up, in order
+
+1. **The microphone — queue 6, `§1` in `ROADMAP.md` §10, and the phone is in hand.** The
+   oldest unverified thing in the app. Chat → hold → speak → release, then read
+   `brains.usage.audio`. `fell_back` with `last_error_was_quota` false is a code problem;
+   true is a spent free tier. `§1` must empty before anything in `§3` starts.
+2. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
+   both app-side, so both ship over the air.
+3. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+
+### The device, as left
+
+Doze whitelist and standby bucket 5 (EXEMPTED) **survived the reboot** — the whitelist
+persists, and the bucket is recomputed from usage rather than reset. Six task runs across
+the eight hours the phone was asleep, thirty-seven by mid-morning: throttled, and alive.
+
+
 ## 🛑 STOP POINT — 2026-08-26, 18:40. Start here; the 08-24 entry below still stands.
 
 **`feat/mobile-hud` at `5a9e1a9`, level with `origin`, tree clean.** 991 tests, 75 suites,
@@ -121,6 +169,52 @@ on the strength of a fallback that fired unattended, in a real window, from a re
 phone, and would simultaneously mean the gateway went silent this morning after briefing
 correctly at 17:59:18 the evening before. The notification itself is already gone from
 `dumpsys notification`, so the panel is the only remaining copy.
+
+
+### Resolved, an hour later: the gateway briefed, and the figures were the disguise
+
+**It was the gateway. The phone stood down, exactly as `cloudArmed` said it should.**
+
+What made it look otherwise is worth keeping, because it is the second time in two days
+that a *correct* briefing has been read as a broken one. The two messages, side by side:
+
+| When | Text |
+| --- | --- |
+| 26 Aug 17:59, Office — known gateway push | A 51% chance of rain on your way out. **An umbrella, unless you've grown fond of arriving wet.** |
+| 27 Aug 07:00, Home | Thunderstorms forecast. Leave early or wait it out — either beats the alternative. A 65% chance of rain on your way out, around 2.1 mm. **An umbrella, unless you've grown fond of arriving wet.** |
+
+The remark is identical. What changed is the **measurements** — 51% to 65%, plus a storm
+line the forecast earned — and that is precisely what `briefingVoice.ts` says must never
+vary and what the rotation never touches. A briefing that reads differently because the
+weather is different is the system working; it was read here as the phone rotating, and
+the gateway was suspected of having gone silent since the evening before.
+
+**Corroborated from outside the phone, which is the part worth repeating.** A `GET /health`
+on the gateway answered `departures: 2`, `days_on: 5`, `push_targets: 1`, `app_link: true`
+— armed, holding the schedule, and able to reach the handset. That endpoint exists for
+exactly this and cost one request; the phone-side reasoning alone could not have settled it.
+
+So `double-post-gate` now holds in a **real** window rather than a forced one, and it held
+under the least supervised conditions available: rebooted the night before, app never
+opened, nobody watching. `fallback-armed` did **not** move — the phone staying silent is
+the gate's proof, not the fallback's, and the fallback still has not been seen to post.
+
+`gateway-briefing-wording` stops being an inference: two mornings, one sentence.
+
+### `activity-detail` closed the same morning, on a timeline long enough to test
+
+The panel had never carried enough entries to exercise itself. Today it did, and all three
+unseen parts were seen at once:
+
+- **The full message on tap** — the 07:00 briefing, whole, in a box that no longer collapses
+  to a single line. That collapse is the defect the row was left `partial` for.
+- **The `Yesterday` rule**, separating two days.
+- **The paging.** `SEE n MORE` revealed twelve at a time, the count fell by twelve a tap, the
+  final page held four, and the button then removed itself rather than sitting there
+  offering nothing. `PAGE = 12`, `ActivityScreen.tsx:27`. `TESTING.md` 3.10.
+
+**"He reaches you without the app being open" is 15 of 20**, and 16 remains the ceiling from
+this repo: `fallback-armed` stays `partial` on purpose, and the other four are gateway rows.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
