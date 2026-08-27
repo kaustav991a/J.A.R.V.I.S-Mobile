@@ -451,9 +451,9 @@
         {
           "id": "mic-in",
           "name": "Microphone in",
-          "status": "untested",
-          "blockedBy": "device",
-          "note": "`brains.usage.audio` is 0. The oldest unverified thing here. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`.",
+          "status": "partial",
+          "blockedBy": "brain",
+          "note": "**Run at last on 2026-08-27, and the transport passed on the first try.** `brains.usage.audio` went `{gemini_ok: 0, fell_back: 0}` to `{gemini_ok: 1, fell_back: 0, last_error: null}` — the clip reached the gateway, Gemini accepted it, and nothing fell back to Groq. **The mime fear this row was written around was already answered in code:** `_AUDIO_MIME` maps `m4a` to `audio/aac`, which is exactly what Google documents, so there was never anything to fix. Note the counter is incremented on a call that did not throw, so it proves the format was accepted and not that words came back — the chat is what settles that.\n\n**The named gap is the transcript.** *\"hi jarvis\"* came back as **\"ki service\"**, and the reply — correct Benglish for the question it thought it had been asked, about what the cloud can do without the desk — was right for a transcript that was wrong. The cause is visible in `_GEMINI_TRANSCRIBE_PROMPT`, which primes hard for romanised Bengali (*\"the speaker mixes Bengali and English… anything that sounds like Hindi is Bengali\"*). That prompt exists to fix the opposite failure and it works; on a two-word English greeting it overcorrects, and `ki` is a real Bengali word. **One sample, and a poor one** — two words, one of them a proper noun the prompt never names. Cheapest thing to try is telling the prompt the assistant is called J.A.R.V.I.S., which is a gateway change and so blocked with the rest.",
           "goal": "voice"
         },
         {
@@ -461,7 +461,7 @@
           "name": "Voice out",
           "status": "none",
           "blockedBy": "app",
-          "note": "The largest single gap in the chat, and app-only — `expo-speech`.",
+          "note": "The largest single gap in the chat, and app-only — `expo-speech`. **Voice IN is no longer the unknown half, as of 2026-08-27:** the microphone path works end to end and only the transcript is unreliable. This row is unchanged — nothing speaks yet.",
           "goal": "voice"
         }
       ]
@@ -1083,9 +1083,9 @@
     {
       "n": 6,
       "title": "Speak into the microphone",
-      "state": "open",
-      "blockedBy": "device",
-      "detail": "The oldest unverified thing in the app. Chat → hold → speak → release, then read `brains.usage.audio`. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`. One line, and it is the complaint that started the feature. Unlock the phone by hand first: `adb` cannot, and `apps_linked: 0` behind the keyguard means nothing.",
+      "state": "blocked",
+      "blockedBy": "brain",
+      "detail": "**Run on 2026-08-27 and no longer the oldest unverified thing here.** Held the mic, said *\"hi jarvis\"*, and `brains.usage.audio` moved from all zeros to `gemini_ok: 1` with no fallback and no error — so the audio reaches the gateway and Gemini accepts the m4a. The mime worry was unfounded: `_AUDIO_MIME` already maps `m4a` to `audio/aac`. **What is left is accuracy, not plumbing:** the transcript read *\"ki service\"*, and the reply was correct Benglish for that question rather than for the one asked. `_GEMINI_TRANSCRIBE_PROMPT` primes for romanised Bengali by design and overcorrects on plain English — a gateway change, so it waits with the rest of the brain work.",
       "goal": "voice"
     },
     {

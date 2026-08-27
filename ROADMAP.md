@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**44 of 85 rows are proved on the phone** (52%). 61 have code (72%). 29 cannot be finished in this repo: 20 on the brain, 2 on the desk, 7 on the phone.
+**44 of 85 rows are proved on the phone** (52%). 61 have code (72%). 29 cannot be finished in this repo: 21 on the brain, 2 on the desk, 6 on the phone.
 
 ### Transport, pairing, security
 
@@ -256,8 +256,10 @@ in §2; `—` — not built.
 | Photo-in-flight indicator; a failed send stays recoverable | — | App | The longest wait in the app, and the least visible. |
 | Sent / delivered / read ticks | — | Brain | Only the gateway can say delivered and read, and it says neither. Needs a per-message id on both sides. The largest fully-specified thing left. |
 | Reply to a message | — | Brain | Wants the same per-message id as the ticks, so it follows them rather than inventing a second identity for a message. |
-| Microphone in | untested | Phone | `brains.usage.audio` is 0. The oldest unverified thing here. If it reads `fell_back` with `last_error_was_quota: false` the mime is wrong — the phone records m4a and Google documents `audio/aac`, not `audio/mp4`. |
-| Voice out | — | App | The largest single gap in the chat, and app-only — `expo-speech`. |
+| Microphone in | partial | Brain | **Run at last on 2026-08-27, and the transport passed on the first try.** `brains.usage.audio` went `{gemini_ok: 0, fell_back: 0}` to `{gemini_ok: 1, fell_back: 0, last_error: null}` — the clip reached the gateway, Gemini accepted it, and nothing fell back to Groq. **The mime fear this row was written around was already answered in code:** `_AUDIO_MIME` maps `m4a` to `audio/aac`, which is exactly what Google documents, so there was never anything to fix. Note the counter is incremented on a call that did not throw, so it proves the format was accepted and not that words came back — the chat is what settles that.
+
+**The named gap is the transcript.** *"hi jarvis"* came back as **"ki service"**, and the reply — correct Benglish for the question it thought it had been asked, about what the cloud can do without the desk — was right for a transcript that was wrong. The cause is visible in `_GEMINI_TRANSCRIBE_PROMPT`, which primes hard for romanised Bengali (*"the speaker mixes Bengali and English… anything that sounds like Hindi is Bengali"*). That prompt exists to fix the opposite failure and it works; on a two-word English greeting it overcorrects, and `ki` is a real Bengali word. **One sample, and a poor one** — two words, one of them a proper noun the prompt never names. Cheapest thing to try is telling the prompt the assistant is called J.A.R.V.I.S., which is a gateway change and so blocked with the rest. |
+| Voice out | — | App | The largest single gap in the chat, and app-only — `expo-speech`. **Voice IN is no longer the unknown half, as of 2026-08-27:** the microphone path works end to end and only the transcript is unreliable. This row is unchanged — nothing speaks yet. |
 
 ### Notifications and being spoken to
 

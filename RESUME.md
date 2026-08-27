@@ -16,7 +16,7 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 14:10. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 14:35. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
@@ -30,6 +30,12 @@ app was force-stopped so the next launch fetches it.
 
 **Both fixes confirmed gone on the phone**, on that update. The bell clears when the chat is
 read, and a tab reopens at its own root.
+
+**The microphone works, and the transcriber is what does not.** `brains.usage.audio` moved
+off zero for the first time — `gemini_ok: 1`, no fallback, no error — so the audio path is
+proved end to end and the mime worry was unfounded. *"hi jarvis"* came back as **"ki
+service"**, and the reply was correct Benglish for that question. `mic-in` is `partial`,
+queue 6 is `blocked` on the brain, and **§1 is now empty of anything this repo can do.**
 
 ### Where the day left the goal
 
@@ -71,24 +77,16 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **The microphone, which does NOT need a quiet room** — this was got wrong on the 27th
-   and cost the afternoon's attempt. The open question is the mime type, not the words:
-   `brains.usage.audio` reads `{gemini_ok: 0, fell_back: 0}`, so **any** clip answers it —
-   ambient noise, near-silence, anything. Hold the mic for two seconds and let go. Then
-   `fell_back` with `last_error_was_quota` false means the mime is wrong (the phone records
-   m4a; Google documents `audio/aac`, not `audio/mp4`), true means the free tier is spent,
-   and `gemini_ok` moving means the path works. The gateway answers *"I couldn't hear
-   anything in that"* for a silent clip, which is a pass for the transport.
-
-   **It needs a finger.** The mic is an `AnimatedPressable`, which is what `Touchable` is
-   built from — and `Touchable` is the component `adb shell input` cannot press. A laptop
-   can read any screen it can reach and cannot start a recording.
-2. **`§1` must empty before anything in `§3` starts**, and the microphone is what is left
-   in it from this repo.
-3. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds.
-4. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
+1. **Say a whole sentence to it**, before concluding anything about the transcriber. The
+   one sample is *"hi jarvis"* — two words, one a proper noun the prompt never names, which
+   is close to the worst case for a Bengali-primed transcriber. If a sentence comes back
+   clean, the fix is a prompt line rather than a rethink. Thirty seconds, and it needs a
+   finger: `adb` cannot press the mic.
+2. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds, and it is
+   the last row in either goal that this repo can close on its own.
+3. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
    both app-side, so both ship over the air.
-5. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+4. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
 
 ### The device, as left
 
@@ -366,6 +364,53 @@ From Settings only three of the five tab icons are on screen. `GlassTabBar` is a
 iOS-camera-style dial: the tabs ride a strip under a fixed lens at the centre and the far
 ones close up and slide off. So at either end of the dial two tabs are reachable by drag
 and not by tap. Working as built — worth knowing before someone reports it as missing tabs.
+
+
+### The microphone, run at last — the plumbing passed and the transcriber didn't
+
+**The oldest unverified thing in this app is no longer unverified.** Held the mic, said
+*"hi jarvis"*, and `brains.usage.audio` went from `{gemini_ok: 0, fell_back: 0}` to
+`{gemini_ok: 1, fell_back: 0, last_error: null}`. The clip reached the gateway, Gemini
+accepted it, nothing fell back to Groq.
+
+**The mime fear this row was built around had already been answered in code.** `_AUDIO_MIME`
+maps `m4a` to `audio/aac` — precisely what the ledger note said Google documents and feared
+was missing. There was nothing to fix, and a week of *"if it reads `fell_back` the mime is
+wrong"* was a hypothesis about code that already did the right thing. Read the source before
+writing the diagnosis into the ledger.
+
+**A counter caveat worth keeping.** `gemini_ok` is incremented on a call that did not throw
+(`cloud_gateway.py:844`); it never checks the transcript was non-empty. So it proves the
+format was accepted, not that words came back. The chat is what settles that — which is why
+the screenshot mattered and the number alone would have been read too generously.
+
+### What came back, and why it is one failure and not two
+
+| | |
+| --- | --- |
+| Said | *"hi jarvis"* |
+| Transcribed | **"ki service"** |
+| Answered | *"Ami ekhon remote cloud gateway te active achhi, Sir—tai shudhu kotha bola r web lookup-er service paben. Desk system-ta online ele baki local control r script run korar kaaj gulo chalu hobe."* |
+
+**The reply is right.** It is a correct answer to *"ki service?"* — what service — and factually
+true: the desk is asleep, so talk and web lookup are what remain. Correct Benglish, correct
+content, correct about its own state. The model did its job on the input it was handed.
+
+**The transcript is the whole of the defect,** and its cause is visible rather than guessed.
+`_GEMINI_TRANSCRIBE_PROMPT` primes hard for romanised Bengali: *"the speaker mixes Bengali
+and English in the same sentence… anything that sounds like Hindi is Bengali."* Given two
+words of plain English it did what it was told, and `ki` is a real Bengali word. **That
+prompt exists to fix the opposite failure** — a clip transcribed against the wrong language
+in a house that speaks two — and it works. This is an overcorrection in a feature that was
+built as a correction.
+
+**One sample, and a weak one.** Two words, one of them a proper noun the prompt never
+mentions. A sentence would likely fare better, and *"hi jarvis"* is close to the worst case:
+short, English, and containing a name. The cheapest thing to try is telling the prompt what
+the assistant is called, which is a gateway change and waits with the rest.
+
+So `mic-in` goes to `partial` rather than `proved`, and queue 6 to `blocked` on the brain
+rather than open on the device. The device half is done.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.

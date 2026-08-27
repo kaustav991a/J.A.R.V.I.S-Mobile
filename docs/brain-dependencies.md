@@ -7,7 +7,7 @@
 >
 > Head: c86d176 on `fix/durable-state`; `feat/cloud-gateway` is what Render watches.
 >
-> **20 ledger rows and 6 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
+> **21 ledger rows and 7 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
 
 ## Read these before touching anything that looks broken
 
@@ -15,7 +15,11 @@
 - **Until `fix/durable-state` merges, every deploy silently disarms the briefing.** It has already happened twice, with nothing said anywhere. The merge is the whole of the deploy: `git merge fix/durable-state && git push` from `feat/cloud-gateway`.
 - The local checkout of `feat/cloud-gateway` is **42 commits behind its remote**. Work that feels missing from this machine is on GitHub. Fetch before concluding anything about that branch.
 
-## The queue items — 6
+## The queue items — 7
+
+### 6 · Speak into the microphone
+
+**Run on 2026-08-27 and no longer the oldest unverified thing here.** Held the mic, said *"hi jarvis"*, and `brains.usage.audio` moved from all zeros to `gemini_ok: 1` with no fallback and no error — so the audio reaches the gateway and Gemini accepts the m4a. The mime worry was unfounded: `_AUDIO_MIME` already maps `m4a` to `audio/aac`. **What is left is accuracy, not plumbing:** the transcript read *"ki service"*, and the reply was correct Benglish for that question rather than for the one asked. `_GEMINI_TRANSCRIBE_PROMPT` primes for romanised Bengali by design and overcorrects on plain English — a gateway change, so it waits with the rest of the brain work.
 
 ### 11 · The notification listener
 
@@ -41,7 +45,7 @@ The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it 
 
 The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time.
 
-## The ledger rows — 20
+## The ledger rows — 21
 
 Every row whose blocker is `brain`, in the order §0b renders them.
 
@@ -60,6 +64,9 @@ Every row whose blocker is `brain`, in the order §0b renders them.
 | No unprompted weekday assertion | broken | **Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like. |
 | Sent / delivered / read ticks | — | Only the gateway can say delivered and read, and it says neither. Needs a per-message id on both sides. The largest fully-specified thing left. |
 | Reply to a message | — | Wants the same per-message id as the ticks, so it follows them rather than inventing a second identity for a message. |
+| Microphone in | partial | **Run at last on 2026-08-27, and the transport passed on the first try.** `brains.usage.audio` went `{gemini_ok: 0, fell_back: 0}` to `{gemini_ok: 1, fell_back: 0, last_error: null}` — the clip reached the gateway, Gemini accepted it, and nothing fell back to Groq. **The mime fear this row was written around was already answered in code:** `_AUDIO_MIME` maps `m4a` to `audio/aac`, which is exactly what Google documents, so there was never anything to fix. Note the counter is incremented on a call that did not throw, so it proves the format was accepted and not that words came back — the chat is what settles that.
+
+**The named gap is the transcript.** *"hi jarvis"* came back as **"ki service"**, and the reply — correct Benglish for the question it thought it had been asked, about what the cloud can do without the desk — was right for a transcript that was wrong. The cause is visible in `_GEMINI_TRANSCRIBE_PROMPT`, which primes hard for romanised Bengali (*"the speaker mixes Bengali and English… anything that sounds like Hindi is Bengali"*). That prompt exists to fix the opposite failure and it works; on a two-word English greeting it overcorrects, and `ki` is a real Bengali word. **One sample, and a poor one** — two words, one of them a proper noun the prompt never names. Cheapest thing to try is telling the prompt the assistant is called J.A.R.V.I.S., which is a gateway change and so blocked with the rest. |
 
 ### Notifications and being spoken to
 
