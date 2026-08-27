@@ -16,14 +16,20 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 13:30. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 13:50. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
 of them were fixed. **995 tests, 75 suites, `tsc` clean.**
 
-**Nothing has been published.** Both fixes are JS-only and ship over the air, so the phone
-is still running `01a03dfe` and still showing both bugs until an `eas update` goes out.
+**Published `01a0422d` to `production`** (group `81fe340c`, commit `2f1cf49`) at runtime
+`31c64113`, which is the installed APK's own — checked with
+`npx expo-updates fingerprint:generate --platform android` **before** publishing rather than
+after, since a moved fingerprint publishes to a runtime no device has and says nothing. The
+app was force-stopped so the next launch fetches it.
+
+**Neither fix has been seen on the phone.** Tests say the code is right; that is a different
+claim, and this project has been wrong about the difference before.
 
 ### Where the day left the goal
 
@@ -51,6 +57,10 @@ and the remark becomes speakable. Open the app at Office tomorrow — that is th
   38 minutes, measured from where he stood; *"is it raining here"* came back with figures and
   the place named. Asked from the Office on purpose — `TESTING.md` 7.1's own wording would
   have answered zero.
+- **Two bugs off the device, fixed and shipped.** The bell counted turns the chat had
+  already shown — two unread systems that had never spoken to each other — and every tab
+  reopened at whatever sub-screen it was left on. A third, About with no back chevron,
+  **could not be reproduced** and nothing was changed for it.
 
 **The cost was a wrong diagnosis, briefly.** The 07:00 text differed from the evening
 before, was read as the phone's rotation, and the gateway was suspected of having gone
@@ -61,15 +71,17 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **The microphone — queue 6, `§1` in `ROADMAP.md` §10.** The oldest unverified thing in
+1. **Look at the phone, on the update that is already published.** Read the chat, go to
+   Home, and the bell should be at zero rather than still counting what you just read. Then
+   Settings → any row → Home → Settings, which should land on the settings list. If both
+   look unchanged, force-stop and open once more: the fetch and the apply are different
+   launches.
+2. **The microphone — queue 6, `§1` in `ROADMAP.md` §10.** The oldest unverified thing in
    the app, and it needs somewhere you can speak — skipped on the 27th because the phone
    was in an office. Chat → hold → speak → release, then read `brains.usage.audio`, which
    read `{gemini_ok: 0, fell_back: 0, last_error: null}` beforehand: no audio turn has ever
    reached the gateway. `fell_back` with `last_error_was_quota` false is a code problem;
    true is a spent free tier. `§1` must empty before anything in `§3` starts.
-2. **Publish the two fixes**, then look at the phone: read the chat and watch the bell go
-   to zero, and leave Settings mid-way and come back to the list. Neither is proved until
-   it is seen on the device — the tests only say the code is right.
 3. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds.
 4. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
    both app-side, so both ship over the air.

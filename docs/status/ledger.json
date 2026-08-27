@@ -29,7 +29,7 @@
     "repo": "jarvis-mobile",
     "read": "2026-08-27",
     "branch": "feat/mobile-hud",
-    "head": "8c26b54",
+    "head": "2f1cf49",
     "tests": 995,
     "suites": 75,
     "typecheck": "clean",
@@ -40,12 +40,12 @@
       "device script": "TESTING.md"
     },
     "otaVerified": {
-      "on": "2026-08-24",
+      "on": "2026-08-27",
       "channel": "production",
       "channelId": "01a01a04-f0d6-7718-90dc-dbae6930b0db",
       "runtime": "31c64113d7d13a400eb1c56ef81c4d0d4be3fa17",
       "group": "33ab8d55-2ea9-4af5-b3f3-1437d8f46b3c",
-      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand."
+      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it."
     }
   },
   "blockers": {
