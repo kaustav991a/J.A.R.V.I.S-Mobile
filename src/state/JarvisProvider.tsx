@@ -1149,7 +1149,39 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    * launching the app must not replay yesterday's notifications.
    */
   const [readAt, setReadAt] = useState(() => Date.now());
-  const markChatRead = useCallback(() => setReadAt(Date.now()), []);
+
+  /**
+   * The log as it stands, for marking read without depending on it.
+   *
+   * `markChatRead` has to see the current turns — it is what clears them from the
+   * bell — but it must NOT change identity when they arrive. The Chat screen holds
+   * it in a `useFocusEffect` dependency list, so a new identity per turn would tear
+   * that effect down and set it up again on every reply, flapping `chatFocused` on
+   * the way through. A ref moves the value without moving the function.
+   */
+  const chatNow = useRef(hud.chat);
+  useEffect(() => {
+    chatNow.current = hud.chat;
+  }, [hud.chat]);
+
+  /**
+   * Reading the conversation clears BOTH counts, which it did not until 2026-08-27.
+   *
+   * There are two of them and they answer different questions: `readAt` below is a
+   * timestamp behind Home's "N new replies", and `readIds` is the persisted set
+   * behind the bell. Only the Activity panel ever wrote to the second, so reading
+   * the chat cleared its own marker and left the bell counting the very turns you
+   * had just read — reported from the device, and a count you cannot clear by
+   * reading is a count you stop reading.
+   *
+   * **Chat turns only.** `timeline` is given an empty trace on purpose: a step the
+   * agent took is not something you saw by reading the conversation, and marking it
+   * read here would be the same lie in the other direction.
+   */
+  const markChatRead = useCallback(() => {
+    setReadAt(Date.now());
+    remember(countable(timeline(chatNow.current, [])).map((i) => i.id));
+  }, [remember]);
   const unread = useMemo(
     () => hud.chat.filter((c) => c.from === 'jarvis' && c.at > readAt).length,
     [hud.chat, readAt]
@@ -1159,6 +1191,20 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   const setChatFocused = useCallback((focused: boolean) => {
     chatFocused.current = focused;
   }, []);
+
+  /**
+   * A reply that lands while you are watching it arrive has been seen.
+   *
+   * The screen marks read on the way in and on the way out, which leaves the gap in
+   * between: the tab bar carried `2` on the Chat tab while the chat was open on the
+   * two answers it was counting. `chatFocused` is a ref and changing it re-renders
+   * nothing, which is why this hangs off the log rather than off the flag — the log
+   * changing is the only moment the question can be newly wrong.
+   */
+  useEffect(() => {
+    if (!chatFocused.current) return;
+    markChatRead();
+  }, [hud.chat, markChatRead]);
 
   /**
    * Unread activity, per entry, for the count on the bell and the marks in the panel.

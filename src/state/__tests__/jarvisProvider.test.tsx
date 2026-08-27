@@ -108,7 +108,8 @@ jest.mock('../../lib/knownPlaces', () => ({
 
 /** the whole chat log, one line per turn, so assertions read like the screen */
 function Probe({ say, read }: { say: string; read?: string }) {
-  const { hud, sendCommand, alertsUnread, markRead, readIds } = useJarvis();
+  const { hud, sendCommand, alertsUnread, markRead, markChatRead, setChatFocused, readIds } =
+    useJarvis();
   return (
     <>
       <Text testID="log">{hud.chat.map((c) => `${c.from}: ${c.text}`).join('\n')}</Text>
@@ -118,6 +119,13 @@ function Probe({ say, read }: { say: string; read?: string }) {
       <Text testID="read-ids">{[...readIds].sort().join(',')}</Text>
       <Text testID="read-one" onPress={() => markRead(read ?? '')}>
         read
+      </Text>
+      {/* what the Chat screen does on focus, and again on the way out */}
+      <Text testID="read-chat" onPress={markChatRead}>
+        chat read
+      </Text>
+      <Text testID="focus-chat" onPress={() => setChatFocused(true)}>
+        focus
       </Text>
       <Text testID="go" onPress={() => void sendCommand(say).catch(() => {})}>
         send
@@ -507,6 +515,64 @@ describe('what has been read', () => {
     );
     await waitFor(() => expect(view.getByTestId('unread').props.children).toBe('1'));
     notify.pendingReplies.mockResolvedValue([]);
+    await finish(view);
+  });
+
+  /**
+   * Two unread systems, and only one of them was being cleared.
+   *
+   * Reported from the device 2026-08-27: the chat's own marker cleared on reading,
+   * and the bell went on counting the same turns. `unread` (Home's "N new replies")
+   * is a timestamp comparison cleared by `markChatRead`; the bell is `alertsUnread`,
+   * a persisted set of ids that only the Activity panel ever wrote to. So reading
+   * the conversation cleared the first and left the second, and a count nobody can
+   * clear by reading is a count you learn to ignore.
+   *
+   * Trace entries are deliberately NOT covered by this: a step the agent took is
+   * not something you saw by reading the chat.
+   */
+  it('clears the bell for turns the chat itself has shown', async () => {
+    const notify = jest.requireMock('../../lib/notify') as { pendingReplies: jest.Mock };
+    notify.pendingReplies.mockResolvedValue([
+      { text: 'Before you leave Home, sir\nAn umbrella, then.', at: 1_755_000_000_000 },
+    ]);
+
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await waitFor(() => expect(view.getByTestId('unread').props.children).toBe('1'));
+    await act(async () => {
+      fireEvent.press(view.getByTestId('read-chat'));
+    });
+    expect(view.getByTestId('unread').props.children).toBe('0');
+    notify.pendingReplies.mockResolvedValue([]);
+    await finish(view);
+  });
+
+  /**
+   * A reply that lands while you are watching it arrive has been seen.
+   *
+   * The tab bar carried `2` on the Chat tab while the chat was open on the very
+   * answers it was counting, which is the same defect one step earlier: the marker
+   * is only cleared on focus and on blur, so anything in between sat unread on a
+   * screen that was displaying it.
+   */
+  it('does not count a reply that arrives while the chat is on screen', async () => {
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      fireEvent.press(view.getByTestId('focus-chat'));
+    });
+    await act(async () => {
+      mockPush.take?.({ text: 'While you watched, sir.' }, false);
+    });
+    await waitFor(() => expect(view.getByTestId('log').props.children).toContain('While you watched, sir.'));
+    expect(view.getByTestId('unread').props.children).toBe('0');
     await finish(view);
   });
 
