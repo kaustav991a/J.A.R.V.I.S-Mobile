@@ -617,6 +617,46 @@ or the mailbox that could answer it properly. Recorded as `chat-stuck-sending` r
 guessed at, because the wrong guess here runs someone's script twice.
 
 
+### `chat-stuck-sending` — found, fixed and seen, inside an hour
+
+A `thanks Jarvis` from Monday **20:02** had been reading `SENDING` for three days. It now
+reads **`INTERRUPTED`**, in red, on `01a042b3`.
+
+`sending` is the gap between `local_command` and `turn_sent`/`turn_failed`, and both of those
+dispatches belong to a running process. Kill it in between and neither ever fires: the turn
+is written to disk mid-flight and **nothing looks at it again**. Its owner read that as never
+sent and re-sent it by hand — which is where the log's only same-text pair came from. The
+duplicate was this bug's footprint, not a de-duplication failure.
+
+**Detected on restore rather than by age.** A restored turn still saying `sending` has lost
+the only thing that could ever have moved it, which is a fact about which process owned the
+send. A threshold would be a guess about how long a send may take, and would eventually
+accuse a slow one in the current session — so only the restored half is touched.
+
+**The obvious fix was wrong, and that is the part worth keeping.** Marking it `failed` would
+render `NOT SENT` and offer this app's one unambiguous retry — the one whose comment promises
+*"nothing carried the message, so it cannot have been acted on — re-sending cannot run
+anything twice."* An interrupted turn may already have gone: the window spans `link.send()`.
+So `NOT SENT` would be a guess, and a safe-looking `SEND AGAIN` on *run script System
+Cleanup* could run it twice. `awaiting` is no better — it asserts *carried*, equally unknown.
+
+`INTERRUPTED` says what happened and claims nothing about the outcome. Tone `bad`, because
+nothing is coming for it and it will not resolve itself. **No retry**, because this app does
+not offer one it cannot promise; the words stay there to be copied, which is what its owner
+did anyway.
+
+**It repaired itself on load** — `hydrate` is what does the marking, so no migration was
+needed and nothing on the device had to be touched.
+
+### Three restarts, not two
+
+Worth writing down, because it cost a wrong reading earlier in the day: after publishing,
+this app needs **three** launches, not two. The first fetches, the second still runs the old
+bundle, and only then does an **`Update ready — RESTART`** banner appear at the top of the
+screen. The banner is the honest signal — when it is showing, the bundle on screen is the old
+one, whatever the Settings row says. Look for it before reading anything as evidence.
+
+
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
 
 The morning's work was code and tests. This is the device, and three rows that had been

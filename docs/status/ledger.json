@@ -29,8 +29,8 @@
     "repo": "jarvis-mobile",
     "read": "2026-08-27",
     "branch": "feat/mobile-hud",
-    "head": "4f96056",
-    "tests": 999,
+    "head": "f025c8c",
+    "tests": 1009,
     "suites": 75,
     "typecheck": "clean",
     "sources": {
@@ -45,7 +45,7 @@
       "channelId": "01a01a04-f0d6-7718-90dc-dbae6930b0db",
       "runtime": "31c64113d7d13a400eb1c56ef81c4d0d4be3fa17",
       "group": "33ab8d55-2ea9-4af5-b3f3-1437d8f46b3c",
-      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it. Twice on 2026-08-27, fingerprint checked before each: 01a0422d (the bell and the tab root) and 01a04293 (the chat order)."
+      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it. Twice on 2026-08-27, fingerprint checked before each: 01a0422d (the bell and the tab root), 01a04293 and 01a0429e (the chat order, in two halves) and 01a042b3 (the interrupted turn)."
     }
   },
   "blockers": {
@@ -340,10 +340,10 @@
         {
           "id": "chat-stuck-sending",
           "name": "A turn interrupted mid-send stops claiming to be sending",
-          "status": "broken",
-          "blockedBy": "app",
+          "status": "proved",
+          "blockedBy": "none",
           "goal": "conversation",
-          "note": "**Found on the device 2026-08-27, and it is the cause of the only duplicate in the log.** A turn is written `sending` by `local_command` and moved to `awaiting` or `failed` when `sendCommand` reports back. Close the app in between and neither dispatch ever runs — the turn is persisted as `sending`, **and nothing re-examines it on reload**. A `thanks Jarvis` from Monday 20:02 still reads `SENDING` three days later. The operator saw exactly that, concluded the message had not gone, and re-sent it by hand: the duplicate in the log is this bug's footprint, not a de-duplication failure.\n\n**The fix is not simply marking it `failed`, and that is the whole difficulty.** `failed` renders `NOT SENT` and offers a retry whose comment promises *\"nothing carried the message, so it cannot have been acted on — re-sending cannot run anything twice.\"* But `sending` spans an `await` window BEFORE `link.send()` — the capability intercept, the place refresh — so a turn killed there **probably** never went and **might** have. Calling a carried `run script X` NOT SENT and offering a safe retry could run it twice, which is the one thing that retry promise exists to rule out. `awaiting` is no better: it means *carried*, which is equally unknown.\n\nSo it wants a state that says what is actually true — interrupted, and unknown whether it went — with no retry attached, or a mailbox that can answer it properly (`docs/superpowers/specs/2026-08-21-mailbox-delivery-design.md`). A display rule in `turnMark`, which already takes `now`, is the cheap shape."
+          "note": "**Found and closed on `84f40716`, 2026-08-27.** A `thanks Jarvis` from Monday 20:02 had been reading `SENDING` for three days: `sending` is the gap between `local_command` and `turn_sent`/`turn_failed`, both of which belong to a running process, so killing the app in between leaves the turn written to disk mid-flight with nothing to move it. Its owner read that as never sent and re-sent it by hand — **the only duplicate in that log is this bug's footprint.**\n\n**Detected on restore, not by age.** A restored turn still saying `sending` has lost the process that owned the send, which is a fact; a threshold would be a guess about how long a send may take and would eventually accuse a slow one in the current session. Only the restored half is touched.\n\n**A new state rather than reusing `failed`, and that distinction is the point.** `failed` renders `NOT SENT` and carries this app's one unambiguous retry, justified by nothing having carried the message. An interrupted turn may already have gone — the window spans `link.send()` — so `NOT SENT` would be a guess and a safe-looking `SEND AGAIN` on *run script X* could run it twice. `awaiting` asserts *carried*, equally unknown. `INTERRUPTED` says what happened and claims nothing about the outcome: tone `bad`, no retry, words left there to be copied.\n\n**Seen on the phone at `01a042b3`:** the Monday turn now reads `You · 20:02 INTERRUPTED` in red. It repaired itself on load, since `hydrate` does the marking — no migration, and nothing else on the device had to change. 7 tests, 5 of which failed first."
         },
         {
           "id": "voice-rule-replies",
