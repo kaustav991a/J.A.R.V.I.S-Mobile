@@ -166,6 +166,10 @@ of rediscovering them is high.
   Places opens. So **anything rendered as a `Touchable` — RESET, PREVIEW, SETTINGS,
   UPDATE, the X on a named place — needs a human finger.** Plan a device check so the
   taps you cannot make are the ones you ask for.
+- **Home's Chat card is the reliable way into the conversation from a laptop.** A plain
+  `input tap` on it opened Chat on 2026-08-27, on a session where the tab bar refused a
+  tap and two held swipes at the same point. The tab bar is a dial and its hit areas move
+  with it; the card does not move. **Reach for the card, not the tab.**
 - **The tab bar takes a held `input swipe`, not a tap.** `AGENTS.md` said neither worked;
   a 140ms `input swipe x y x y 140` on the Settings tab switched tabs on 2026-08-26, where
   a plain `input tap` at the same point did nothing. `GlassTabBar` handles touch through

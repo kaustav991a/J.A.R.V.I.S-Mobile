@@ -16,12 +16,12 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 15:20. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 15:40. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
 of them were fixed, then one more app bug was fixed by reading rather than by guessing.
-**999 tests, 75 suites, `tsc` clean.**
+**1002 tests, 75 suites, `tsc` clean.**
 
 **Two publishes, both at runtime `31c64113`** — the installed APK's own, checked with
 `npx expo-updates fingerprint:generate --platform android` **before** each, since a moved
@@ -32,13 +32,16 @@ order and has NOT been looked at** — the app was force-stopped so the next lau
 **The bell and the tab root are confirmed gone on the phone.** The bell clears when the chat
 is read, and a tab reopens at its own root.
 
-**The chat order is fixed in code and unproved on the phone.** The log rendered in ARRIVAL
-order — `ChatScreen` reversed the array and never sorted by `at` — so a turn swept out of
-the tray carrying last night's stamp was appended last and read as the newest. Fixed in the
-reducer, since two readers assumed the array was ordered while `activity.ts` sorted the same
-data. **`chat-order` stays `broken` on purpose:** the previous fix was called done from a
-screenshot and the screen was still wrong. Open the chat and look at whether yesterday's
-entries sit above today's.
+**`chat-order` is closed**, on `01a0429e`, read end to end by scrolling the whole log rather
+than from one screen. Two fixes were needed: `place()` for what arrives, `inOrder()` for what
+was already on disk — shipping only the first would have left the phone identical and read as
+a third failure.
+
+**One new bug came out of closing it.** A turn interrupted mid-send says `SENDING` forever —
+one from Monday 20:02 still does. It is why the log's only same-text pair exists: the
+operator re-sent by hand. **Do not "fix" it by marking it `failed`** — that advertises a
+retry as safe, and a turn killed in the `await` window before `link.send()` might have been
+carried. `chat-stuck-sending`.
 
 **The microphone works.** `brains.usage.audio` went from all zeros to `gemini_ok: 2`, no
 fallback, no error — the audio path is proved and the mime worry was unfounded. `mic-in` is
@@ -92,9 +95,10 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **Open the chat and read the order**, on `01a04293`. Yesterday's entries above today's,
-   each reply once. That is the only thing shipped today that nobody has looked at, and
-   `chat-order` stays `broken` until somebody does.
+1. **`chat-stuck-sending`**, which is app-side, ships over the air, and needs a decision
+   rather than code: what a turn interrupted mid-send should SAY. Not `failed` (promises a
+   safe retry it cannot support) and not `awaiting` (asserts it was carried). A display
+   rule in `turnMark`, which already takes `now`, is the cheap shape.
 2. **`_FAR_RE`, when the brain reopens — the biggest thing found today.** It answers
    distance questions with invented numbers whenever the phrasing puts `from` after the
    destination, which is most natural phrasings. Prefer a `to` destination when both appear
@@ -489,14 +493,21 @@ first clip's did. Not an empty transcript — `frames.ts:203` drops those, and a
 would have made the gateway answer *"I couldn't hear anything in that"* instead of replying.
 Undiagnosed, and deliberately not folded into the regex finding.
 
-### adb cannot drive this app's UI, beyond scrolling
+### adb and this app's UI — the earlier note in this entry was too broad
 
-`AGENTS.md` records `Touchable` as deaf to `adb shell input`. This session found the same of
-a **`TextInput`**: a tap on the composer did not focus it, `input text` went nowhere and
-`keyevent 66` sent nothing, with no keyboard ever appearing. `input swipe` on a `ScrollView`
-still works, which is how every screen in this session was read. So a laptop can navigate
-nothing and read everything — plan device sessions accordingly, and do not spend attempts
-rediscovering it.
+**Written mid-session and wrong:** *"adb cannot drive this app's UI, beyond scrolling."* An
+hour later a plain `input tap` on Home's Chat card opened the conversation on the first
+attempt, which is how the whole of `chat-order` was then verified without a finger.
+
+What is actually true, and `AGENTS.md` already had most of it: a `Touchable` does not take
+synthetic events, a plain `Pressable`/`SettingsRow` does, and **the tab bar is its own
+problem** — a dial whose hit areas move with it, which refused a tap and two held swipes
+today at coordinates read off a screenshot. The composer `TextInput` also refused a tap,
+which remains unexplained and is worth a second look rather than a rule.
+
+**The useful conclusion is a route, not a limit:** to reach Chat from a laptop, tap Home's
+card rather than the tab. Recorded in `AGENTS.md`. Generalising from three failures to
+"cannot" cost this session an hour of asking for taps that were not needed.
 
 
 ### The missing transcript: the socket died, and only the answer had a lifeboat
@@ -556,6 +567,54 @@ broken"*, and both now lead that list with their file and line numbers. That sec
 because two rows were once re-diagnosed from the app side after being fixed in the gateway;
 these two have the same shape — **they look like app defects from the phone and neither is
 one.**
+
+
+### `chat-order` closed — read end to end, not from one screen
+
+**Proved on `01a0429e`, by scrolling the whole ~100-entry log rather than looking at a
+screenshot**, which is precisely how this row was wrongly called done twice before. Every
+timestamp ascends, across four days and three day rules, and the case reported broken —
+yesterday's 19:00 briefing sitting above today's 07:00 — reads correctly.
+
+| Section | Timestamps |
+| --- | --- |
+| `Friday` | 22:10 → 22:10 → 22:11 |
+| `Tuesday` | 07:00 → 19:00 → 22:02 → … → 22:14 |
+| `Yesterday` | 07:00 → 08:09 → 11:51 → … → 19:00 |
+| `Today` | 07:00 → 08:35 → … → 14:30 → 14:44 |
+
+**It took two fixes and the first was not enough.** `place()` orders what arrives;
+`inOrder()` had to be added for what was already written, because a relaunch restores the
+file as it stands and `place()` can never reach it. Shipping only the first would have left
+the phone looking identical and read as a third failure — `hydrate`'s own sentence about
+duplicates, one row over. Caught by reading the code before looking at the device, which is
+the opposite of how the previous two attempts went.
+
+**The only same-text pair in the log is not a duplicate.** Two identical turns 60 seconds
+apart, and the operator confirms he sent it twice by hand. The 5-second window is right to
+treat that as a second send.
+
+### What made him send it twice, which is a new bug
+
+`thanks Jarvis`, Monday **20:02**, still reading **`SENDING`** three days later.
+
+A turn is written `sending` by `local_command` and moved to `awaiting` or `failed` when
+`sendCommand` reports back. Close the app in between and neither dispatch runs — the turn is
+persisted mid-flight and **nothing re-examines it on reload**. So it claims to be sending
+forever. The operator saw that, concluded it had not gone, and re-sent by hand: **the
+duplicate in the log is this bug's footprint, not a de-duplication failure.**
+
+**The fix is not to mark it `failed`, and the reason is the interesting part.** `failed`
+renders `NOT SENT` and offers a retry whose comment promises *"nothing carried the message,
+so it cannot have been acted on — re-sending cannot run anything twice."* But `sending`
+spans an `await` window BEFORE `link.send()` — the capability intercept, the place refresh —
+so a turn killed there **probably** never went and **might** have. Calling a carried
+`run script X` NOT SENT, with a retry advertised as safe, could run it twice. `awaiting` is
+no better: it asserts *carried*, equally unknown.
+
+So it wants a state that says what is true — interrupted, and unknown — carrying no retry,
+or the mailbox that could answer it properly. Recorded as `chat-stuck-sending` rather than
+guessed at, because the wrong guess here runs someone's script twice.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.

@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**44 of 85 rows are proved on the phone** (52%). 61 have code (72%). 29 cannot be finished in this repo: 21 on the brain, 2 on the desk, 6 on the phone.
+**45 of 86 rows are proved on the phone** (52%). 62 have code (72%). 29 cannot be finished in this repo: 21 on the brain, 2 on the desk, 6 on the phone.
 
 ### Transport, pairing, security
 
@@ -234,18 +234,23 @@ in §2; `—` — not built.
 
 ### Talking to him
 
-*10 proved of 20.*
+*11 proved of 21.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
 | Text chat, both directions | proved |  |  |
 | Replies arrive word by word | proved |  |  |
 | Markdown rendered, not shown as asterisks | proved |  |  |
-| The chat log in the right order, once each | broken | App | **The note below was stale, and re-reading it was the whole of the fix.** It said the surviving pair must carry different timestamps and that identity on an exact millisecond could not unify them — **which `96de0e1` had already acted on**, replacing the key with a 5-second window measured from a real 100-entry log (duplicates 422–459 ms apart, nearest genuine repeat 32.9 s). The duplicate half has been fixed and shipped since then.
+| The chat log in the right order, once each | proved |  | **Proved on `84f40716`, 2026-08-27, on update `01a0429e`** — read top to bottom by scrolling the whole ~100-entry log, not from one screenshot, which is how this row was wrongly called done before. **Every timestamp ascends**, across four days and three day rules (`Friday`, `Tuesday`, `Yesterday`, `Today`), including the exact case reported broken: yesterday's 19:00 briefing sitting above today's 07:00.
 
-**What was left was the ordering half, and it is one line.** `ChatScreen:118` did `[...hud.chat].reverse()` — the log rendered in ARRIVAL order, never sorted by `at`. A turn swept out of the tray carries the notification's own time, so an entry from last night entered this morning was appended last and read as the newest. That is the second reported symptom exactly: yesterday's `15:xx` below today's `12:xx`.
+It took two fixes today and the first was incomplete. `place()` orders what arrives; **`inOrder()` had to be added for what was already on disk**, because a relaunch restores the file as written and `place()` can never reach it — a fix that only guarded new entries would have left the phone looking identical and read as a third failure. That is `hydrate`'s own sentence about duplicates, applied to order.
 
-**Fixed at the source rather than at the reader**, because there were two readers and both assumed the array was already ordered — `ChatScreen` reverses without sorting, and `HomeScreen:231` takes `chat[chat.length - 1]` as the last thing said, while `activity.ts` sorts the same data before showing it. A log that disagrees with itself depending on who reads it is the bug one layer up. `place()` walks back from the end and stops, so an in-order log costs nothing and ties keep arrival order — an answer stamped in the same millisecond as its question still follows it. 4 tests, 2 of which failed first. **Unproved on the phone**, and this row stays `broken` until it is seen: the last fix here was called done from a screenshot and was not. |
+**The one same-text pair in the log is not a duplicate:** two identical turns 60 seconds apart, and the operator confirms he sent it twice by hand after the first appeared to get no reply. Sixty seconds is far outside the 5-second window and the code is right to treat it as a second send. **What made him resend is a separate defect, recorded under `chat-stuck-sending`.** |
+| A turn interrupted mid-send stops claiming to be sending | broken | App | **Found on the device 2026-08-27, and it is the cause of the only duplicate in the log.** A turn is written `sending` by `local_command` and moved to `awaiting` or `failed` when `sendCommand` reports back. Close the app in between and neither dispatch ever runs — the turn is persisted as `sending`, **and nothing re-examines it on reload**. A `thanks Jarvis` from Monday 20:02 still reads `SENDING` three days later. The operator saw exactly that, concluded the message had not gone, and re-sent it by hand: the duplicate in the log is this bug's footprint, not a de-duplication failure.
+
+**The fix is not simply marking it `failed`, and that is the whole difficulty.** `failed` renders `NOT SENT` and offers a retry whose comment promises *"nothing carried the message, so it cannot have been acted on — re-sending cannot run anything twice."* But `sending` spans an `await` window BEFORE `link.send()` — the capability intercept, the place refresh — so a turn killed there **probably** never went and **might** have. Calling a carried `run script X` NOT SENT and offering a safe retry could run it twice, which is the one thing that retry promise exists to rule out. `awaiting` is no better: it means *carried*, which is equally unknown.
+
+So it wants a state that says what is actually true — interrupted, and unknown whether it went — with no retry attached, or a mailbox that can answer it properly (`docs/superpowers/specs/2026-08-21-mailbox-delivery-design.md`). A display rule in `turnMark`, which already takes `now`, is the cheap shape. |
 | The voice rule applied to what the model writes | broken | Brain | **Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it. |
 | No unprompted weekday assertion | broken | Brain | **Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like. |
 | Reasoning monologues can never reach the screen | proved |  | `_strip_reasoning()`. **Device pass 2026-08-24:** two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only. |
