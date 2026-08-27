@@ -200,6 +200,35 @@ const holdsTurn = (chat: ChatEntry[], turn: { from: ChatEntry['from']; text: str
       Math.abs(c.at - turn.at) <= SAME_TURN_WINDOW_MS
   );
 
+/**
+ * Add a turn where it belongs, which is not always at the end.
+ *
+ * **Arrival order is not chronological order.** A reply swept out of the tray
+ * carries the notification's own time, so a turn from last night can be entered
+ * this morning — and appending it put a stale stamp at the foot of the log.
+ * Reported from the device: yesterday's `15:xx` entries rendering below today's
+ * `12:xx` ones. Deduplication was never the whole of that bug; this is the rest.
+ *
+ * **Fixed here rather than at the readers**, of which there were two and both had
+ * quietly assumed the array was already in order: `ChatScreen` reverses it without
+ * sorting, and Home takes `chat[chat.length - 1]` as the last thing said. Meanwhile
+ * `activity.ts` sorts the same data before showing it. One log disagreeing with
+ * itself depending on who reads it is the bug one layer up, and the same lesson
+ * `timeline()` in `activity.ts` already carries.
+ *
+ * **A scan from the end, not a sort.** The log is in order virtually always — this
+ * walks back over the few entries that are later and stops, which costs nothing in
+ * the normal case and cannot reorder anything it does not have to touch. Ties keep
+ * arrival order, so an answer stamped in the same millisecond as its question still
+ * follows it rather than jumping ahead of it.
+ */
+const place = (chat: ChatEntry[], entry: ChatEntry): ChatEntry[] => {
+  let i = chat.length;
+  while (i > 0 && chat[i - 1].at > entry.at) i--;
+  if (i === chat.length) return [...chat, entry];
+  return [...chat.slice(0, i), entry, ...chat.slice(i)];
+};
+
 const settle = (chat: ChatEntry[]): ChatEntry[] => {
   const i = chat.findIndex((c) => c.from === 'user' && c.state === 'awaiting');
   return i < 0 ? chat : chat.map((c, n) => (n === i ? { ...c, state: 'answered' as const } : c));
@@ -240,7 +269,7 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
       // no local text to log, so the transcript is the only place it appears.
       return {
         ...state,
-        chat: cap([...state.chat, { from: 'user' as const, text: frame.text, at }], CHAT_CAP),
+        chat: cap(place(state.chat, { from: 'user' as const, text: frame.text, at }), CHAT_CAP),
       };
     case 'status': {
       /**
@@ -294,7 +323,7 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
         user: frame.user ?? state.user,
         chat:
           frame.message && !repeated && !alreadyLogged && !linkNotice
-            ? cap([...settle(state.chat), { from: 'jarvis' as const, text: frame.message, at }], CHAT_CAP)
+            ? cap(place(settle(state.chat), { from: 'jarvis' as const, text: frame.message, at }), CHAT_CAP)
             : state.chat,
       };
     }
@@ -367,7 +396,7 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
         // the outcome is said in Chat as well as logged: the timeline is a place
         // you have to go looking, and afterwards the one thing worth knowing is
         // whether the machine is open or shut
-        chat: cap([...state.chat, { from: 'jarvis' as const, text: WATCH_SAID[frame.outcome], at }], CHAT_CAP),
+        chat: cap(place(state.chat, { from: 'jarvis' as const, text: WATCH_SAID[frame.outcome], at }), CHAT_CAP),
         trace: cap(
           [
             ...state.trace,
@@ -468,7 +497,7 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
       return {
         ...state,
         intruder: null,
-        chat: cap([...state.chat, { from: 'jarvis' as const, text: WATCH_SAID.expired, at: action.at }], CHAT_CAP),
+        chat: cap(place(state.chat, { from: 'jarvis' as const, text: WATCH_SAID.expired, at: action.at }), CHAT_CAP),
         trace: cap(
           [
             ...state.trace,

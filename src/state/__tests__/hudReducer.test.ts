@@ -413,6 +413,58 @@ describe('the bugs an audit found in the reducer', () => {
  * must still append. `hydrate` already draws the line exactly there and the key below is
  * the same one, deliberately.
  */
+/**
+ * A turn that describes an earlier moment belongs at that moment.
+ *
+ * Reported from the device: yesterday's 15:xx entries rendered BELOW today's 12:xx
+ * ones. Deduplication was never the whole of `chat-order` — a swept entry that is
+ * not a duplicate of anything still carries the notification's own time and was
+ * still appended last, so the log read in the order things were RECEIVED rather
+ * than the order they happened.
+ *
+ * Two readers assumed insertion order was chronological and both were wrong:
+ * `ChatScreen` reverses the array without sorting, and Home takes
+ * `chat[chat.length - 1]` as the last thing said. Fixed where the entry is made
+ * rather than at either reader, because `activity.ts` sorts the same data and the
+ * two views disagreeing is the bug one layer up.
+ */
+describe('a turn stamped earlier than the one before it', () => {
+  const said = (message: string) =>
+    ({ kind: 'status', status: 'speaking', message, user: null }) as const;
+
+  it('sits at its own time rather than at the end of the log', () => {
+    let s = hudReducer(initialHudState, { type: 'frame', frame: said('This morning, sir.'), at: 5_000 });
+    // swept out of the tray now, but it was said last night
+    s = hudReducer(s, { type: 'frame', frame: said('Last night, sir.'), at: 1_000 });
+
+    expect(s.chat.map((c) => c.text)).toEqual(['Last night, sir.', 'This morning, sir.']);
+    expect(s.chat.map((c) => c.at)).toEqual([1_000, 5_000]);
+  });
+
+  it('leaves Home reading the latest turn rather than the last one to arrive', () => {
+    let s = hudReducer(initialHudState, { type: 'frame', frame: said('This morning, sir.'), at: 5_000 });
+    s = hudReducer(s, { type: 'frame', frame: said('Last night, sir.'), at: 1_000 });
+
+    // HomeScreen takes the final entry as "last said"
+    expect(s.chat[s.chat.length - 1].text).toBe('This morning, sir.');
+  });
+
+  it('keeps arrival order for turns sharing a millisecond, so a reply follows its question', () => {
+    let s = hudReducer(initialHudState, { type: 'local_command', text: 'you there?', at: 2_000 });
+    s = hudReducer(s, { type: 'frame', frame: said('Always, sir.'), at: 2_000 });
+
+    expect(s.chat.map((c) => c.text)).toEqual(['you there?', 'Always, sir.']);
+  });
+
+  it('does not disturb a log that already arrived in order', () => {
+    let s = hudReducer(initialHudState, { type: 'local_command', text: 'first', at: 1_000 });
+    s = hudReducer(s, { type: 'frame', frame: said('second'), at: 2_000 });
+    s = hudReducer(s, { type: 'local_command', text: 'third', at: 3_000 });
+
+    expect(s.chat.map((c) => c.text)).toEqual(['first', 'second', 'third']);
+  });
+});
+
 describe('a pushed reply that was also carried over the socket', () => {
   const greeting = { kind: 'status', status: 'speaking', message: 'Standing by, Sir.', user: null } as const;
 
