@@ -88,10 +88,14 @@ gateway from the phone side.**
    destination, which is most natural phrasings. Prefer a `to` destination when both appear
    and reject `here` / `my location` / `current location`, **with a test per phrasing** —
    the whole defect is that one phrasing was never tried. `cloud_gateway.py:2757`.
-2. **The missing transcript turn**, which is app-side and the only undiagnosed thing left
-   here. The second spoken clip produced a reply and no `You sent` turn; the first produced
-   both. Not an empty transcript, since the gateway answered rather than saying it heard
-   nothing. Needs another clip and a look at whether the socket held.
+2. **The missing transcript turn — diagnosed, and it is gateway work like the last one.**
+   `emit()` returns False when the socket has gone; `deliver()` checks it and pushes the
+   answer (`:3977`), and the transcript at `:4095` discards the result with no push path.
+   So a turn that outlives its socket arrives as an answer with no question above it.
+   Proved by `numPostedByApp` going 2 to 3 on the device. **The fix wants the push payload
+   to carry the transcript** so the app writes the user turn itself — prepending it to the
+   answer is closed off, since the gateway is explicit that a transcript sent as a status
+   message is a lie about who spoke.
 3. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds, and it is
    the last row in either goal that this repo can close on its own.
 4. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
@@ -482,6 +486,65 @@ a **`TextInput`**: a tap on the composer did not focus it, `input text` went now
 still works, which is how every screen in this session was read. So a laptop can navigate
 nothing and read everything — plan device sessions accordingly, and do not spend attempts
 rediscovering it.
+
+
+### The missing transcript: the socket died, and only the answer had a lifeboat
+
+Diagnosed the same afternoon, and it is the second gateway bug of the day rather than an app
+one. Both were left unfixed on purpose — `jarvis-brain` stays closed, and the finding is the
+deliverable.
+
+The spoken turn is emitted at `cloud_gateway.py:4095`:
+
+```python
+await emit({"type": "transcript", "text": text, "user": who})   # return discarded
+```
+
+and the answer goes out through `deliver()` at `:3977`:
+
+```python
+if alive and await say("speaking", answer):
+    return
+await _push_all("J.A.R.V.I.S.", answer, {"kind": "reply"}, force=True)
+```
+
+`emit()` returns `False` when the socket has gone. **The answer checks it and falls back to a
+push. The transcript throws the result away and has no push path at all.** So a turn that
+outlives its socket arrives as a reply with no question above it, which is exactly what the
+chat showed at 14:30.
+
+**Confirmed on the device rather than argued:** `numPostedByApp` went 2 to 3 across the
+turn, so that reply did arrive by push. The process never restarted — 40 minutes uptime
+through the whole episode — so nothing was lost to a relaunch.
+
+**Why the first clip survived and the second did not.** Transcription of a sentence takes
+longer than of two words, and the window is the app being backgrounded mid-turn, where
+`LinkMachine.suspend` closes the socket deliberately. `deliver()`'s own docstring names the
+same window for vision: *"long enough for a screen to lock and Android to take the WebSocket
+with it."*
+
+**The lesson was already learned here and only half-applied.** `emit`'s docstring says the
+bool exists because False was once indistinguishable from success, *"which is how a finished
+answer came to vanish silently."* That fix was given to the answer and never to the
+transcript.
+
+**What the fix wants**, for whoever opens the brain: the push payload carrying the transcript
+so the app writes the user turn itself. Prepending it to the answer is closed off, and the
+gateway is right about why — a transcript sent as a status message is a lie about who spoke.
+
+**And this one does not land in the gateway alone.** The cause is entirely there, but the
+app has to render what the push carries, and `replyFromData` (`src/lib/notify.ts`) returns
+`{text, at}` and nothing more — a new field would be dropped without a word. Both halves go
+together or the gateway change looks like it did nothing, which is the same silence this bug
+is made of.
+
+### Both gateway bugs are at the top of the handoff, not buried in a row
+
+`docs/brain-dependencies.md` opens with *"Read these before touching anything that looks
+broken"*, and both now lead that list with their file and line numbers. That section exists
+because two rows were once re-diagnosed from the app side after being fixed in the gateway;
+these two have the same shape — **they look like app defects from the phone and neither is
+one.**
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.
