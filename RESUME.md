@@ -16,11 +16,14 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 12:45. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 13:30. Start here; the 08-26 entry below still stands.
 
-**`feat/mobile-hud`, tree clean, ahead of `origin`.** Nothing shipped today — no app code
-changed, and none needed to. Four rows were closed by looking at the phone rather than
-by writing anything.
+**`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
+the phone rather than by writing anything, and then three bugs came off the device and two
+of them were fixed. **995 tests, 75 suites, `tsc` clean.**
+
+**Nothing has been published.** Both fixes are JS-only and ship over the air, so the phone
+is still running `01a03dfe` and still showing both bugs until an `eas update` goes out.
 
 ### Where the day left the goal
 
@@ -64,10 +67,13 @@ gateway from the phone side.**
    read `{gemini_ok: 0, fell_back: 0, last_error: null}` beforehand: no audio turn has ever
    reached the gateway. `fell_back` with `last_error_was_quota` false is a code problem;
    true is a spent free tier. `§1` must empty before anything in `§3` starts.
-2. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds.
-3. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
+2. **Publish the two fixes**, then look at the phone: read the chat and watch the bell go
+   to zero, and leave Settings mid-way and come back to the list. Neither is proved until
+   it is seen on the device — the tests only say the code is right.
+3. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds.
+4. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
    both app-side, so both ship over the air.
-4. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+5. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
 
 ### The device, as left
 
@@ -286,6 +292,65 @@ Two adb attempts to reach the Chat tab, both no-ops, both at the coordinates a s
 gives. `AGENTS.md` already says a `Touchable` is deaf to `adb shell input`; this is the
 second session to spend attempts confirming it. Scrolling works — `input swipe` on a
 `ScrollView` is fine — so a laptop can read any screen it can reach without a tap.
+
+
+### Three bugs off the device, two fixed and one that would not reproduce
+
+The first app code of the day, and the first of the week: everything before this was
+looking rather than writing.
+
+**The bell counted what the chat had already shown.** Two unread systems, and they had
+never spoken to each other. `readAt` is a timestamp behind Home's *"N new replies"*,
+cleared by `markChatRead` when Chat gains or loses focus; the bell runs on `readIds`, a
+persisted set of ids that only the Activity panel ever wrote to. So reading the
+conversation cleared one and left the other — and a count you cannot clear by reading is
+the count you stop reading, which is the exact failure the read set was built to end.
+
+`markChatRead` now clears both, and **chat turns only**: `timeline` is handed an empty
+trace deliberately, since a step the agent took is not something you saw by reading the
+chat. The turns reach it through a ref rather than a dependency, because `markChatRead`
+lives in the Chat screen's `useFocusEffect` dependency list — a new identity per arriving
+turn would tear that effect down and rebuild it on every reply, flapping `chatFocused`
+through the gap where the notification decision is made.
+
+**The same screenshot carried a second one.** The tab bar read `2` on the Chat tab while
+the chat was open on the two answers it was counting. Marked read on the way in and on the
+way out leaves the middle, so an effect on the log closes it: a reply that lands while you
+are watching it arrive has been seen.
+
+**A tab you come back to is where that tab starts.** Settings → a row → Home → Settings
+returned you to the row. Each tab owns a stack and a stack remembers, which is right inside
+the tab and wrong on leaving it. `popToTopOnBlur` on the navigator's `screenOptions` — all
+five tabs, not the one it was reported against, since Scripts, Chat and Home all push too.
+On blur rather than on press, because a tab is also left by a quick action or a tapped
+notification.
+
+### The one that would not reproduce, and what was checked
+
+**About was reported as having no back navigation. It has one.** The chevron is drawn —
+`‹ ABOUT` in the screenshot — and `adb shell input keyevent 4` popped it to Settings, which
+is the more interesting half: the hardware key works, so nothing about the stack is wrong.
+
+What was audited, since the ask was "check all navigations": `ScreenTitle` defaults `back`
+to *"does this stack have anything to pop"*, read off the navigator's own index rather than
+`canGoBack()` — which is the 2026-08-20 fix, and the reason tab roots correctly draw
+nothing. **Every screen that can be pushed inherits it.** Four pass `back` explicitly
+(Journal, Security, Capabilities, Updates), which is redundant rather than wrong. Activity
+is a modal and deliberately offers no chevron: it is dismissed, not travelled back from.
+
+A test now pins the mechanism **in the shape it was reported broken in** — a stack inside a
+tab, pushed — so the next report starts from a known-good baseline instead of repeating this
+investigation. It passed on the first run, which is what closed the question.
+
+**Nothing was changed on the strength of a report that could not be shown.** If it recurs,
+the thing worth capturing is the *path* taken to reach About.
+
+### Noticed on the way, and not a bug
+
+From Settings only three of the five tab icons are on screen. `GlassTabBar` is an
+iOS-camera-style dial: the tabs ride a strip under a fixed lens at the centre and the far
+ones close up and slide off. So at either end of the dial two tabs are reachable by drag
+and not by tap. Working as built — worth knowing before someone reports it as missing tabs.
 
 
 ## ✅ 2026-08-26, evening. What the phone actually did, on `84f40716`.

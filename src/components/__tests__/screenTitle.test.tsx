@@ -86,6 +86,52 @@ describe('the back chevron', () => {
 });
 
 /**
+ * The same question asked of a stack that lives INSIDE a tab, which is every stack
+ * in this app.
+ *
+ * A screen with no chevron was reported from the device on 2026-08-27 — About, which
+ * passes no `back` and relies on the default. It could not be reproduced: the
+ * chevron is drawn, and the hardware back key pops correctly. This pins the
+ * mechanism in the real shape so the next report starts from a known-good baseline
+ * rather than from the same investigation.
+ */
+describe('a screen pushed inside a tab', () => {
+  function SettingsHome({ navigation }: { navigation: { navigate: (n: string) => void } }) {
+    return (
+      <>
+        <ScreenTitle title="SETTINGS" testID="title" />
+        <Touchable testID="go-about" onPress={() => navigation.navigate('About')}>
+          <Text>about</Text>
+        </Touchable>
+      </>
+    );
+  }
+
+  function SettingsStack() {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {/* eslint-disable-next-line react/no-unstable-nested-components */}
+        <Stack.Screen name="SettingsHome" component={SettingsHome as never} />
+        <Stack.Screen name="About" component={Deeper} />
+      </Stack.Navigator>
+    );
+  }
+
+  it('draws the chevron, the same as one pushed outside a tab', async () => {
+    const { queryByTestId, getByTestId } = await render(
+      <NavigationContainer>
+        <Tabs.Navigator initialRouteName="Settings" screenOptions={{ headerShown: false }}>
+          <Tabs.Screen name="Home">{() => <Text>home</Text>}</Tabs.Screen>
+          <Tabs.Screen name="Settings" component={SettingsStack} />
+        </Tabs.Navigator>
+      </NavigationContainer>
+    );
+    await fireEvent.press(getByTestId('go-about'));
+    await waitFor(() => expect(queryByTestId('screen-back')).toBeTruthy());
+  });
+});
+
+/**
  * The caption's case, and the other thing the device showed that day.
  *
  * The situation line went out as `3:05 PM, SIR. YOU ARE AT BIDHANNAGAR…`, which

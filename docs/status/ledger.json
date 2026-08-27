@@ -29,8 +29,8 @@
     "repo": "jarvis-mobile",
     "read": "2026-08-27",
     "branch": "feat/mobile-hud",
-    "head": "98a539d",
-    "tests": 991,
+    "head": "8c26b54",
+    "tests": 995,
     "suites": 75,
     "typecheck": "clean",
     "sources": {
