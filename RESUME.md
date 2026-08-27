@@ -16,20 +16,29 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 14:50. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-27, 15:20. Start here; the 08-26 entry below still stands.
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two
-of them were fixed. **995 tests, 75 suites, `tsc` clean.**
+of them were fixed, then one more app bug was fixed by reading rather than by guessing.
+**999 tests, 75 suites, `tsc` clean.**
 
-**Published `01a0422d` to `production`** (group `81fe340c`, commit `2f1cf49`) at runtime
-`31c64113`, which is the installed APK's own — checked with
-`npx expo-updates fingerprint:generate --platform android` **before** publishing rather than
-after, since a moved fingerprint publishes to a runtime no device has and says nothing. The
-app was force-stopped so the next launch fetches it.
+**Two publishes, both at runtime `31c64113`** — the installed APK's own, checked with
+`npx expo-updates fingerprint:generate --platform android` **before** each, since a moved
+fingerprint publishes to a runtime no device has and says nothing. `01a0422d` carried the
+bell and the tab root, both since confirmed on the phone. **`01a04293` carries the chat
+order and has NOT been looked at** — the app was force-stopped so the next launch fetches it.
 
-**Both fixes confirmed gone on the phone**, on that update. The bell clears when the chat is
-read, and a tab reopens at its own root.
+**The bell and the tab root are confirmed gone on the phone.** The bell clears when the chat
+is read, and a tab reopens at its own root.
+
+**The chat order is fixed in code and unproved on the phone.** The log rendered in ARRIVAL
+order — `ChatScreen` reversed the array and never sorted by `at` — so a turn swept out of
+the tray carrying last night's stamp was appended last and read as the newest. Fixed in the
+reducer, since two readers assumed the array was ordered while `activity.ts` sorted the same
+data. **`chat-order` stays `broken` on purpose:** the previous fix was called done from a
+screenshot and the screen was still wrong. Open the chat and look at whether yesterday's
+entries sit above today's.
 
 **The microphone works.** `brains.usage.audio` went from all zeros to `gemini_ok: 2`, no
 fallback, no error — the audio path is proved and the mime worry was unfounded. `mic-in` is
@@ -83,12 +92,15 @@ gateway from the phone side.**
 
 ### What to pick up, in order
 
-1. **`_FAR_RE`, when the brain reopens — the biggest thing found today.** It answers
+1. **Open the chat and read the order**, on `01a04293`. Yesterday's entries above today's,
+   each reply once. That is the only thing shipped today that nobody has looked at, and
+   `chat-order` stays `broken` until somebody does.
+2. **`_FAR_RE`, when the brain reopens — the biggest thing found today.** It answers
    distance questions with invented numbers whenever the phrasing puts `from` after the
    destination, which is most natural phrasings. Prefer a `to` destination when both appear
    and reject `here` / `my location` / `current location`, **with a test per phrasing** —
    the whole defect is that one phrasing was never tried. `cloud_gateway.py:2757`.
-2. **The missing transcript turn — diagnosed, and it is gateway work like the last one.**
+3. **The missing transcript turn — diagnosed, and it is gateway work like the last one.**
    `emit()` returns False when the socket has gone; `deliver()` checks it and pushes the
    answer (`:3977`), and the transcript at `:4095` discards the result with no push path.
    So a turn that outlives its socket arrives as an answer with no question above it.
@@ -96,11 +108,10 @@ gateway from the phone side.**
    to carry the transcript** so the app writes the user turn itself — prepending it to the
    answer is closed off, since the gateway is explicit that a transcript sent as a status
    message is a lie about who spoke.
-3. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds, and it is
+4. **Open the app at Office tomorrow**, which closes `timeline`. Thirty seconds, and it is
    the last row in either goal that this repo can close on its own.
-4. **`§2` — the two live defects**, `chat-order` and `voice-rule-replies`, both `broken` and
-   both app-side, so both ship over the air.
-5. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
+5. **`voice-rule-replies`**, the last `broken` row that is app-side and unstarted.
+6. **Then `§3` in `ROADMAP.md` §10 order**, which is gateway work and waits on the brain.
 
 ### The device, as left
 

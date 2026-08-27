@@ -29,8 +29,8 @@
     "repo": "jarvis-mobile",
     "read": "2026-08-27",
     "branch": "feat/mobile-hud",
-    "head": "2f1cf49",
-    "tests": 995,
+    "head": "4f96056",
+    "tests": 999,
     "suites": 75,
     "typecheck": "clean",
     "sources": {
@@ -45,7 +45,7 @@
       "channelId": "01a01a04-f0d6-7718-90dc-dbae6930b0db",
       "runtime": "31c64113d7d13a400eb1c56ef81c4d0d4be3fa17",
       "group": "33ab8d55-2ea9-4af5-b3f3-1437d8f46b3c",
-      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it."
+      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it. Twice on 2026-08-27, fingerprint checked before each: 01a0422d (the bell and the tab root) and 01a04293 (the chat order)."
     }
   },
   "blockers": {
@@ -1046,7 +1046,7 @@
       "title": "The chat log in the right order, once each",
       "state": "shipped",
       "blockedBy": "app",
-      "detail": "**The ordering half is fixed; the duplicate half already was.** The note this item carried was stale — it asked for the real `at` values before more code, and `96de0e1` had already got them from a shipped audit and turned the exact-millisecond key into a 5-second window. What remained was that the chat rendered in ARRIVAL order: `ChatScreen` reversed the array without ever sorting by `at`, so a turn swept out of the tray carrying last night's stamp was appended last and read as the newest — yesterday's `15:xx` below today's `12:xx`, the second reported symptom. Fixed in the reducer rather than at the reader, because two readers assumed the array was ordered and `activity.ts` sorted the same data before showing it. 4 tests, 2 failed first; 999 tests green, `tsc` clean. **Not yet seen on the phone, and the row stays `broken` until it is** — the previous fix here was called done from a screenshot and was not.",
+      "detail": "**The ordering half is fixed; the duplicate half already was.** The note this item carried was stale — it asked for the real `at` values before more code, and `96de0e1` had already got them from a shipped audit and turned the exact-millisecond key into a 5-second window. What remained was that the chat rendered in ARRIVAL order: `ChatScreen` reversed the array without ever sorting by `at`, so a turn swept out of the tray carrying last night's stamp was appended last and read as the newest — yesterday's `15:xx` below today's `12:xx`, the second reported symptom. Fixed in the reducer rather than at the reader, because two readers assumed the array was ordered and `activity.ts` sorted the same data before showing it. 4 tests, 2 failed first; 999 tests green, `tsc` clean. **Published as `01a04293` and not yet seen on the phone; the row stays `broken` until it is** — the previous fix here was called done from a screenshot and was not.",
       "goal": "conversation"
     },
     {

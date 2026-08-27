@@ -434,8 +434,8 @@
     </p>
     <ul class="facts">
       <li>Branch <b>feat/mobile-hud</b></li>
-      <li>HEAD <b>2f1cf49</b></li>
-      <li><b>995</b> tests · 75 suites</li>
+      <li>HEAD <b>4f96056</b></li>
+      <li><b>999</b> tests · 75 suites</li>
       <li><code>tsc --noEmit</code> <b>clean</b></li>
       <li>OTA <b>verified</b> 2026-08-27</li>
     </ul>
@@ -1764,7 +1764,7 @@
       when it is proved</strong> — a human has seen it work — which is the same bar the ledger
       uses. <span class="q-tag q-tag-shipped">Shipped · unproved</span> means code landed, tests
       green, published, and still nobody has looked: the most recent one was correct in
-      995 tests and unseen on a phone, and striking that through would make this list
+      999 tests and unseen on a phone, and striking that through would make this list
       agree with the tests rather than with reality.
     </p>
     <p class="sec-note" style="margin-top:-10px">
@@ -1799,7 +1799,7 @@
         <span class="q-n">2.5</span>
         <div>
           <p class="q-t">The chat log in the right order, once each</p>
-          <p class="q-d"><strong>The ordering half is fixed; the duplicate half already was.</strong> The note this item carried was stale — it asked for the real <code>at</code> values before more code, and <code>96de0e1</code> had already got them from a shipped audit and turned the exact-millisecond key into a 5-second window. What remained was that the chat rendered in ARRIVAL order: <code>ChatScreen</code> reversed the array without ever sorting by <code>at</code>, so a turn swept out of the tray carrying last night's stamp was appended last and read as the newest — yesterday's <code>15:xx</code> below today's <code>12:xx</code>, the second reported symptom. Fixed in the reducer rather than at the reader, because two readers assumed the array was ordered and <code>activity.ts</code> sorted the same data before showing it. 4 tests, 2 failed first; 999 tests green, <code>tsc</code> clean. <strong>Not yet seen on the phone, and the row stays <code>broken</code> until it is</strong> — the previous fix here was called done from a screenshot and was not.</p>
+          <p class="q-d"><strong>The ordering half is fixed; the duplicate half already was.</strong> The note this item carried was stale — it asked for the real <code>at</code> values before more code, and <code>96de0e1</code> had already got them from a shipped audit and turned the exact-millisecond key into a 5-second window. What remained was that the chat rendered in ARRIVAL order: <code>ChatScreen</code> reversed the array without ever sorting by <code>at</code>, so a turn swept out of the tray carrying last night's stamp was appended last and read as the newest — yesterday's <code>15:xx</code> below today's <code>12:xx</code>, the second reported symptom. Fixed in the reducer rather than at the reader, because two readers assumed the array was ordered and <code>activity.ts</code> sorted the same data before showing it. 4 tests, 2 failed first; 999 tests green, <code>tsc</code> clean. <strong>Published as <code>01a04293</code> and not yet seen on the phone; the row stays <code>broken</code> until it is</strong> — the previous fix here was called done from a screenshot and was not.</p>
         </div>
         <div class="row-tags">
           <span class="dep dep-app" title="App repo, ships over the air. Nothing outside this repo is owed.">App</span>
