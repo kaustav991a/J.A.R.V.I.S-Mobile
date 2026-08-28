@@ -16,7 +16,108 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-08-27, 16:30. Start here; the 08-26 entry below still stands.
+## 🛑 STOP POINT — 2026-08-28, 14:20. Start here; the 08-27 entry below still stands.
+
+**`feat/mobile-hud`, pushed. 1111 tests, 80 suites, `tsc` clean, `build-status --check` up
+to date.** From 1013 and 75 this morning.
+
+**Nothing was seen on the phone today, and nothing was published.** The device was on
+charge for the session, which is the whole shape of it: everything below is written,
+green, and **unproved on hardware**. Two device-free things came out of that — a full day
+of app-only work, and a fact about this laptop that changes what can ever be done on it.
+
+**The runtime is still `31c64113`**, checked with
+`npx expo-updates fingerprint:generate --platform android` after each of the two bodies of
+work. Both ship over the air whenever the publish is made.
+
+### This laptop cannot do gateway work at all
+
+`python` and `python3` resolve to the Microsoft Store stub and `py` does not exist, so
+`pytest` cannot run and `cloud_gateway.py` cannot be imported. **`jarvis-brain` was closed
+on 2026-08-26 by decision; as of today it is also a fact about the hardware.** Written at
+the top of `docs/brain-dependencies.md`, which is where the home machine should start.
+
+**The two live gateway bugs are now queue items rather than prose** — 24 (`_FAR_RE` and the
+stale `currently` fact, one bug in two halves) and 25 (the transcript that outlives its
+socket, whose app half in `notify.ts` must land in the same sitting). They had been sitting
+in a warnings preamble, which is how a thing worth doing gets rediscovered instead of
+picked up. `docs/brain-dependencies.md` now carries **9 queue items and 21 rows**.
+
+### Queue 3 — a crash says what it was
+
+**The JavaScript half, and the native half is still owed.** `src/lib/crashLog.ts` keeps a
+derived record five deep in AsyncStorage; `ErrorBoundary` now writes down the render crash
+it was already displaying, and `installCrashHandler` wraps the global handler for
+everything outside render — **calling the one it replaced**, so the app still dies exactly
+as it would have and the record is a side effect rather than a change of behaviour.
+Settings → Diagnostics reads them back, copies a report, and badges what has not been
+looked at.
+
+**Redaction has a test per rule**, and the interesting one is the pair that pulls in
+opposite directions: `createNativeStackNavigator` must survive and
+`0a1b2c3d4e5f6a7b8c9d` must not. The rule is **digits, not length** — a long run with two
+or more digits is a secret, a long run without them is a symbol name. The reason redaction
+exists at all is that an error message quotes its own input: a parse failure on a gateway
+frame would otherwise carry that frame, token and chat text included, into the one store
+whose entire purpose is to be pasted into a chat window.
+
+### Anticipation — three triggers became seven
+
+**The budget was rebuilt first, and that was the real work.** `spokenStore` kept one
+subject, so with one remark a day every new trigger made the app *less* likely to say the
+useful thing — a dull observation spent the day exactly as fast as a sharp one. It now
+keeps **a day per subject**: same daily cap, same quiet hours, but a subject that spoke
+goes quiet for three days while a different one may still speak tomorrow. **The old
+two-field marker still reads**, because a phone upgrading at noon has already spoken today
+and a clean slate would have made the upgrade's first act saying something twice.
+
+New triggers, ranked above the day total because they name something that could be
+different tomorrow: **the app that moved** past its own usual (`appDeltas`), **early** at a
+place, **absent** from one, and **a departure that no longer matches you** (`scheduleDrift`).
+
+Three things were decided rather than discovered, and each is written at its site:
+
+- **Absence is matched to the same weekday**, and refuses to speak until four of that
+  weekday are on record. This is the gateway nudge's Saturday-shift bug turned into a rule
+  rather than a memory.
+- **The schedule remark says *seen*, never *left*.** A sighting needs the app open, so it
+  names the median of last sightings and the day count behind it. Claiming to know when he
+  walked out would be inventing the one figure this file exists to refuse.
+- **Arriving late is never remarked on.** The margin that makes "an hour early" an
+  observation makes "an hour late" an accusation, and a late first sighting is as likely to
+  mean the app was not opened.
+
+**A real limit fell out of it, and it is not a bug:** the early-arrival trigger cannot fire
+before 08:00, because that is where the quiet hours start — which is exactly when arriving
+early happens. `QUIET_FROM_H` is one constant and it was deliberately not touched.
+
+### What it cost
+
+- **The AsyncStorage spy rule was already written down and was still walked into.**
+  `jest.spyOn(AsyncStorage, 'setItem').mockRestore()` silently strips the implementation
+  for every later test in the file — `AGENTS.md` documents it, `taskHealth.test.ts` paid
+  for it, and a brand-new test file paid again. It reads as two unrelated failures in
+  tests that never touched storage. **The rule is in AGENTS.md; read it before writing a
+  storage test, not after.**
+- **Backticks inside a `node -e "…"` string are shell command substitution.** A ledger edit
+  whose prose quoted `` `adb logcat` `` executed it, which sat waiting for a device until
+  the command was killed. Nothing was written and nothing was damaged, but the failure
+  looks like a hung script. **Put ledger edits in a `.mjs` file and run the file.**
+
+### What to pick up, in order
+
+1. **Publish and look at the phone.** Both bodies of work are unproved on hardware and both
+   are JS-only. `eas update --branch production --environment production --platform android`,
+   with the runtime checked against the phone first as always.
+2. **Then `TESTING.md` §4d and §4e**, which were written today for exactly this. §4d.2 is
+   the one to watch: it must stay silent on a weekday it has never watched.
+3. **Queue 23, the native build**, still unapproved and still gating four things — and now
+   a fifth, since background sightings are what would unbias every figure §4d quotes.
+4. **The gateway work is the home machine's**, and `docs/brain-dependencies.md` is its
+   brief. Queue 24 before 25: the invented distances are answered confidently and daily,
+   where the missing transcript is rarer and visible.
+
+
 
 **`feat/mobile-hud`, tree clean, ahead of `origin`.** Four rows were closed by looking at
 the phone rather than by writing anything, and then three bugs came off the device and two

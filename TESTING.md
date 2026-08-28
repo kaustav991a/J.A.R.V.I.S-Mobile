@@ -162,19 +162,50 @@ At most one remark a day, on the Chat screen under the opening line. **Most days
 says nothing, and that is correct** — a machine that always has something to say is
 one you mute.
 
+**Seven triggers as of 2026-08-28, ranked.** What can be acted on now beats what is
+about today, which beats what is about a habit. Only one is ever spent, so the
+ranking is the feature: the rows below are in the order they win.
+
 | # | Feature | Do this | Pass | Fail |
 | --- | --- | --- | --- | --- |
-| 4d.1 | It notices a heavy day | Open Chat on a day well past your usual screen time | A blue line naming both figures — `4h on the phone today against a usual 1h 40m, sir.` | A vague remark with no numbers, which cannot be disagreed with |
-| 4d.2 | It notices a departure nearly here | Open Chat within 45 minutes of a leaving time | `You leave Office in 15 minutes, sir.` | Nothing, or a departure already behind you |
-| 4d.3 | The deadline wins | Both true at once | The departure, not the screen time | Screen time while a departure is 10 minutes away |
-| 4d.4 | **Once a day, and no more** | Open Chat repeatedly | The line appears once and does not come back | It reappears on every visit |
-| 4d.5 | Never the same subject twice running | Two heavy days in a row | Silence on the second | The same observation again — that is a nag |
-| 4d.6 | Quiet hours hold | Open Chat before 8 AM or after 9 PM | Nothing, whatever it thinks it sees | A remark at 11 PM |
-| 4d.7 | It waits for a baseline | A fresh install, few days of journal | Nothing about usage | "Unusual" against two days of history |
+| 4d.1 | Still somewhere you are usually gone from | Open Chat at the office an hour after you normally leave | `Still at Office, sir. You are usually gone by 6:40 PM.` | A remark with no hour in it — an estimate you cannot argue with |
+| 4d.2 | Missing from somewhere you usually are | Open Chat at home on a weekday, well after your usual office arrival | `Not at Office, sir. You are usually there by 9:00 AM.` | The same line on a Sunday. **It must be silent on a weekday it has never watched** |
+| 4d.3 | Somewhere earlier than usual | Open Chat at the office an hour before you normally arrive | `At Office early, sir — usually you are there by 9:00 AM.` | Anything about being *late*, which is deliberately never said |
+| 4d.4 | A departure that no longer matches you | Have a leaving time set for 9:00 and be gone by 8:30 for four days | `Your Office departure is set for 9:00 AM, sir, and you were last seen there by 8:30 AM on 4 days.` | The word *left*. It measures **last seen**, and must say so |
+| 4d.5 | The app that moved | Open Chat after a heavy run in one app | `2h 40m in Instagram today against a usual 50m, sir.` | The day's total when one app is clearly what moved |
+| 4d.6 | A heavy day overall | A day well past your usual, spread across everything | `4h on the phone today against a usual 1h 40m, sir.` | A vague remark with no numbers |
+| 4d.7 | A fidgety day | Many more pickups than usual | Both figures named | Silence on a day of 120 pickups against a usual 45 |
+| 4d.8 | **Once a day, and no more** | Open Chat repeatedly | The line appears once and does not come back | It reappears on every visit |
+| 4d.9 | A subject goes quiet, the next one speaks | Two heavy days running, with something else also true | A *different* remark on the second day | The same observation twice — that is a nag — **or** silence when another subject had something to say |
+| 4d.10 | Quiet hours hold | Open Chat before 8 AM or after 9 PM | Nothing, whatever it thinks it sees | A remark at 11 PM |
+| 4d.11 | It waits for a baseline | A fresh install, few days of journal | Nothing about usage | "Unusual" against two days of history |
+
+**Known limit, not a bug:** 4d.3 cannot fire before 8 AM, because that is where the
+quiet hours start. Arriving at 7:50 is exactly when it would be worth saying, and it
+will stay silent.
 
 **What it does not do yet:** find you. It notices when you open the app, not while
 the phone is in your pocket — nothing this app schedules runs unattended on this
-device, measured. That is `ROADMAP.md` §7, and the gateway push is the fix.
+device, measured. That is `ROADMAP.md` §7, and the gateway push is the fix. The same
+limit biases every figure above: a sighting needs the app to be open, which is why
+each remark names its own basis rather than asserting it.
+
+---
+
+## 4e. A crash says what it was
+
+**Built 2026-08-28, never seen on the phone.** Settings → Diagnostics. Only
+JavaScript crashes reach it; a native crash takes the process with no JS involved and
+still needs `adb logcat`.
+
+| # | Feature | Do this | Pass | Fail |
+| --- | --- | --- | --- | --- |
+| 4e.1 | It admits to having nothing | Open Settings → Diagnostics on a phone that has not crashed | *Nothing has crashed*, and a line saying a native crash needs a cable | An empty list, which reads as a failed load |
+| 4e.2 | A crash survives the restart | Force a JS crash, reopen the app, open Diagnostics | The error, the time, and which build it happened on | The crash screen was the only record and it is gone |
+| 4e.3 | The row says there is something to read | After a crash, look at Settings before opening Diagnostics | A count on the Diagnostics row | A silent row — a crash nobody hears about is one nobody reports |
+| 4e.4 | It stops announcing once read | Open Diagnostics, go back | The count is gone | It keeps counting what you have already seen |
+| 4e.5 | The report copies | Tap **Copy the report** | Clipboard holds every record with ISO timestamps | Nothing, or a report with no stack frames |
+| 4e.6 | **Nothing private is in it** | Read the copied report after using the chat | Error text, frames, version, update id — **no chat text and no token** | Any part of a message you typed, or anything that looks like a secret |
 
 ---
 

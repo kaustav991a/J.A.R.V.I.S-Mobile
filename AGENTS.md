@@ -185,6 +185,12 @@ of rediscovering them is high.
   that reaches the journal drags it in. It fails **after** a full minute of bundling with
   `Web Bundling failed`, `✖ Export failed`, and nothing about Android, which reads like a
   broken publish rather than a platform this app does not ship.
+- **Edit the ledger from a script file, never from `node -e "…"`.** The notes in
+  `docs/status/ledger.json` are full of backticked code spans, and inside a double-quoted
+  shell string a backtick is command substitution — a note quoting `` `adb logcat` `` ran
+  it, and the command sat waiting for a device until it was killed. Nothing is written and
+  the failure looks like a hung script rather than a quoting mistake. Write the edit to a
+  `.mjs` file and run the file.
 - **Never `mockRestore()` a spy on AsyncStorage.** `jest-setup.js` installs the
   library's own jest mock, so `setItem`/`getItem` are *already* `jest.fn`s —
   `jest.spyOn(AsyncStorage, 'setItem').mockRestore()` hands back a mock with **no
