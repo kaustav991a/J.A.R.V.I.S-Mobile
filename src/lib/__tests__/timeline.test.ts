@@ -1,4 +1,14 @@
-import { ENOUGH_PLACE_DAYS, LATE_BY_MIN, daysSeenAt, stillHereLate, usuallyGoneBy } from '../timeline';
+import {
+  ENOUGH_PLACE_DAYS,
+  LATE_BY_MIN,
+  absentFrom,
+  daysSeenAt,
+  hereEarly,
+  placesSeen,
+  stillHereLate,
+  usuallyGoneBy,
+  usuallyHereBy,
+} from '../timeline';
 import type { Seen } from '../timeline';
 
 /**
@@ -106,5 +116,108 @@ describe('how many days it has seen you somewhere', () => {
 
   it('is zero somewhere it has never seen you', () => {
     expect(daysSeenAt(office, 'Airport', NOW)).toBe(0);
+  });
+});
+
+/**
+ * Arrival, and being absent from somewhere you are usually at.
+ *
+ * The mirror of `usuallyGoneBy`, and it carries one extra rule the departure side
+ * does not need: **absence is judged against the same weekday only.** A Mon–Fri
+ * pattern asserted onto a Saturday is what broke the gateway's own nudge on
+ * 2026-08-21 — it announced a shift that did not exist — and "you are not at the
+ * office" on a Sunday morning is the identical mistake with a different subject.
+ */
+describe('when you are usually there', () => {
+  it('says nothing until it has enough days', () => {
+    expect(usuallyHereBy(seen([17, 9, 0, 'Office'], [18, 9, 10, 'Office']), 'Office', NOW)).toBeNull();
+  });
+
+  it('takes the median of the first sighting each day', () => {
+    // 9:00, 9:10, 8:50, 9:05 -> 9:00 (lower middle of an even count)
+    const arrivals = seen(
+      [17, 9, 0, 'Office'],
+      [17, 18, 30, 'Office'],
+      [18, 9, 10, 'Office'],
+      [19, 8, 50, 'Office'],
+      [20, 9, 5, 'Office']
+    );
+    expect(usuallyHereBy(arrivals, 'Office', NOW)).toBe(9 * 60);
+  });
+
+  it('ignores today, which is the day being judged', () => {
+    const withToday = [...office, ...seen([21, 6, 0, 'Office'])];
+    expect(usuallyHereBy(withToday, 'Office', NOW)).toBe(usuallyHereBy(office, 'Office', NOW));
+  });
+});
+
+describe('being somewhere earlier than usual', () => {
+  const arrivals = seen(
+    [17, 9, 0, 'Office'],
+    [18, 9, 10, 'Office'],
+    [19, 8, 50, 'Office'],
+    [20, 9, 5, 'Office']
+  );
+
+  it('is nothing to remark on ten minutes early', () => {
+    expect(hereEarly(arrivals, 'Office', new Date(2026, 7, 21, 8, 50))).toBeNull();
+  });
+
+  it('is worth saying an hour early, with the usual named', () => {
+    expect(hereEarly(arrivals, 'Office', new Date(2026, 7, 21, 7, 55))).toEqual({
+      usualBy: 9 * 60,
+      at: 7 * 60 + 55,
+    });
+  });
+
+  it('says nothing about arriving late, which the departure side does not cover either', () => {
+    expect(hereEarly(arrivals, 'Office', new Date(2026, 7, 21, 10, 30))).toBeNull();
+  });
+});
+
+describe('not being somewhere you usually are', () => {
+  /** four Fridays of arriving at Office by 9, so a Friday has a baseline */
+  const fridays = seen(
+    [7, 9, 0, 'Office'],
+    [14, 9, 10, 'Office'],
+    [21, 8, 50, 'Office'],
+    [28, 9, 5, 'Office']
+  );
+  // 2026-09-04 is the Friday after the last of those
+  const friday = (h: number, m = 0) => new Date(2026, 8, 4, h, m);
+
+  it('says nothing before the hour you are usually there by', () => {
+    expect(absentFrom(fridays, 'Office', friday(8, 30))).toBeNull();
+  });
+
+  it('says nothing in the first hour after it, which is a late train', () => {
+    expect(absentFrom(fridays, 'Office', friday(9, 30))).toBeNull();
+  });
+
+  it('is worth saying well past the hour, with the usual named', () => {
+    expect(absentFrom(fridays, 'Office', friday(10, 30))?.usualBy).toBe(9 * 60);
+  });
+
+  it('says nothing once you have been seen there today', () => {
+    const withToday = [...fridays, { place: 'Office', at: friday(9, 45).getTime() }];
+    expect(absentFrom(withToday, 'Office', friday(10, 30))).toBeNull();
+  });
+
+  it('refuses to judge a Sunday by your weekdays', () => {
+    // the exact shape that broke the gateway nudge: a Mon–Fri pattern asserted
+    // onto a day it had never seen
+    const sunday = new Date(2026, 8, 6, 10, 30);
+    expect(absentFrom(fridays, 'Office', sunday)).toBeNull();
+  });
+});
+
+describe('which places it has ever seen you at', () => {
+  it('names each one once, however many sightings there are', () => {
+    const mixed = seen([17, 9, 0, 'Office'], [17, 20, 0, 'Home'], [18, 9, 0, 'Office']);
+    expect(placesSeen(mixed).sort()).toEqual(['Home', 'Office']);
+  });
+
+  it('is empty before anything has been seen', () => {
+    expect(placesSeen([])).toEqual([]);
   });
 });

@@ -576,3 +576,40 @@ export async function commuteBriefing(
     return { state: 'unavailable', reason: 'network' };
   }
 }
+
+/**
+ * A departure he typed, against the hour he is measurably gone by.
+ *
+ * Pure, and it takes the measurement as a function rather than reaching for the
+ * sighting store: what the timeline has watched and what the schedule claims are two
+ * separate facts, and this has an opinion only about the gap between them.
+ *
+ * Only earlier, never later. Leaving after the time he set is what the briefing
+ * itself is for, and a remark about it would be telling him he is late for an
+ * appointment he invented — where leaving reliably *before* it means the schedule is
+ * simply wrong, and a briefing arriving half an hour after he has gone is a briefing
+ * that missed.
+ *
+ * Days the schedule does not run are skipped, for the reason every date rule in this
+ * project now carries: a weekday pattern asserted onto a Saturday is what made the
+ * gateway announce a shift that did not exist.
+ */
+/** how far a typed departure has to sit from the measured one before it is worth saying */
+export const DRIFT_MIN = 30;
+
+export function scheduleDrift(
+  s: CommuteSettings,
+  now: Date,
+  measured: (place: string) => { goneBy: number | null; days: number }
+): { place: string; setAt: number; goneBy: number; days: number } | null {
+  if (!s.days[now.getDay()]) return null;
+  for (const d of s.departures) {
+    if (!d.on) continue;
+    const { goneBy, days } = measured(d.label);
+    if (goneBy === null) continue;
+    const setAt = d.hour * 60 + d.minute;
+    if (setAt - goneBy < DRIFT_MIN) continue;
+    return { place: d.label, setAt, goneBy, days };
+  }
+  return null;
+}

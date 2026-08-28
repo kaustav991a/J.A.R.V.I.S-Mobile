@@ -116,3 +116,66 @@ export async function usageForAsk(j: Journal, now: number): Promise<AskUsage | n
     days: r.usual.days,
   };
 }
+
+/** an app has to be worth this many minutes today before it is worth naming */
+export const APP_FLOOR_MIN = 45;
+
+/** and this much more than its own usual */
+export const APP_OVER = 2;
+
+export type AppDelta = {
+  /** the real name where the journal knows one, the package where it does not */
+  app: string;
+  /** minutes today */
+  today: number;
+  /** minutes on an ordinary day, today excluded */
+  usual: number;
+  /** how many completed days that usual is built from */
+  days: number;
+};
+
+/**
+ * Every app that is well past its OWN usual today, heaviest movement first.
+ *
+ * A day's total is a fact nobody can act on — "4h on the phone" names nothing that
+ * could be different tomorrow. The app that moved is the fact underneath it, and the
+ * journal has held per-app days all along: `usageForAsk` reports today's heaviest
+ * with no baseline beside them, which is a list rather than a comparison.
+ *
+ * A floor as well as a ratio, for the same reason the day-level trigger has one: an
+ * app that went from two minutes to twelve has tripled, and saying so is arithmetic
+ * dressed as an observation. Sorted by how far past its usual it went rather than by
+ * size, so the browser that is heavy every day never crowds out the thing that
+ * actually changed.
+ *
+ * Empty rather than null when there is no baseline: an empty list of findings is a
+ * true statement about a day, where a zero baseline invites "far more than usual"
+ * about somebody nobody has watched yet.
+ */
+export async function appDeltas(j: Journal, now: number): Promise<AppDelta[]> {
+  const day = dayKey(now);
+  const from = dayKey(now - (WINDOW_DAYS - 1) * DAY_MS);
+
+  const perDay = await j.msByDay(from, day);
+  const before = perDay.filter((d) => d.day !== day);
+  if (before.length === 0) return [];
+
+  const lastBefore = before[before.length - 1].day;
+  const earlier = await j.appTotals(from, lastBefore, 50);
+  const usualByApp = new Map(earlier.map((r) => [r.app, Math.round(r.ms / before.length)]));
+  const names = await j.allLabels();
+
+  const minutes = (ms: number) => Math.round(ms / 60_000);
+  const out: AppDelta[] = [];
+
+  for (const row of await j.dailyFor(day)) {
+    const todayMin = minutes(row.ms);
+    const usualMin = minutes(usualByApp.get(row.app) ?? 0);
+    if (todayMin < APP_FLOOR_MIN) continue;
+    if (todayMin < usualMin * APP_OVER) continue;
+    out.push({ app: appLabel(row.app, names), today: todayMin, usual: usualMin, days: before.length });
+  }
+
+  // by movement, not by size: the app that changed is the finding
+  return out.sort((a, b) => b.today - b.usual - (a.today - a.usual));
+}

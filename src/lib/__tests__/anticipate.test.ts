@@ -23,6 +23,10 @@ const seen = (over: Partial<Observations> = {}): Observations => ({
   place: null,
   stillHereLate: false,
   goneBy: null,
+  topApp: null,
+  early: null,
+  absent: null,
+  schedule: null,
   spokenBefore: null,
   ...over,
 });
@@ -47,7 +51,7 @@ describe('most of the time, he says nothing', () => {
       anticipate(
         seen({
           usage: { today: 400, usual: 100, days: 9 },
-          spokenBefore: { day: '2026-08-21', about: 'anything' },
+          spokenBefore: { day: '2026-08-21', about: 'anything', said: { anything: '2026-08-21' } },
         })
       )
     ).toBeNull();
@@ -60,7 +64,7 @@ describe('most of the time, he says nothing', () => {
       anticipate(
         seen({
           usage: { today: 400, usual: 100, days: 9 },
-          spokenBefore: { day: '2026-08-20', about: 'usage' },
+          spokenBefore: { day: '2026-08-20', about: 'usage', said: { usage: '2026-08-20' } },
         })
       )
     ).toBeNull();
@@ -200,4 +204,139 @@ describe('a day of unusually many pickups', () => {
     expect(anticipate({ ...fidgety, pickups: { today: 20, usual: 8, days: 9 } })).toBeNull();
   });
 
+});
+
+/**
+ * The budget, which is what actually limits how much this can notice.
+ *
+ * One remark a day and one remembered subject was the shape until 2026-08-28, and
+ * with it every new trigger made the app *less* likely to say the useful thing — a
+ * dull observation spends the day exactly as fast as a sharp one. A day per subject
+ * is what lets the list grow.
+ */
+describe('what may be said, and how often', () => {
+  const heavy = { usage: { today: 400, usual: 100, days: 9 } };
+
+  it('stays silent on a subject it used yesterday', () => {
+    expect(
+      anticipate(seen({ ...heavy, spokenBefore: { day: '2026-08-20', about: 'usage', said: { usage: '2026-08-20' } } }))
+    ).toBeNull();
+  });
+
+  it('says a different thing rather than nothing, now that subjects are counted apart', () => {
+    // the old store could not tell "spoke about usage yesterday" from "spoke
+    // yesterday", so this remark was lost
+    const said = anticipate(
+      seen({
+        ...heavy,
+        pickups: { today: 120, usual: 45, days: 9 },
+        spokenBefore: { day: '2026-08-20', about: 'usage', said: { usage: '2026-08-20' } },
+      })
+    );
+    expect(said?.about).toBe('pickups');
+  });
+
+  it('lets a subject speak again once its cooldown has passed', () => {
+    expect(
+      anticipate(seen({ ...heavy, spokenBefore: { day: '2026-08-17', about: 'usage', said: { usage: '2026-08-17' } } }))
+        ?.about
+    ).toBe('usage');
+  });
+
+  it('still says nothing at all when it has already spoken today', () => {
+    expect(
+      anticipate(
+        seen({ ...heavy, spokenBefore: { day: '2026-08-21', about: 'place', said: { place: '2026-08-21' } } })
+      )
+    ).toBeNull();
+  });
+});
+
+describe('the app that moved, rather than the day that did', () => {
+  const instagram = seen({ topApp: { app: 'Instagram', today: 160, usual: 40, days: 6 } });
+
+  it('names the app and both figures', () => {
+    const said = anticipate(instagram);
+    expect(said?.about).toBe('app');
+    expect(said?.line).toContain('Instagram');
+    expect(said?.line).toMatch(/2h 40m/);
+    expect(said?.line).toContain('40m');
+  });
+
+  it('outranks the day total, which names nothing you could change', () => {
+    const said = anticipate({ ...instagram, usage: { today: 400, usual: 100, days: 9 } });
+    expect(said?.about).toBe('app');
+  });
+
+  it('spends `sir` once, like everything else that speaks', () => {
+    expect(anticipate(instagram)!.line.match(/\bsir\b/gi)).toHaveLength(1);
+  });
+});
+
+describe('being somewhere earlier than usual, and missing from somewhere', () => {
+  // 8:10 rather than 7:55: the quiet hours start at 8, so an arrival remark
+  // before then cannot be said at all — which is a real limit on this trigger and
+  // not a detail of the fixture
+  const early = seen({ now: at(8, 10), early: { place: 'Office', usualBy: 9 * 60 + 30, at: 8 * 60 + 10 } });
+  const absent = seen({ now: at(10, 30), absent: { place: 'Office', usualBy: 9 * 60, days: 4 } });
+
+  it('says you are early, with the hour you are usually there by', () => {
+    const said = anticipate(early);
+    expect(said?.about).toBe('arrival');
+    expect(said?.line).toContain('Office');
+    expect(said?.line).toMatch(/9:30/);
+  });
+
+  it('says you are not there, with the same figure behind it', () => {
+    const said = anticipate(absent);
+    expect(said?.about).toBe('absent');
+    expect(said?.line).toContain('Office');
+    expect(said?.line).toMatch(/9:00/);
+  });
+
+  it('ranks being missing above being early, one being actionable', () => {
+    const said = anticipate({ ...absent, early: early.early });
+    expect(said?.about).toBe('absent');
+  });
+
+  it('ranks still-being-somewhere-late above both, being about right now', () => {
+    const said = anticipate({
+      ...absent,
+      place: 'Office',
+      stillHereLate: true,
+      goneBy: 18 * 60 + 40,
+    });
+    expect(said?.about).toBe('place');
+  });
+});
+
+describe('a departure time that no longer matches what you do', () => {
+  const drifted = seen({
+    schedule: { place: 'Office', setAt: 9 * 60, goneBy: 8 * 60 + 30, days: 4 },
+  });
+
+  it('names both times and how many days are behind the measurement', () => {
+    const said = anticipate(drifted);
+    expect(said?.about).toBe('schedule');
+    expect(said?.line).toMatch(/9:00/);
+    expect(said?.line).toMatch(/8:30/);
+    expect(said?.line).toContain('4');
+  });
+
+  it('says nothing about half an hour either way', () => {
+    expect(
+      anticipate(seen({ schedule: { place: 'Office', setAt: 9 * 60, goneBy: 8 * 60 + 50, days: 4 } }))
+    ).toBeNull();
+  });
+
+  it('waits for enough measured days, like every other figure here', () => {
+    expect(
+      anticipate(seen({ schedule: { place: 'Office', setAt: 9 * 60, goneBy: 8 * 60, days: 2 } }))
+    ).toBeNull();
+  });
+
+  it('says what it measured, which is last seen and not left', () => {
+    // sightings need the app open, so it cannot claim to know when you walked out
+    expect(anticipate(drifted)?.line).toMatch(/seen/i);
+  });
 });

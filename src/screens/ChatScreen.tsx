@@ -13,11 +13,11 @@ import { situationLine } from '../lib/situation';
 import * as Clipboard from 'expo-clipboard';
 import { turnMark } from '../lib/turnMark';
 import { anticipate } from '../lib/anticipate';
-import { loadSpoken, saveSpoken } from '../lib/spokenStore';
-import { loadSeen, stillHereLate, usuallyGoneBy } from '../lib/timeline';
-import { usageForAsk } from '../lib/journal/rollup';
+import { loadSpoken, noteSpoken } from '../lib/spokenStore';
+import { absentFrom, daysSeenAt, hereEarly, loadSeen, placesSeen, stillHereLate, usuallyGoneBy } from '../lib/timeline';
+import { appDeltas, usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
-import { dayKey, dueToday } from '../lib/commute';
+import { dayKey, dueToday, loadCommute, scheduleDrift } from '../lib/commute';
 import { msToNextMinute } from '../theme/greeting';
 import { EmptyState } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
@@ -204,11 +204,14 @@ export function ChatScreen() {
       void (async () => {
         try {
           const now = new Date();
-          const [spokenBefore, departure, usage, seen] = await Promise.all([
+          const journal = await openJournal();
+          const [spokenBefore, departure, usage, seen, apps, commute] = await Promise.all([
             loadSpoken(),
             dueToday(now),
-            usageForAsk(await openJournal(), now.getTime()).catch(() => null),
+            usageForAsk(journal, now.getTime()).catch(() => null),
             loadSeen(),
+            appDeltas(journal, now.getTime()).catch(() => []),
+            loadCommute(),
           ]);
           if (!alive) return;
           const said = anticipate({
@@ -236,11 +239,42 @@ export function ChatScreen() {
              */
             stillHereLate: place ? stillHereLate(seen, place, now) : false,
             goneBy: place ? usuallyGoneBy(seen, place, now) : null,
+            // the app that moved, rather than the day that did. Already sorted by
+            // how far each is past its own usual, so the first is the finding
+            topApp: apps[0] ?? null,
+            // only about where he is standing: arriving early somewhere else is not
+            // an observation, it is arithmetic on a place he has left
+            early: place
+              ? (() => {
+                  const e = hereEarly(seen, place, now);
+                  return e ? { place, ...e } : null;
+                })()
+              : null,
+            /**
+             * Missing from somewhere he is usually at by now.
+             *
+             * Every place the store has ever seen, because the one he is NOT at is
+             * by definition not the one the phone can report. `absentFrom` matches
+             * the weekday and returns null the moment he has been seen there today,
+             * so the loop cannot accuse him of missing a place he is standing in.
+             */
+            absent:
+              placesSeen(seen)
+                .map((label) => {
+                  const a = absentFrom(seen, label, now);
+                  return a ? { place: label, ...a } : null;
+                })
+                .find(Boolean) ?? null,
+            // the schedule he typed against the hour he is measurably gone by
+            schedule: scheduleDrift(commute, now, (label) => ({
+              goneBy: usuallyGoneBy(seen, label, now),
+              days: daysSeenAt(seen, label, now),
+            })),
             spokenBefore,
           });
           if (!said) return;
           setRemark(said.line);
-          await saveSpoken({ day: dayKey(now), about: said.about });
+          await noteSpoken(said.about, dayKey(now));
         } catch {
           // a remark is the most optional thing in this app; nothing it needs may
           // ever be the reason the chat fails to open

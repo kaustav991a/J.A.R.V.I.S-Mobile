@@ -1,6 +1,6 @@
 import { openJournal } from '../store';
 import type { Journal } from '../store';
-import { rollup, startOfDay, usageForAsk, WINDOW_DAYS } from '../rollup';
+import { appDeltas, rollup, startOfDay, usageForAsk, WINDOW_DAYS } from '../rollup';
 
 /**
  * The read side of the recall layer.
@@ -154,5 +154,65 @@ describe('what rides on every question', () => {
 
   it('carries nothing at all when the journal is empty', async () => {
     expect(await usageForAsk(await fresh(), NOW)).toBeNull();
+  });
+});
+
+/**
+ * One app against its own usual, rather than a day against its own usual.
+ *
+ * "4h on the phone today" is a fact nobody can act on; "2h 40m in Instagram against a
+ * usual 50m" names the thing that moved. The journal has held per-app days all along
+ * and nothing read them this way — `usageForAsk` reports today's heaviest apps with
+ * no baseline beside them, which is a list, not a comparison.
+ */
+describe('an app against its own usual', () => {
+  const load = async (j: Journal, app: string, perDay: number[]) => {
+    await j.putDaily(perDay.map((ms, back) => ({ day: dayOf(back), app, ms })));
+  };
+
+  it('has nothing to say on the first day, when there is no usual', async () => {
+    const j = await fresh();
+    await load(j, 'com.instagram.android', [60 * 60_000]);
+    expect(await appDeltas(j, NOW)).toEqual([]);
+  });
+
+  it('measures today against the completed days, today excluded', async () => {
+    const j = await fresh();
+    // 160m today; 40m, 40m, 40m before it
+    await load(j, 'com.instagram.android', [160 * 60_000, 40 * 60_000, 40 * 60_000, 40 * 60_000]);
+    const [top] = await appDeltas(j, NOW);
+    expect(top.today).toBe(160);
+    expect(top.usual).toBe(40);
+    expect(top.days).toBe(3);
+  });
+
+  it('names the app the way a person does, not the way the package does', async () => {
+    const j = await fresh();
+    await load(j, 'com.instagram.android', [160 * 60_000, 40 * 60_000, 40 * 60_000, 40 * 60_000]);
+    await j.putLabels({ 'com.instagram.android': 'Instagram' });
+    expect((await appDeltas(j, NOW))[0].app).toBe('Instagram');
+  });
+
+  it('puts the app that moved most first, not the app that is simply biggest', async () => {
+    const j = await fresh();
+    // the browser is heavier in absolute terms and entirely ordinary
+    await load(j, 'com.android.chrome', [200 * 60_000, 190 * 60_000, 200 * 60_000, 210 * 60_000]);
+    await load(j, 'com.instagram.android', [160 * 60_000, 40 * 60_000, 40 * 60_000, 40 * 60_000]);
+    // 'Instagram' rather than the package: appLabel prettifies one even with no
+    // label stored, so the assertion is about the ORDER, not the naming
+    expect((await appDeltas(j, NOW))[0].app).toBe('Instagram');
+  });
+
+  it('leaves an app alone when today is ordinary for it', async () => {
+    const j = await fresh();
+    await load(j, 'com.android.chrome', [200 * 60_000, 190 * 60_000, 200 * 60_000, 210 * 60_000]);
+    expect(await appDeltas(j, NOW)).toEqual([]);
+  });
+
+  it('ignores a heavy day on an app that is usually nothing at all', async () => {
+    // a 12-minute app tripling is arithmetic, not an observation
+    const j = await fresh();
+    await load(j, 'com.example.rare', [12 * 60_000, 2 * 60_000, 2 * 60_000, 2 * 60_000]);
+    expect(await appDeltas(j, NOW)).toEqual([]);
   });
 });

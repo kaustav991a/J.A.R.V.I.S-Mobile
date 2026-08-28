@@ -21,6 +21,10 @@
  * push or a foreground service is what turns it into the second, and neither is
  * reachable from here today.
  */
+import { DRIFT_MIN } from './commute';
+import { spokeRecently } from './spokenStore';
+import type { Spoken } from './spokenStore';
+
 export type Observations = {
   now: Date;
   /** minutes of screen time today, the usual for this many days, from the journal */
@@ -61,8 +65,29 @@ export type Observations = {
   stillHereLate: boolean;
   /** the minute of the day he is usually gone by, for the figure in the remark */
   goneBy: number | null;
-  /** what was said unprompted last time, and on which day */
-  spokenBefore: { day: string; about: string } | null;
+  /**
+   * The app that is furthest past its OWN usual today, from `appDeltas`.
+   *
+   * A day's total names nothing that could be different tomorrow; the app that moved
+   * does. Ranked above the total for exactly that reason, and the total stays as the
+   * fallback for a heavy day spread across everything.
+   */
+  topApp: { app: string; today: number; usual: number; days: number } | null;
+  /** somewhere well before the hour he is usually there, from `hereEarly` */
+  early: { place: string; usualBy: number; at: number } | null;
+  /** not somewhere he is usually at by now on this weekday, from `absentFrom` */
+  absent: { place: string; usualBy: number; days: number } | null;
+  /**
+   * A departure he typed against the hour he is measurably gone by.
+   *
+   * The one observation here that ends in something to do. `goneBy` is a median of
+   * LAST SIGHTINGS, so the remark says "seen" rather than "left" — the app has to be
+   * open for a sighting, and claiming to know when he walked out would be inventing
+   * the one figure this file exists to refuse.
+   */
+  schedule: { place: string; setAt: number; goneBy: number; days: number } | null;
+  /** what has been said unprompted, and on which day — one day per subject */
+  spokenBefore: Spoken | null;
 };
 
 export type Remark = {
@@ -118,14 +143,27 @@ export function anticipate(o: Observations): Remark | null {
   // muted, and a muted assistant cannot say the one thing that mattered
   if (o.spokenBefore?.day === dayKey(o.now)) return null;
 
-  const candidate = placeRemark(o) ?? usageRemark(o) ?? pickupsRemark(o);
-  if (!candidate) return null;
+  /**
+   * Ranked, and the order is the argument: what can be acted on now, then what is
+   * about today, then what is about a habit. Only one is ever spent, so the ranking
+   * decides which observation is worth a day's budget — a list sorted by how
+   * interesting each looked in isolation would spend the day on the app total and
+   * never mention that you are missing from the office.
+   */
+  const candidates = [
+    placeRemark(o),
+    absentRemark(o),
+    earlyRemark(o),
+    scheduleRemark(o),
+    appRemark(o),
+    usageRemark(o),
+    pickupsRemark(o),
+  ];
 
-  // never the same subject twice running — one a day is not enough on its own, and
-  // the same observation on consecutive days is how a remark becomes a nag
-  if (o.spokenBefore?.about === candidate.about) return null;
-
-  return candidate;
+  // a subject that spoke goes quiet for a few days, and the NEXT one down speaks
+  // instead of the day being spent in silence — which is what the single-subject
+  // marker used to do
+  return candidates.find((c) => c && !spokeRecently(o.spokenBefore, c.about, o.now)) ?? null;
 }
 
 /**
@@ -143,6 +181,80 @@ function placeRemark(o: Observations): Remark | null {
   return {
     about: 'place',
     line: `Still at ${o.place}, sir. You are usually gone by ${clock(o.goneBy)}.`,
+  };
+}
+
+/**
+ * Missing from somewhere he is usually at by now.
+ *
+ * Second only to being somewhere late, and above being early, because it is the one
+ * of the three that might be worth doing something about. The weekday matching that
+ * makes it safe lives in `absentFrom` — a Mon–Fri pattern asserted onto a Sunday is
+ * the mistake the gateway's own nudge made on 2026-08-21, and it announced a shift
+ * that did not exist.
+ */
+function absentRemark(o: Observations): Remark | null {
+  if (!o.absent) return null;
+  return {
+    about: 'absent',
+    line: `Not at ${o.absent.place}, sir. You are usually there by ${clock(o.absent.usualBy)}.`,
+  };
+}
+
+/**
+ * Somewhere well before the hour he is usually there.
+ *
+ * Early only, never late: the same margin that makes "an hour early" an observation
+ * makes "an hour late" an accusation, and a first sighting is as likely to mean the
+ * app was not opened as that he was not there.
+ */
+function earlyRemark(o: Observations): Remark | null {
+  if (!o.early) return null;
+  return {
+    about: 'arrival',
+    line: `At ${o.early.place} early, sir — usually you are there by ${clock(o.early.usualBy)}.`,
+  };
+}
+
+/** and how many measured days must be behind that figure */
+const ENOUGH_DRIFT_DAYS = 4;
+
+/**
+ * A departure time he typed that no longer matches what he does.
+ *
+ * The only remark here that ends in something to do, which is why it outranks every
+ * observation about a day. It says **seen** rather than **left**, and names the day
+ * count: `goneBy` is a median of last sightings, and a sighting needs the app to be
+ * open — so the figure is honest about being an estimate, and the schedule it is
+ * arguing with is one he can change in Places.
+ */
+function scheduleRemark(o: Observations): Remark | null {
+  const s = o.schedule;
+  if (!s || s.days < ENOUGH_DRIFT_DAYS) return null;
+  if (s.setAt - s.goneBy < DRIFT_MIN) return null;
+  return {
+    about: 'schedule',
+    line:
+      `Your ${s.place} departure is set for ${clock(s.setAt)}, sir, ` +
+      `and you were last seen there by ${clock(s.goneBy)} on ${s.days} days.`,
+  };
+}
+
+/**
+ * The app that moved, rather than the day that did.
+ *
+ * Above the day total, which is the same fact with the useful half removed: "4h on
+ * the phone" names nothing that could be different tomorrow, and "2h 40m in
+ * Instagram against a usual 50m" names exactly one thing. The floor and the ratio
+ * live in `appDeltas`, with the journal, since they are about the measurement rather
+ * than about whether to speak.
+ */
+function appRemark(o: Observations): Remark | null {
+  const a = o.topApp;
+  if (!a || a.days < ENOUGH_DAYS) return null;
+  return {
+    about: 'app',
+    line: `${spell(a.today)} in ${a.app} today against a usual ${spell(a.usual)}, sir.`,
   };
 }
 

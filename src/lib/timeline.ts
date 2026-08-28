@@ -178,3 +178,105 @@ export function stillHereLate(seen: Seen[], place: string, now: Date): boolean {
   if (gone === null) return false;
   return minuteOfDay(now.getTime()) > gone + LATE_BY_MIN;
 }
+
+/**
+ * The minute of the day you are usually FIRST seen at a place, or null.
+ *
+ * The mirror of `usuallyGoneBy`, and biased the other way by the same mechanism: a
+ * sighting needs the app to be open, so a first sighting is at best when you arrived
+ * and at worst an hour after it. Median across days, today excluded, and the same
+ * four-day floor — an arrival estimate that has watched three mornings is a guess
+ * wearing a figure.
+ */
+export function usuallyHereBy(seen: Seen[], place: string, now: Date): number | null {
+  const today = dayKey(now.getTime());
+  const firstPerDay = new Map<string, number>();
+
+  for (const s of seen) {
+    if (s.place !== place) continue;
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    const minute = minuteOfDay(s.at);
+    const held = firstPerDay.get(key);
+    if (held === undefined || minute < held) firstPerDay.set(key, minute);
+  }
+
+  if (firstPerDay.size < ENOUGH_PLACE_DAYS) return null;
+  const sorted = [...firstPerDay.values()].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  // the lower of the two middles on an even count, matching `usuallyGoneBy`
+  return sorted.length % 2 ? sorted[mid] : sorted[mid - 1];
+}
+
+/** how far before the usual arrival before being early is worth a remark */
+export const EARLY_BY_MIN = 45;
+
+/**
+ * Being somewhere well before you usually are, with the figure behind it.
+ *
+ * Only early. Arriving late is deliberately not remarked on: the same margin that
+ * makes "an hour early" interesting makes "an hour late" an accusation, and the
+ * measurement is not good enough to carry one — a late first sighting is as likely to
+ * mean you did not open the app as that you were not there.
+ */
+export function hereEarly(
+  seen: Seen[],
+  place: string,
+  now: Date
+): { usualBy: number; at: number } | null {
+  const usualBy = usuallyHereBy(seen, place, now);
+  if (usualBy === null) return null;
+  const at = minuteOfDay(now.getTime());
+  return at <= usualBy - EARLY_BY_MIN ? { usualBy, at } : null;
+}
+
+/** how far past the usual arrival before absence is worth a remark */
+export const ABSENT_BY_MIN = 60;
+
+/**
+ * Not being somewhere you are usually at by now, judged against THIS weekday only.
+ *
+ * The weekday rule is not caution, it is a bug this project has already paid for: the
+ * gateway's nudge matched a Mon–Fri pattern with a substring and announced a Saturday
+ * shift that did not exist. "You are not at the office" on a Sunday is the same
+ * mistake wearing different words, and the same fix applies — compare a Friday only
+ * with other Fridays, and stay silent until four of them have been seen.
+ *
+ * Silent, too, the moment you have been seen there today: the question is whether you
+ * are missing, not whether you are standing still.
+ */
+export function absentFrom(
+  seen: Seen[],
+  place: string,
+  now: Date
+): { usualBy: number; days: number } | null {
+  const today = dayKey(now.getTime());
+  const weekday = now.getDay();
+  const firstPerDay = new Map<string, number>();
+
+  for (const s of seen) {
+    if (s.place !== place) continue;
+    const when = new Date(s.at);
+    const key = dayKey(s.at);
+    // seen there today: nothing is missing
+    if (key === today) return null;
+    if (when.getDay() !== weekday) continue;
+    const minute = minuteOfDay(s.at);
+    const held = firstPerDay.get(key);
+    if (held === undefined || minute < held) firstPerDay.set(key, minute);
+  }
+
+  if (firstPerDay.size < ENOUGH_PLACE_DAYS) return null;
+  const sorted = [...firstPerDay.values()].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const usualBy = sorted.length % 2 ? sorted[mid] : sorted[mid - 1];
+
+  return minuteOfDay(now.getTime()) > usualBy + ABSENT_BY_MIN
+    ? { usualBy, days: firstPerDay.size }
+    : null;
+}
+
+/** every place this store has ever seen him at, each named once */
+export function placesSeen(seen: Seen[]): string[] {
+  return [...new Set(seen.map((s) => s.place))];
+}

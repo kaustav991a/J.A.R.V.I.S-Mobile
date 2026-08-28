@@ -14,6 +14,7 @@ import {
   markBriefed,
   markCloudArmed,
   saveCommute,
+  scheduleDrift,
 } from '../commute';
 import type { CommuteSettings, Departure } from '../commute';
 import { TITLES } from '../briefingVoice';
@@ -605,5 +606,50 @@ describe('what the phone can honestly claim about the gateway', () => {
     await markCloudArmed(hoursAgo(CLOUD_TTL_HOURS + 1));
     expect(await cloudArmed(now)).toBe(false);
     await expect(cloudArmedState(now)).resolves.toBe('stale');
+  });
+});
+
+/**
+ * A departure time he typed against the hour he is measurably gone by.
+ *
+ * The one anticipation trigger that ends in something to do. Pure, and it takes the
+ * measurement as a function rather than importing the sighting store: what the
+ * timeline knows and what the schedule says are two different facts, and this only
+ * has an opinion about the gap between them.
+ */
+describe('a schedule that no longer matches what you do', () => {
+  const measured = (goneBy: number | null, days: number) => () => ({ goneBy, days });
+
+  it('says nothing when the schedule matches the measurement', () => {
+    expect(scheduleDrift(at('office', 9), friday(12), measured(8 * 60 + 50, 6))).toBeNull();
+  });
+
+  it('names the gap when you are reliably gone well before it', () => {
+    const drift = scheduleDrift(at('office', 9), friday(12), measured(8 * 60 + 20, 6));
+    expect(drift?.setAt).toBe(9 * 60);
+    expect(drift?.goneBy).toBe(8 * 60 + 20);
+    expect(drift?.days).toBe(6);
+  });
+
+  it('says nothing about a departure that is switched off', () => {
+    const off: CommuteSettings = {
+      ...DEFAULT_COMMUTE,
+      departures: DEFAULT_COMMUTE.departures.map((d) => ({ ...d, on: false })),
+    };
+    expect(scheduleDrift(off, friday(12), measured(8 * 60 + 20, 6))).toBeNull();
+  });
+
+  it('says nothing on a day the schedule does not run', () => {
+    // the same rule the briefing follows: a weekday pattern is not a fact about
+    // Saturday, which is how the gateway nudge invented a shift
+    expect(scheduleDrift(at('office', 9), saturday(12), measured(8 * 60 + 20, 6))).toBeNull();
+  });
+
+  it('says nothing when nothing has been measured', () => {
+    expect(scheduleDrift(at('office', 9), friday(12), measured(null, 0))).toBeNull();
+  });
+
+  it('ignores leaving LATER than the schedule, which the briefing already covers', () => {
+    expect(scheduleDrift(at('office', 9), friday(12), measured(9 * 60 + 40, 6))).toBeNull();
   });
 });
