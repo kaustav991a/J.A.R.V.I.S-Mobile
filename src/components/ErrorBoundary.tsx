@@ -1,5 +1,7 @@
 import { Component, ErrorInfo, PropsWithChildren } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { crashBuild } from '../lib/crashBuild';
+import { makeCrash, recordCrash } from '../lib/crashLog';
 import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 
 type State = { error: Error | null; stack: string };
@@ -27,6 +29,22 @@ export class ErrorBoundary extends Component<PropsWithChildren, State> {
     // also goes to `npx expo start` / logcat, for when the screen is not enough
     console.error('[jarvis] render crash', error, info.componentStack);
     this.setState({ stack: info.componentStack ?? '' });
+    // and to disk, because this screen lasts exactly as long as the process does.
+    // Not awaited and wrapped: the crash screen must go up whatever the store does
+    try {
+      void recordCrash(
+        makeCrash({
+          error,
+          kind: 'render',
+          fatal: true,
+          at: Date.now(),
+          build: crashBuild(),
+          componentStack: info.componentStack ?? undefined,
+        })
+      );
+    } catch {
+      // a report that cannot be written is not worth a second crash
+    }
   }
 
   render() {

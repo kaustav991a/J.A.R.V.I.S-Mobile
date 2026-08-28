@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SettingsScreen } from '../SettingsScreen';
 import { ChatScreen } from '../ChatScreen';
 import { AppearanceProvider } from '../../theme/appearance';
+import { clearCrashes, makeCrash, recordCrash } from '../../lib/crashLog';
 
 const mockNavigate = jest.fn();
 const mockParentNavigate = jest.fn();
@@ -69,7 +70,10 @@ const mount = (ui: React.ReactElement) =>
     </SafeAreaProvider>
   );
 
-beforeEach(() => {
+const BUILD = { version: '1.4.0', updateId: '01a042b3…', platform: 'android 34' };
+
+beforeEach(async () => {
+  await clearCrashes();
   mockNavigate.mockClear();
   mockParentNavigate.mockClear();
   mockSendCommand.mockClear();
@@ -95,6 +99,19 @@ describe('SettingsScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Security');
   });
 
+  it('opens Diagnostics, which is where a crash is read off without a cable', async () => {
+    const { getByTestId } = await mount(<SettingsScreen />);
+    fireEvent.press(getByTestId('settings-diagnostics'));
+    expect(mockNavigate).toHaveBeenCalledWith('Diagnostics');
+  });
+
+  it('says how many crashes have not been looked at, so the screen is not one nobody opens', async () => {
+    await recordCrash(
+      makeCrash({ error: new Error('boom'), kind: 'js', fatal: true, at: Date.now(), build: BUILD })
+    );
+    const { findByTestId } = await mount(<SettingsScreen />);
+    expect((await findByTestId('settings-diagnostics-count')).props.children).toBe(1);
+  });
   it('marks unbuilt rows instead of leaving dead taps', async () => {
     const { getByTestId, getAllByText } = await mount(<SettingsScreen />);
     // the pairing token took Security's place in this group: the token is still

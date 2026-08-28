@@ -18,6 +18,8 @@ import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
 import { syncCommuteTask } from './src/lib/commuteTask';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { crashBuild } from './src/lib/crashBuild';
+import { installCrashHandler } from './src/lib/crashLog';
 import { UpdateBanner } from './src/components/UpdateBanner';
 import { BlurTargetProvider } from './src/components/ui/Glass';
 import { AppearanceProvider } from './src/theme/appearance';
@@ -31,6 +33,13 @@ void SplashScreen.preventAutoHideAsync();
 // that arrives before it exists is discarded. Channels and permission are asked
 // for once the app is up, since those can wait and this cannot.
 installHandler();
+
+// Same reasoning, for the errors no boundary sees: a throw in a socket callback, a
+// task or an unawaited promise reaches React Native's global handler and today ends
+// the process with nothing written down. Installed at module scope so it is already
+// there for a crash during the first render, and it calls the handler it replaced —
+// the app still dies exactly as it would have, with the record as a side effect.
+installCrashHandler({ build: crashBuild });
 
 /**
  * The gate, as a child so it can read the auth context it is gated by.

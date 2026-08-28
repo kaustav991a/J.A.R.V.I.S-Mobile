@@ -1,5 +1,7 @@
-import { StyleSheet, Switch, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Switch, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Hint, Screen, SectionLabel } from '../components/ui/Atoms';
@@ -11,6 +13,7 @@ import { COLOR, RADIUS, SPACE } from '../theme/tokens';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import { versionLine } from '../lib/updates';
+import { loadCrashes, seenAt, unseenCount } from '../lib/crashLog';
 import { APP_VERSION } from '../data/fixtures';
 import { TABS_ID } from '../navigation/types';
 import type { SettingsStackParams, TabParams } from '../navigation/types';
@@ -20,6 +23,21 @@ export function SettingsScreen() {
   const tabs = nav.getParent<BottomTabNavigationProp<TabParams>>(TABS_ID);
   const { shareLocation, setShareLocation } = useJarvis();
   const toast = useToast();
+
+  /**
+   * Crashes recorded since the diagnostics screen was last opened.
+   *
+   * On the row rather than only inside the screen, because a crash the user never
+   * hears about is one nobody reports — and the app restarting in silence is
+   * exactly how this went unnoticed until now. Read on focus: a crash written by
+   * the launch that preceded this one is the whole case for the count.
+   */
+  const [unreadCrashes, setUnreadCrashes] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => setUnreadCrashes(unseenCount(await loadCrashes(), await seenAt())))();
+    }, [])
+  );
 
   return (
     <Screen testID="settings-screen">
@@ -122,6 +140,29 @@ export function SettingsScreen() {
           // changes; the id and the runtime hash tell a person nothing at a glance
           subtitle={versionLine(Constants.expoConfig?.version, Updates.createdAt)}
           onPress={() => nav.navigate('Updates')}
+        />
+        <SettingsRow
+          testID="settings-diagnostics"
+          icon="bug-outline"
+          title="Diagnostics"
+          subtitle={
+            unreadCrashes > 0
+              ? 'A crash was recorded since you last looked'
+              : 'What broke, the last few times something did'
+          }
+          onPress={() => nav.navigate('Diagnostics')}
+          trailing={
+            <View style={styles.trailing}>
+              {unreadCrashes > 0 ? (
+                <View style={styles.count}>
+                  <Text testID="settings-diagnostics-count" style={styles.countText}>
+                    {unreadCrashes}
+                  </Text>
+                </View>
+              ) : null}
+              <Ionicons name="chevron-forward" size={16} color={COLOR.dim} />
+            </View>
+          }
           last
         />
       </View>
@@ -168,4 +209,16 @@ const styles = StyleSheet.create({
     borderColor: COLOR.line,
     overflow: 'hidden',
   },
+  trailing: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
+  // a number rather than a dot: red against the panel is the one distinction a
+  // colour-blind reader cannot make, and the count is the useful part anyway
+  count: {
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLOR.red,
+    alignItems: 'center',
+  },
+  countText: { color: COLOR.white, fontSize: 11, fontWeight: '700' },
 });

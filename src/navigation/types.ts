@@ -58,6 +58,8 @@ export type SettingsStackParams = {
   Journal: undefined;
   /** what version is running, and the one button that moves it forward */
   Updates: undefined;
+  /** the last few JavaScript crashes, read off the phone instead of off a cable */
+  Diagnostics: undefined;
   About: undefined;
 };
 
