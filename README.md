@@ -5,8 +5,9 @@ WebSocket, falls back to a cloud gateway, and goes honestly dark when neither
 answers.
 
 This README is a **setup guide for a fresh machine** — what to install, in what
-order, and which traps cost real time. `RESUME.md` is the running log of where
-the work stands; read this first, then that.
+order, and which traps cost real time. It says nothing about what is built:
+`docs/status/ledger.json` is the only place a status claim may live, `ROADMAP.md`
+is the plan, and `RESUME.md` is the archaeology of how something was proved.
 
 ---
 
@@ -114,7 +115,7 @@ The project is `@kaustav790/jarvis-mobile`, EAS project id in `app.json` under
 git clone https://github.com/kaustav991a/J.A.R.V.I.S-Mobile.git
 cd J.A.R.V.I.S-Mobile
 npm install
-npm test          # 287 tests
+npm test          # the whole suite; trust the run, not a count written here
 npm run typecheck # tsc --noEmit
 ```
 
@@ -239,10 +240,18 @@ like a missing package while the package is sitting on disk.
 ```bash
 npm test
 npm run typecheck
+node scripts/build-status.mjs --check   # the generated status still matches the ledger
 ```
 
-287 tests, and they are load-bearing — several real bugs in this project were
-caught by a test rather than by the phone.
+All three, and they are load-bearing — several real bugs here were caught by a test
+rather than by the phone. Trust the run for the count, never a number written in a
+file. If you changed what is built, edit `docs/status/ledger.json` and run
+`node scripts/build-status.mjs`; editing the generated tables directly is lost work.
+
+**Do not add an npm script.** `packageJson:scripts` is a fingerprint input, so a
+convenience script moves the OTA runtime and the next publish reaches a runtime no
+device has — silently. Anything that must ship over the air lives in `scripts/` and
+is invoked directly.
 
 ---
 
@@ -321,7 +330,9 @@ src/screens/                one file per screen
 src/components/             ArcReactor, CommandBar, and ui/ primitives
 src/state/                  hudReducer + JarvisProvider (one socket, one reducer)
 src/security/               AuthProvider — the app's own gate
-src/lib/                    biometrics, haptics
+src/lib/                    the pure half: what to say and whether to say it
+src/lib/journal/            phone usage, on the device, in SQLite
+src/lib/crashLog.ts         what the app remembers about the time it died
 src/link/                   transport choice, LinkMachine, useLink
 src/ws/frames.ts            the wire contract. Start here to understand the data
 src/api/client.ts           REST, for what the socket cannot do
@@ -334,18 +345,32 @@ app displays arrives through it.
 
 ## 8. What is not built
 
-See `RESUME.md` for the current list. The short version: no pairing token is ever
-written (so authenticated endpoints cannot safely be exposed), the desk endpoint
-has no in-app field, push notifications are installed but unregistered, voice is
-an icon only, Scripts are fixture-backed, and the desk-side of the desk-watch
-feature does not exist.
+**Do not read a list of features here.** It went stale twice — this section was still
+saying push was unregistered and voice was an icon long after both had moved — which
+is exactly why status now lives in one generated place:
+
+```bash
+node scripts/build-status.mjs   # regenerates the tables below from the ledger
+```
+
+Open `docs/completion-tracker.html` for the human view, or read
+`docs/status/ledger.json` directly. Every row carries a typed `blockedBy`:
+`brain` / `desk` / `device` / `app-build` / `app`, so what is waiting on someone else
+is separated from what is waiting on code. **`jarvis-brain` is closed** — what the app
+is owed by it is in `docs/brain-dependencies.md`, and that page is where a second
+machine should start.
 
 Everything needed to understand the remaining work is in the repo:
 
 | File | What it holds |
 | --- | --- |
-| `RESUME.md` | Running log. Where the work stands, and what is owed next |
-| `ROADMAP.md` | The longer arc |
+| `docs/status/ledger.json` | **The only place a status claim may live.** Every row, criterion, and queue item |
+| `docs/completion-tracker.html` | The same thing for a human, filed under the eight goals. Generated |
+| `docs/brain-dependencies.md` | What is blocked on the gateway, and what is dangerous about reopening it. Generated |
+| `TESTING.md` | What to tap and what should happen, feature by feature. Never says whether something is built |
+| `AGENTS.md` | The rules this codebase has already paid to learn. Read before writing anything |
+| `RESUME.md` | Running log. How something was proved, and what it cost to find out |
+| `ROADMAP.md` | The longer arc. §10 is the order |
 | `docs/desk-watch.md` | What the desk owes for the intruder watch — frames, routes, the lock call, retention |
 | `docs/cloud-app-link.md` | What the Render gateway owes for cloud failover |
 | `docs/ui-reference-prompt.md` | The image-generator prompt for new reference mockups |
