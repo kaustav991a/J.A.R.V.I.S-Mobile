@@ -18,6 +18,16 @@ export type MinimalSocket = {
 export type MachineDeps = {
   endpoints: Endpoints;
   token: string | null;
+  /**
+   * The gateway's `link` capability token, when the phone has minted one.
+   *
+   * Only the CLOUD dial uses it: the desk on the LAN knows nothing about
+   * capabilities and takes the pairing token as it always has. Null falls back
+   * to `token`, which is what every install did before this existed — the dial
+   * must never wait on a mint, because a socket that will not open until an
+   * HTTP round-trip succeeds is a socket that does not open on a bad train.
+   */
+  cloudToken?: string | null;
   fetchImpl: typeof fetch;
   wsFactory: (url: string) => MinimalSocket;
   now: () => number;
@@ -205,7 +215,7 @@ export class LinkMachine {
     const url =
       mode === 'lan'
         ? lanWsUrl(this.deps.endpoints, this.deps.token)
-        : cloudWsUrl(this.deps.endpoints, this.deps.token);
+        : cloudWsUrl(this.deps.endpoints, this.deps.cloudToken ?? this.deps.token);
 
     if (!url) {
       this.set({ mode: 'offline', status: 'closed', lastError: 'no cloud gateway configured' });

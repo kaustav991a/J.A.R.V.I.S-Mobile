@@ -456,3 +456,43 @@ describe('the watchdog after probes have raced', () => {
     expect(FakeSocket.opened).toHaveLength(1);
   });
 });
+
+/**
+ * The socket is the widest door of the five the gateway gates: it opens onto a
+ * brain that answers as him. It presents a `link` token when the phone has one,
+ * and the master otherwise — the fallback is not a nicety, it is what keeps a
+ * bad train or an older gateway from costing him the connection entirely.
+ */
+describe('the cloud socket and the capability token', () => {
+  const withCloudToken = (fetchImpl: typeof fetch, cloudToken: string | null) => {
+    const machine = new LinkMachine({
+      endpoints,
+      token: 'sekrit',
+      cloudToken,
+      fetchImpl,
+      wsFactory: (url) => new FakeSocket(url),
+      now: () => 0,
+      onFrame: () => {},
+      reconnectMs: 100,
+      watchdogMs: 30000,
+    });
+    return machine;
+  };
+
+  it('dials the cloud with the link token when there is one', async () => {
+    await withCloudToken(cloudOnly(), 'j1.link.tok').start();
+    expect(FakeSocket.opened[0].url).toBe('wss://cloud.test/app-link?token=j1.link.tok');
+  });
+
+  it('dials with the master when the mint has not landed yet', async () => {
+    // the dial never waits on an HTTP exchange: a socket that will not open until
+    // a mint succeeds is a socket that does not open on a bad train
+    await withCloudToken(cloudOnly(), null).start();
+    expect(FakeSocket.opened[0].url).toBe('wss://cloud.test/app-link?token=sekrit');
+  });
+
+  it('leaves the LAN desk on the pairing token, which is all it knows', async () => {
+    await withCloudToken(lanUp(), 'j1.link.tok').start();
+    expect(FakeSocket.opened[0].url).toBe('ws://desk:8000/ws?token=sekrit');
+  });
+});

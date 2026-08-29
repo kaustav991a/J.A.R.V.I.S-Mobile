@@ -1,4 +1,5 @@
 import type { CommuteUpload } from '../lib/commuteSync';
+import type { Capability } from '../link/capabilityTokens';
 
 export class ApiError extends Error {
   constructor(
@@ -22,6 +23,23 @@ export type ApiConfig = {
    */
   cloudUrl?: string | null;
   token: string | null;
+  /**
+   * The short-lived token for one gateway capability, when the phone has one.
+   *
+   * `token` above is the MASTER — the pairing secret that opens every route and
+   * never expires. It is still what a request falls back to, because the gateway
+   * still accepts it and an auth change that locks him out of his own assistant
+   * would be worse than the leak it prevents. What this provider adds is that
+   * the ordinary case stops being the master: the push address is registered
+   * with a credential that can only register a push address.
+   *
+   * `refresh` is called once when the gateway says a token has expired, and the
+   * request is retried with whatever comes back. Once, not in a loop: a second
+   * expiry after a fresh mint is a clock problem, and retrying it forever would
+   * turn that into a hang.
+   */
+  capabilityToken?: (cap: Capability) => Promise<string | null>;
+  refreshCapabilityTokens?: () => Promise<void>;
   fetchImpl?: typeof fetch;
 };
 
@@ -125,17 +143,44 @@ export function createApi(cfg: ApiConfig): Api {
    * configured this is not a network problem to retry, it is a route that does not
    * exist, and the screen should say so.
    */
-  const postCloud = async (path: string, body: unknown): Promise<unknown> => {
+  const postCloud = async (path: string, body: unknown, cap?: Capability): Promise<unknown> => {
     if (!cfg.cloudUrl) throw new ApiError('no cloud gateway is configured', 0);
-    let res: Response;
-    try {
-      res = await doFetch(`${cfg.cloudUrl}${path}`, {
-        method: 'POST',
-        headers: { ...headers(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-    } catch (e) {
-      throw new ApiError(e instanceof Error ? e.message : 'network error', 0);
+
+    /**
+     * One attempt, with whichever credential this call is entitled to.
+     *
+     * The capability token when there is one, the master otherwise — and the
+     * master is not a degraded mode, it is what every install presented before
+     * this existed and what the gateway still counts on `/health` so the
+     * migration is a number rather than a hope.
+     */
+    const attempt = async (): Promise<Response> => {
+      const scoped = cap && cfg.capabilityToken ? await cfg.capabilityToken(cap) : null;
+      const auth = scoped ? { Authorization: `Bearer ${scoped}` } : headers();
+      try {
+        return await doFetch(`${cfg.cloudUrl}${path}`, {
+          method: 'POST',
+          headers: { ...auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch (e) {
+        throw new ApiError(e instanceof Error ? e.message : 'network error', 0);
+      }
+    };
+
+    let res = await attempt();
+    // Expiry is the ordinary end of a token's life, and the gateway says so in
+    // the body rather than leaving a bare 401 to be guessed at. Mint and go
+    // again, exactly once.
+    if (res.status === 401 && cap && cfg.refreshCapabilityTokens) {
+      const said = await res
+        .clone()
+        .text()
+        .catch(() => '');
+      if (said.includes('token_expired')) {
+        await cfg.refreshCapabilityTokens();
+        res = await attempt();
+      }
     }
     if (!res.ok) throw new ApiError(`${path} failed with ${res.status}`, res.status);
     const text = await res.text();
@@ -178,19 +223,19 @@ export function createApi(cfg: ApiConfig): Api {
       // not exist, and this app has renamed its everyday channel eight times —
       // every one of those renames silently broke replies until the gateway was
       // told, which nobody remembered to do.
-      await postCloud('/app-push/register', { push_token: pushToken, platform, channels });
+      await postCloud('/app-push/register', { push_token: pushToken, platform, channels }, 'push');
     },
     // The schedule replaces whatever the gateway held, so a departure switched
     // off travels as an absence — see `commutePayload`, which is where the
     // filtering happens and why an empty list is meaningful rather than empty.
     syncCommute: async (upload) => {
-      await postCloud('/app-commute', upload);
+      await postCloud('/app-commute', upload, 'state');
     },
-    facts: async () => readFacts(await postCloud('/app-fact', {})),
+    facts: async () => readFacts(await postCloud('/app-fact', {}, 'memory')),
     remember: async (fact) => {
-      const raw = await postCloud('/app-fact', { fact });
+      const raw = await postCloud('/app-fact', { fact }, 'memory');
       return { ...readFacts(raw), stored: (raw as { stored?: unknown })?.stored === true };
     },
-    forget: async (fact) => readFacts(await postCloud('/app-fact', { forget: fact })),
+    forget: async (fact) => readFacts(await postCloud('/app-fact', { forget: fact }, 'memory')),
   };
 }

@@ -6,6 +6,7 @@ import { syncUsage } from './journal/sync';
 import { rollup } from './journal/rollup';
 import { shareFacts } from './journal/facts';
 import { loadEndpoints, loadToken } from './../link/config';
+import { makeCapabilityProvider } from './../link/capabilityTokens';
 import { createApi } from './../api/client';
 import { GENERAL_CHANNEL, postNow } from './notify';
 import {
@@ -76,10 +77,18 @@ async function catchUpJournal(): Promise<void> {
 
     const endpoints = await loadEndpoints();
     const token = await loadToken();
+    // The headless run gets the same capability tokens as the app: this task
+    // writes FACTS, and a background job holding the master to do it is the
+    // widest credential in the smallest place anyone would look.
+    const capabilities = makeCapabilityProvider(endpoints.cloudBase, token);
     const api = createApi({
       baseUrl: endpoints.cloudBase ?? endpoints.deskBase,
       cloudUrl: endpoints.cloudBase,
       token,
+      capabilityToken: capabilities.token,
+      refreshCapabilityTokens: async () => {
+        await capabilities.refresh();
+      },
     });
     await shareFacts({
       rollup: await rollup(journal, at),

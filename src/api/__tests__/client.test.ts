@@ -169,3 +169,109 @@ describe('gateway-only routes', () => {
     expect((await api.facts()).facts).toEqual([]);
   });
 });
+
+/**
+ * One token per door.
+ *
+ * The pairing token opened five gateway routes at once and never expired, so any
+ * leak was a leak of all five, for good. The gateway derives a short-lived token
+ * per capability now; these pin that the client asks for the right one, and —
+ * the part that matters more — that it still reaches him when it cannot get one.
+ */
+describe('capability tokens', () => {
+  const cloud = 'https://gateway.example';
+  const withCaps = (fetchImpl: typeof fetch, tokens: Record<string, string>, refresh = jest.fn()) =>
+    createApi({
+      baseUrl: 'http://d',
+      cloudUrl: cloud,
+      token: 'the-master',
+      capabilityToken: async (cap) => tokens[cap] ?? null,
+      refreshCapabilityTokens: refresh,
+      fetchImpl,
+    });
+
+  const auth = (call: { init: RequestInit | undefined }) =>
+    (call.init!.headers as Record<string, string>).Authorization;
+
+  it('registers the push address with a token that can only register a push address', async () => {
+    const { calls, fetchImpl } = recorder();
+    await withCaps(fetchImpl, { push: 'j1.push.tok' }).registerPush('ExponentPushToken[x]', 'android');
+    expect(auth(calls[0])).toBe('Bearer j1.push.tok');
+  });
+
+  it('reads and writes facts with the memory token, and the schedule with state', async () => {
+    const { calls, fetchImpl } = recorder(200, { facts: [], persistent: true });
+    const api = withCaps(fetchImpl, { memory: 'j1.memory.tok', state: 'j1.state.tok' });
+    await api.facts();
+    await api.remember('a fact');
+    await api.forget('a fact');
+    await api.syncCommute({ tz: 'Asia/Kolkata', days: [], departures: [] } as never);
+    expect(calls.map(auth)).toEqual([
+      'Bearer j1.memory.tok',
+      'Bearer j1.memory.tok',
+      'Bearer j1.memory.tok',
+      'Bearer j1.state.tok',
+    ]);
+  });
+
+  it('falls back to the master for a door it has no token for', async () => {
+    // an older gateway, an offline mint, SecureStore unavailable on web — all of
+    // them land here, and all of them must still reach him
+    const { calls, fetchImpl } = recorder();
+    await withCaps(fetchImpl, {}).registerPush('ExponentPushToken[x]', 'android');
+    expect(auth(calls[0])).toBe('Bearer the-master');
+  });
+
+  it('uses the master when no provider is configured at all', async () => {
+    const { calls, fetchImpl } = recorder();
+    const api = createApi({ baseUrl: 'http://d', cloudUrl: cloud, token: 'the-master', fetchImpl });
+    await api.registerPush('ExponentPushToken[x]', 'android');
+    expect(auth(calls[0])).toBe('Bearer the-master');
+  });
+
+  it('mints again and retries once when the gateway says the token expired', async () => {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    let tokens: Record<string, string> = { memory: 'stale' };
+    const fetchImpl = jest.fn(async (url: unknown, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      const expired = (init!.headers as Record<string, string>).Authorization === 'Bearer stale';
+      return new Response(
+        JSON.stringify(expired ? { error: 'token_expired', capability: 'memory' } : { facts: ['x'] }),
+        { status: expired ? 401 : 200, headers: { 'content-type': 'application/json' } }
+      );
+    }) as unknown as typeof fetch;
+    const api = createApi({
+      baseUrl: 'http://d',
+      cloudUrl: cloud,
+      token: 'the-master',
+      capabilityToken: async (cap) => tokens[cap] ?? null,
+      refreshCapabilityTokens: async () => {
+        tokens = { memory: 'fresh' };
+      },
+      fetchImpl,
+    });
+    expect((await api.facts()).facts).toEqual(['x']);
+    expect(calls.map((c) => (c.init!.headers as Record<string, string>).Authorization)).toEqual([
+      'Bearer stale',
+      'Bearer fresh',
+    ]);
+  });
+
+  it('does not retry a 401 that is not about expiry', async () => {
+    // a wrong token is a bug or an intruder; re-minting for either would turn one
+    // refusal into an endless pair of them
+    const { calls, fetchImpl } = recorder(401, { error: 'wrong_capability' });
+    const refresh = jest.fn();
+    await expect(withCaps(fetchImpl, { memory: 'tok' }, refresh).facts()).rejects.toBeInstanceOf(
+      ApiError
+    );
+    expect(calls).toHaveLength(1);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('leaves desk routes alone: the LAN desk knows nothing about capabilities', async () => {
+    const { calls, fetchImpl } = recorder();
+    await withCaps(fetchImpl, { memory: 'j1.memory.tok' }).tasks();
+    expect(auth(calls[0])).toBe('Bearer the-master');
+  });
+});

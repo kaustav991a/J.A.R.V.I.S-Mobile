@@ -29,6 +29,7 @@ import {
 } from '../link/config';
 import type { Endpoints, LinkMode, LinkStatus } from '../link/config';
 import { createApi } from '../api/client';
+import { makeCapabilityProvider } from '../link/capabilityTokens';
 import type { Api } from '../api/client';
 import {
   GENERAL_CHANNEL,
@@ -403,9 +404,31 @@ export function JarvisProvider({ children }: PropsWithChildren) {
   // and both routes the desk gates are reached this way.
   // `cloudUrl` is passed separately from `base`: the gateway-only routes must not
   // follow the live link onto the desk, which does not serve them
+  /**
+   * One capability-token cache for this session.
+   *
+   * Memoised on the gateway and the master, so pointing the phone somewhere else
+   * or re-pairing it starts a fresh exchange rather than presenting tokens the
+   * new gateway will refuse. Everything it hands out is optional: a null falls
+   * back to the master, which every route still accepts.
+   */
+  const capabilities = useMemo(
+    () => makeCapabilityProvider(endpoints.cloudBase, token ?? null),
+    [endpoints.cloudBase, token]
+  );
+
   const api = useMemo(
-    () => createApi({ baseUrl: base, cloudUrl: endpoints.cloudBase, token: token ?? null }),
-    [base, endpoints.cloudBase, token]
+    () =>
+      createApi({
+        baseUrl: base,
+        cloudUrl: endpoints.cloudBase,
+        token: token ?? null,
+        capabilityToken: capabilities.token,
+        refreshCapabilityTokens: async () => {
+          await capabilities.refresh();
+        },
+      }),
+    [base, endpoints.cloudBase, token, capabilities]
   );
 
   const pairing = useMemo(

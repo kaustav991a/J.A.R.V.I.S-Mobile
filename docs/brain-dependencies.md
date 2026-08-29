@@ -64,8 +64,8 @@ Every row whose blocker is `brain`, in the order §0b renders them.
 
 | | Status | Why it is here |
 | --- | --- | --- |
-| Capability-split tokens | — | One string gates the socket, push, the commute route and app state alike. A token that can register a push and a token that can read your day must not be the same secret. |
-| Token expiry | — | Nothing expires. |
+| Capability-split tokens | untested | **WRITTEN 2026-08-29 on the home machine, both halves, and NOT LIVE.** The gateway derives a short-lived token per capability from `APP_TOKEN` (`POST /app-tokens`, master-only): `link`, `push`, `state`, `memory`, `say`. A token is `j1.<cap>.<exp>.<mac>` with the mac keyed by the master itself, so verification is stateless, **rotating the master revokes every derived token at once**, and a leaked `push` token buys the push route and nothing else — it cannot even mint itself a new one. This app exchanges once and stores the set beside the master (`src/link/capabilityTokens.ts`), attaches the right one per route, and re-mints three days before they lapse. **The master still opens every route on purpose**: this install presents it, and an auth change that locked him out of his own assistant would be worse than the leak it prevents — `/health` counts every master use per route so the migration is a number. 68 checks in `test_app_tokens.py`, 20 + 3 + 7 jest here. **Owed: a deploy and an OTA publish, then `master_calls` going quiet.** |
+| Token expiry | untested | **Written 2026-08-29 with [token-split], and the same deploy is owed.** Every derived token carries an expiry (`APP_TOKEN_TTL_DAYS`, default 30, declared in `render.yaml`). An expired one is refused with `401 {"error": "token_expired"}` rather than a bare 401, because the difference decides what the phone does: this app mints again and retries **once**, and a second expiry after a fresh mint is a clock problem rather than something to loop on. A caller may ask for a shorter TTL and never a longer one. The master itself does not expire and is not meant to — it is the pairing secret in SecureStore, and rotating it is what revokes. |
 
 ### Talking to him
 

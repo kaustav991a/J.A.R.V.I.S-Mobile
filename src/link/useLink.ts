@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 import { DEFAULT_ENDPOINTS, Endpoints, LinkMode, LinkStatus, loadToken } from './config';
+import { makeCapabilityProvider } from './capabilityTokens';
 import { LinkMachine, LinkSnapshot, MachineDeps, MinimalSocket } from './machine';
 import { JarvisFrame } from '../ws/frames';
 
@@ -98,6 +99,23 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
       const deps = (machine as unknown as { deps: MachineDeps }).deps;
       const moved = deps.token !== (next ?? null);
       deps.token = next ?? null;
+
+      /**
+       * The cloud socket presents a `link` token when the phone has one.
+       *
+       * Fetched alongside the dial rather than before it, and deliberately: the
+       * master opens the socket too, so waiting on an HTTP exchange before
+       * dialling would trade a real connection for a narrower credential — the
+       * wrong way round on a bad train. The token lands when it lands, and the
+       * next dial carries it.
+       */
+      void makeCapabilityProvider(endpoints.cloudBase, next ?? null)
+        .token('link')
+        .then((scoped) => {
+          if (cancelled) return;
+          deps.cloudToken = scoped;
+        });
+
       if (startedFor.current !== machine) {
         startedFor.current = machine;
         void machine.start();
@@ -108,7 +126,7 @@ export function useLink(opts: UseLinkOptions): UseLinkResult {
     return () => {
       cancelled = true;
     };
-  }, [machine, token]);
+  }, [machine, token, endpoints.cloudBase]);
 
   useEffect(() => {
     const id = setInterval(() => {
