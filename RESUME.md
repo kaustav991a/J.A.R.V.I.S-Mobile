@@ -16,6 +16,36 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ⛔ FROZEN — 2026-08-29. This repo is closed until the desk is 100%.
+
+**Kaustav's decision, and it governs every session until he lifts it: no further
+work on the phone app until the DESK is finished.** Not a blocker that arrived —
+a scope call. The desk tracker owns it and defines what "100%" means:
+`F:\work\JARVIS-Project\JARVIS_TRACKER.md` §0.5.
+
+**What that leaves here, stated so the next session does not rediscover it as a
+bug.** Two commits are finished, tested and NOT on the phone, because the OTA
+publish is frozen with everything else:
+
+* `6d8be2d` — the app half of brain queue item 25. The gateway half **is live**
+  and puts the transcript on the reply's push (`data.transcript`); this side is
+  what reads it. Until it publishes, a spoken turn that outlives its socket still
+  arrives as an answer with no question above it — which will look exactly like
+  the original defect, and is not.
+* `38a05cb` — the app half of the capability tokens. The gateway mints them and
+  still accepts the master, so nothing is broken; the phone simply keeps
+  presenting the master, and `/health.app_auth.master_calls` keeps counting.
+
+Four brain-queue items stay parked with them: `6` (the transcribe prompt
+overcorrects on plain English), `11` (notification listener, gated on 12), `14`
+(the situation on the persona envelope), `15` (delivered/read ticks). Several are
+gateway-side code, but this app is their only consumer, so they wait here.
+
+**Nothing in this repo is broken and nothing needs picking up.** `feat/mobile-hud`
+is pushed at 1149 tests / 81 suites, `tsc` clean, and the generated pages match
+the ledger. When the freeze lifts, the two publishes above are the first move,
+and the device repro for item 25 is the first thing to look at afterwards.
+
 ## 🛑 STOP POINT — 2026-08-28, 14:20. Start here; the 08-27 entry below still stands.
 
 **`feat/mobile-hud`, pushed. 1111 tests, 80 suites, `tsc` clean, `build-status --check` up

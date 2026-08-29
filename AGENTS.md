@@ -1,5 +1,17 @@
 # jarvis-mobile — read this first
 
+> ## ⛔ FROZEN, 2026-08-29 — do not work on this repo
+>
+> Kaustav's decision: **no further work on the phone app until the DESK is 100%.**
+> A scope call rather than a blocker, and it governs every session until he lifts
+> it. The desk tracker owns it and defines what 100% means —
+> `F:\work\JARVIS-Project\JARVIS_TRACKER.md` §0.5.
+>
+> Nothing here is broken and nothing needs picking up. Two finished commits are
+> waiting on an OTA publish that is frozen with everything else; `RESUME.md`'s
+> top entry names them and says what each will look like on the phone meanwhile.
+> If you were sent here anyway, read that entry before touching anything.
+
 The phone half of a personal assistant. Expo / React Native, TypeScript, five
 tabs, one WebSocket to a desk machine with a cloud fallback.
 
