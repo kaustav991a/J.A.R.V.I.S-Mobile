@@ -1222,9 +1222,9 @@
     {
       "n": 22,
       "title": "The gateway briefing repeats itself too",
-      "state": "open",
+      "state": "blocked",
       "blockedBy": "brain",
-      "detail": "The phone-sent briefing rotates its wording as of 2026-08-26. The gateway-sent one does not, and on a cloud-linked phone the gateway is the sender — so the original complaint survives wherever the cloud is armed. Port the shape rather than inventing a second one: a pool per slot, one cursor object, figures never varied, the actionable word kept in every variant, and the cursor committed only on a briefing that actually went out so a failed run cannot spend the pool. Wants `fix/durable-state` merged first, because a cursor that a redeploy resets would restart the rotation at the same line every time.",
+      "detail": "**WRITTEN on the home machine 2026-08-29 (`02604c6`) and NOT LIVE.** Ported from this repo's `src/lib/briefingVoice.ts` line for line rather than reinvented, because two senders with two voices is worse than the repetition: a pool per slot, one cursor object shared across departures, the figures never varied, and the actionable word (`umbrella`, `jacket`, `Water`, `hair`, `wait it out`) kept in every variant, since Android truncates a body in the shade. The cursor is spent only on a briefing that actually went out — `_push_all` returns whether anything left, and a push that reached nobody now leaves the day OPEN rather than marking it done, which is the rule the failed-forecast path already had. It persists through `_persist(\"briefing_voice\")` and is restored on boot, the half that waited on durable state: a cursor a deploy resets restarts the rotation at the same line every time. `_briefing_text` without a cursor still draws the first line of every pool, so the prose the harness asserts is unchanged; `test_commute_briefing.py` 15 -> 26, negative-tested by committing the cursor before the push instead of after. **Owed: a deploy, then two mornings of looking at the notification.**",
       "goal": "reachable"
     },
     {
