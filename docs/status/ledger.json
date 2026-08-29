@@ -27,10 +27,10 @@
   ],
   "meta": {
     "repo": "jarvis-mobile",
-    "read": "2026-08-28",
+    "read": "2026-08-29",
     "branch": "feat/mobile-hud",
-    "head": "b361e48",
-    "tests": 1111,
+    "head": "6d7961a",
+    "tests": 1119,
     "suites": 80,
     "typecheck": "clean",
     "sources": {
@@ -1246,10 +1246,10 @@
     {
       "n": 25,
       "title": "A spoken turn that outlives its socket arrives with no question above it",
-      "state": "open",
+      "state": "blocked",
       "blockedBy": "brain",
       "goal": "conversation",
-      "detail": "**Diagnosed to the line on 2026-08-27, and the only brain item whose fix is not gateway-only.** `emit()` returns False when the socket has gone. `deliver()` checks it and pushes the answer (`cloud_gateway.py:3977`); the transcript at `:4095` discards the result and has no push path, so a turn that outlives its socket reaches the phone as an answer with nothing above it. Proved on the device by `numPostedByApp` going 2 to 3. **The push payload has to carry the transcript so the app writes the user turn itself** — prepending it to the answer is closed off, since the gateway is right that a transcript sent as a status message lies about who spoke. **Land both halves together:** `replyFromData` in `src/lib/notify.ts` returns `{text, at}` and nothing else, so a new field on the push is dropped in silence and the gateway change looks like it did nothing."
+      "detail": "**BOTH HALVES ARE WRITTEN, on the home machine, 2026-08-29 — and neither is live.** Gateway `2301ad7` on `feat/cloud-gateway`: the transcript `emit()` result is read rather than discarded, and when the socket died before it left, the text rides on the reply's push as `data.transcript`. App half in this repo: `replyFromData` reads that field for `kind: reply` only, `take()` dispatches a `transcript` frame above the answer with the same `at`, and the reducer deduplicates a user turn the way it already did a pushed reply — the tray sweep re-enters the same notification on every return to the foreground, which would otherwise have appended his question again under its own answer. **What is owed is a deploy and a publish, not code:** Render has to take the gateway commit and the app half has to go out over the air before anyone can see it. Then the device proof, which is the original repro — ask by voice, pocket the phone, and read what the chat shows when it comes back. Tests: `test_app_link.py` 42 -> 46 (three drive the real handler with `send_json` failing on exactly the frame a pocketed phone loses; one pins the discarded-`emit` statement form a refactor would restore), and 1119 jest across 80 suites here, typecheck clean."
     }
   ]
 }

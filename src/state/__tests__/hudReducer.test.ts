@@ -286,6 +286,46 @@ describe('the desk attaching to the gateway', () => {
 });
 
 describe('a voice transcript', () => {
+  /**
+   * The same question is not two questions.
+   *
+   * A transcript that missed its socket arrives on the reply's push, and the
+   * tray sweep re-enters that notification on every return to the foreground.
+   * Without a guard his question was appended again underneath its own answer.
+   * Identity within the window rather than adjacency, because by then the answer
+   * sits between the two copies.
+   */
+  it('is not logged twice when the tray sweep brings the same push back', () => {
+    const once = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'transcript', text: 'how far is home' },
+      at: 1000,
+    });
+    const twice = hudReducer(once, {
+      type: 'frame',
+      frame: { kind: 'transcript', text: 'how far is home' },
+      at: 1000,
+    });
+    expect(twice.chat).toHaveLength(1);
+    // the same array, not merely an equal one: the second copy allocated no turn
+    expect(twice.chat).toBe(once.chat);
+  });
+
+  it('still logs the same words asked again later, because that is a second question', () => {
+    const once = hudReducer(initialHudState, {
+      type: 'frame',
+      frame: { kind: 'transcript', text: 'how far is home' },
+      at: 1000,
+    });
+    // 32.9 s: the closest genuine repeat in the log the 5 s window was read off
+    const again = hudReducer(once, {
+      type: 'frame',
+      frame: { kind: 'transcript', text: 'how far is home' },
+      at: 1000 + 32_900,
+    });
+    expect(again.chat).toHaveLength(2);
+  });
+
   it('is logged as him speaking, not as J.A.R.V.I.S.', () => {
     // a typed command gets its user entry from `local_command`; a spoken one has
     // no local text, so this frame is the only place it can come from

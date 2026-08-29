@@ -464,8 +464,16 @@ export async function dismiss(id: string | null): Promise<void> {
  * paths that have it supply one. It matters for anything swept out of the tray
  * hours after it landed: stamping the read time instead files this morning's
  * briefing under lunchtime, above the things that actually came after it.
+ *
+ * `transcript` is what HE said, and it is present only when the socket died
+ * before the transcript frame reached the phone. A spoken turn is two frames;
+ * when only the answer survives, the chat shows a reply with no question above
+ * it, which reads as J.A.R.V.I.S. volunteering something. The gateway cannot
+ * repair that alone: a transcript pushed as a notification of its own would be
+ * filed as the machine speaking, so it rides on the reply and the app writes
+ * the user turn itself.
  */
-export type PushedReply = { text: string; at?: number };
+export type PushedReply = { text: string; at?: number; transcript?: string };
 
 /**
  * Read a reply out of a notification, or return null.
@@ -506,7 +514,11 @@ export function replyFromData(
   // only the briefing wears its title. A reply's title is the bare name
   // "J.A.R.V.I.S.", and prefixing that would put a signature on every turn
   const title = d.kind === 'commute' && typeof extra?.title === 'string' ? extra.title.trim() : '';
-  return { text: title ? `${title}\n${text}` : text, at: extra?.at };
+  // What he said, when the socket died before his transcript reached the phone.
+  // Read for replies only: a briefing has no question above it by nature, and a
+  // `transcript` on a commute push would invent a turn he never took.
+  const spoken = d.kind === 'reply' && typeof d.transcript === 'string' ? d.transcript.trim() : '';
+  return { text: title ? `${title}\n${text}` : text, at: extra?.at, ...(spoken ? { transcript: spoken } : {}) };
 }
 
 /**

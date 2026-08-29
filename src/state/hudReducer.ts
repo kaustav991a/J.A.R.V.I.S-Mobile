@@ -281,14 +281,26 @@ function applyFrame(state: HudState, frame: JarvisFrame, at: number): HudState {
       // notification carry it, and a log line here would be the machine
       // narrating its own plumbing
       return { ...state, deskLinked: frame.linked };
-    case 'transcript':
+    case 'transcript': {
       // from: 'user' — these are his words coming back, not the machine's. Typed
       // commands get the same entry locally via `local_command`; a spoken one has
       // no local text to log, so the transcript is the only place it appears.
-      return {
-        ...state,
-        chat: cap(place(state.chat, { from: 'user' as const, text: frame.text, at }), CHAT_CAP),
-      };
+      //
+      // Deduplicated the way a pushed reply is, and for the same reason: a
+      // transcript that missed its socket rides in on the reply's push, and the
+      // tray sweep re-enters that notification on every return to the
+      // foreground. Without this his question was appended again underneath its
+      // own answer. Identity within the window rather than adjacency, so the
+      // same thing said again later is still a second thing said — the closest
+      // genuine repeat in the log this window was read off is 32.9 s.
+      const heard = holdsTurn(state.chat, { from: 'user', text: frame.text, at });
+      return heard
+        ? state
+        : {
+            ...state,
+            chat: cap(place(state.chat, { from: 'user' as const, text: frame.text, at }), CHAT_CAP),
+          };
+    }
     case 'status': {
       /**
        * The same status twice in a row is not a second thing that happened.

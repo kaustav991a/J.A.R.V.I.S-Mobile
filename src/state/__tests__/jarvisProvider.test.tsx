@@ -328,6 +328,51 @@ describe('a reply that arrives as a push', () => {
     await finish(view);
   });
 
+  /**
+   * The pocketed SPOKEN turn, which arrived as an answer above nothing.
+   *
+   * Diagnosed in the gateway on 2026-08-27 and fixed in both halves at once: the
+   * transcript frame met a dead socket and was discarded, the answer was pushed,
+   * and the chat showed a reply with no question over it. The gateway now sends
+   * what he said on the push because only this side can write his own turn.
+   */
+  it('writes the question he asked above the answer it came with', async () => {
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockPush.take?.(
+        { text: 'Twenty four minutes, sir.', transcript: 'how far is home' } as never,
+        false
+      );
+    });
+    const log = view.getByTestId('log').props.children as string;
+    expect(log).toContain('user: how far is home');
+    expect(log).toContain('jarvis: Twenty four minutes, sir.');
+    // order, not merely presence: an answer above its question is the defect
+    expect(log.indexOf('user: how far is home')).toBeLessThan(
+      log.indexOf('jarvis: Twenty four minutes, sir.')
+    );
+    await finish(view);
+  });
+
+  it('does not ask his question twice when the tray sweep returns the same push', async () => {
+    const view = await render(
+      <JarvisProvider>
+        <Probe say="unused" />
+      </JarvisProvider>
+    );
+    await act(async () => {
+      mockPush.take?.({ text: 'Once, sir.', transcript: 'how far is home' } as never, false);
+      mockPush.take?.({ text: 'Once, sir.', transcript: 'how far is home' } as never, false);
+    });
+    const log = view.getByTestId('log').props.children as string;
+    expect(log.split('how far is home').length - 1).toBe(1);
+    await finish(view);
+  });
+
   it('does not say the same thing twice when the socket delivers it as well', async () => {
     // the answer can arrive pushed and then again down a socket that reopened
     // underneath it; the reducer's consecutive-duplicate guard is what collapses

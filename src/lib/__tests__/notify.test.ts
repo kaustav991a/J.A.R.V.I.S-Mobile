@@ -326,6 +326,45 @@ describe('a reply that arrived as a push', () => {
     expect(replyFromData({ kind: 'reply' }, '   ')).toBeNull();
     expect(replyFromData({ kind: 'reply' }, undefined)).toBeNull();
   });
+
+  /**
+   * A spoken turn is two frames, and only the second one has a push path.
+   *
+   * Proved on the device on 2026-08-27: ask by voice, pocket the phone, and the
+   * transcript meets a dead socket while the answer is pushed — so the chat
+   * gained an answer with no question above it, which reads as J.A.R.V.I.S.
+   * having volunteered it. The gateway cannot write his turn itself: a
+   * transcript sent as a notification of its own would be filed as the machine
+   * speaking. It rides on the reply instead, and this is the half that reads it
+   * — an unknown field on the push is dropped in silence, which is exactly how
+   * the gateway change would have looked like it did nothing.
+   */
+  it('carries the question he asked, when the socket lost it', () => {
+    expect(
+      replyFromData({ kind: 'reply', transcript: 'how far is home' }, 'Twenty four minutes, sir.')
+    ).toEqual({ text: 'Twenty four minutes, sir.', transcript: 'how far is home' });
+  });
+
+  it('leaves the field off entirely when the transcript did reach the socket', () => {
+    // the ordinary case: the phone already logged his turn, and a second copy
+    // would be him appearing to have asked twice
+    expect(replyFromData({ kind: 'reply' }, 'Twenty four minutes, sir.')).toEqual({
+      text: 'Twenty four minutes, sir.',
+    });
+  });
+
+  it('ignores a blank or non-string transcript rather than logging an empty turn', () => {
+    expect(replyFromData({ kind: 'reply', transcript: '   ' }, 'said')).toEqual({ text: 'said' });
+    expect(replyFromData({ kind: 'reply', transcript: 7 }, 'said')).toEqual({ text: 'said' });
+  });
+
+  it('ignores a transcript on a briefing, which had no question above it', () => {
+    // the commute push is not an answer to anything; a transcript there would
+    // invent a turn he never took
+    expect(
+      replyFromData({ kind: 'commute', transcript: 'never said this' }, 'An umbrella, then.')
+    ).toEqual({ text: 'An umbrella, then.' });
+  });
 });
 
 /**

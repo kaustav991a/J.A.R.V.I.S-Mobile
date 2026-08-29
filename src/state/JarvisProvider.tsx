@@ -1064,16 +1064,36 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    * arrives twice — once pushed, once down a socket that reopened underneath it.
    */
   useEffect(() => {
-    const take = (reply: PushedReply) =>
+    const take = (reply: PushedReply) => {
+      // the notification's own arrival time when it has one, which the tray
+      // sweep does. A briefing pushed at 8 AM is swept whenever the app is next
+      // opened — stamping `now` filed it under lunchtime, above the things that
+      // really did come after it, and the panel's order was then a lie
+      const at = reply.at ?? Date.now();
+      /**
+       * His question first, when it came with the answer.
+       *
+       * A spoken turn reaches the phone as two frames: the transcript, logged as
+       * him, then the answer. Pocket the phone between them and only the answer
+       * survives, by push, so the chat gained a reply with nothing above it and
+       * read as J.A.R.V.I.S. having volunteered it. The gateway sends the
+       * transcript on that push precisely because it cannot write the turn
+       * itself — a transcript delivered as its own notification would be filed
+       * as the machine speaking.
+       *
+       * Same `at` as the reply, which is the only honest stamp available: one
+       * notification carries one arrival time, and `place()` keeps insertion
+       * order among equal stamps, so the question stays above its answer.
+       */
+      if (reply.transcript) {
+        dispatch({ type: 'frame', frame: { kind: 'transcript', text: reply.transcript }, at });
+      }
       dispatch({
         type: 'frame',
         frame: { kind: 'status', status: 'speaking', message: reply.text, user: null },
-        // the notification's own arrival time when it has one, which the tray
-        // sweep does. A briefing pushed at 8 AM is swept whenever the app is next
-        // opened — stamping `now` filed it under lunchtime, above the things that
-        // really did come after it, and the panel's order was then a lie
-        at: reply.at ?? Date.now(),
+        at,
       });
+    };
 
     const l = live();
     // the cold-start case: tapped while the app was dead, so no listener ever saw it
