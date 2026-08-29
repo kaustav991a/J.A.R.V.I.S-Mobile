@@ -7,10 +7,34 @@
 > it. The desk tracker owns it and defines what 100% means —
 > `F:\work\JARVIS-Project\JARVIS_TRACKER.md` §0.5.
 >
+> **Gateway work continues in the other repo** — the line is this repository, not
+> the feature area. A brain-queue item whose code lives in `cloud_gateway.py` is
+> desk work and is being done.
+>
 > Nothing here is broken and nothing needs picking up. Two finished commits are
 > waiting on an OTA publish that is frozen with everything else; `RESUME.md`'s
 > top entry names them and says what each will look like on the phone meanwhile.
 > If you were sent here anyway, read that entry before touching anything.
+>
+> **When the freeze lifts, this is what is left on this side**, so it does not
+> have to be re-derived:
+>
+> 1. **Publish.** `38a05cb` (capability tokens) and `6d8be2d` (item 25's user
+>    turn) are already committed; the OTA publish is the whole of step one, and
+>    item 25's device repro is the first thing to look at afterwards.
+> 2. **Brain queue `11`** — the notification listener. Gated on the token split,
+>    whose gateway half is now live, so the gate is open: what is owed here is the
+>    spec, the pure drop-rule reducer, the service registration and the permission
+>    ask. A listener sees OTPs and private messages, and once that is collected
+>    badly no later fix un-collects it.
+> 3. **Brain queue `15`, app half** — `delivered` and `read` ticks against the
+>    per-message id the gateway assigns. The gateway half is the other repo's.
+> 4. **Brain queue `12`, app half** — already written and shipped in `38a05cb`;
+>    what remains is watching `/health.app_auth.master_calls` go quiet after the
+>    publish, which is how the migration is finished rather than assumed.
+> 5. The ledger's own `blockedBy: app` and `app-build` rows — `voice-out`
+>    (`expo-speech`), `facts-from-talking`, `chat-window`, `call-log`. Those are
+>    the app-area backlog that has nothing to do with the brain queue.
 
 The phone half of a personal assistant. Expo / React Native, TypeScript, five
 tabs, one WebSocket to a desk machine with a cloud fallback.
