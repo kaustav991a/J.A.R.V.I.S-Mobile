@@ -36,7 +36,7 @@
     "read": "2026-08-31",
     "branch": "feat/mobile-hud",
     "head": "843ffa7",
-    "tests": 1176,
+    "tests": 1179,
     "suites": 84,
     "typecheck": "clean",
     "sources": {
@@ -100,6 +100,8 @@
       ],
       "owedNext": [
         "**15 — a per-message id.** Checked against `origin/feat/cloud-gateway` on 2026-08-31: there is no `msg_id` / `message_id` anywhere in `cloud_gateway.py`, so delivered and read ticks cannot start on this side at all. The app knows *sent* and nothing else. **Reply-to-a-message wants the same id**, so this unblocks two features rather than one, and inventing a second identity for a message later is the thing to avoid. Highest value of anything left here.",
+        "**presence — \"awake but idle\", and the app half cannot start without a field to put it in.** Inferred from socket state today, which cannot tell a phone in a pocket from a phone being read. The phone already has the honest signal and sends none of it: the journal holds `screen_on` / `screen_off` / `unlock` timestamps, so minutes-since-last-interaction is a derived number the app can put on the ask envelope the moment the gateway accepts one. **Derived only, never raw** — a count of minutes, never what was on screen. Name the field and the app half follows in a sitting.",
+        "**anticipate-pocket — the remark that finds you.** `anticipate()` decides in code, on the phone, and is measurably incapable of running unattended on this device (`#netAvail=0`, RARE bucket). So the gateway has to be the sender. The cheapest shape that does not duplicate the judgement: the phone posts the remark it would have made along with its own budget marker, and the gateway pushes it when it next has a reason to — rather than the gateway deciding what is worth saying, which is the mistake `speaks-first` already paid for. One remark a day, shared with the nudge budget, or the two channels talk over each other.",
         "**6 — the transcribe prompt overcorrects on plain English.** `_GEMINI_TRANSCRIBE_PROMPT` (`cloud_gateway.py:901`) primes for romanised Bengali by design, and a plain English question came back as *\"ki service\"* — answered correctly for the question it heard, which is worse than a failure because it looks like an answer. The audio path itself is proved: `brains.usage.audio` reached `gemini_ok` with no fallback on 2026-08-27.",
         "**14 — the situation on the persona envelope.** `where` already rides on it (`:4107`); place, battery and link as one field is the rest. The most character per line of code left anywhere in the plan.",
         "**12, the second half — retire the master token**, once `master_calls` has gone quiet. Not before, and the counter is the evidence rather than the calendar.",
@@ -562,7 +564,7 @@
           "status": "partial",
           "blockedBy": "device",
           "goal": "reachable",
-          "note": "**Found unarmed on 2026-08-26, fixed, and the armed half proved on the device the same day.** `setCommuteTask` reads the registration back after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s words, every attempt is recorded for a screen to read after a relaunch, and `App.tsx` logs a failure rather than discarding it. **Proved:** WorkManager holds job `#u0a495/288`, the task executes and writes its stamp, and Places reports it truthfully. **The named gap is the other half — “says so when it is not”.** The phone re-arms itself at launch and on every visit to Places, so the unarmed state cannot be induced on demand; it is covered by tests and by the reading that named it, not by a sighting. **2026-08-27 did not move this and is worth recording as such.** The 07:00 window was the first real one with the phone armed underneath a live gateway, and the phone correctly stayed silent — so the fallback still has not been seen to POST anything. Standing down is the gate’s proof, not this row’s."
+          "note": "**Found unarmed on 2026-08-26, fixed, and the armed half proved on the device the same day.** `setCommuteTask` reads the registration back after asking, because `registerTaskAsync` resolving proves only that it did not throw; the result carries the platform’s words, every attempt is recorded for a screen to read after a relaunch, and `App.tsx` logs a failure rather than discarding it. **Proved:** WorkManager holds job `#u0a495/288`, the task executes and writes its stamp, and Places reports it truthfully. **The named gap is the other half — “says so when it is not”.** The phone re-arms itself at launch and on every visit to Places, so the unarmed state cannot be induced on demand; it is covered by tests and by the reading that named it, not by a sighting. **2026-08-27 did not move this and is worth recording as such.** The 07:00 window was the first real one with the phone armed underneath a live gateway, and the phone correctly stayed silent — so the fallback still has not been seen to POST anything. Standing down is the gate’s proof, not this row’s. **2026-08-31: the missing half is now checkable in one tap.** The reason it stayed `partial` was never doubt about the code — it was that the app re-arms at launch and on every visit to Places, so the unarmed state healed faster than anyone could look at it. Places now offers `TEST` beside the row, which unregisters the task and re-reads the health so the sentence can be read for real; the stored schedule is untouched, and leaving Places and returning re-arms it by the same path that fixed the real occurrence on 2026-08-26. **This row is now one device check away from proved, and that check is thirty seconds.**"
         },
         {
           "id": "briefing-content",
@@ -575,17 +577,17 @@
         {
           "id": "gateway-briefing-wording",
           "name": "Rotating wording in the gateway-sent briefing",
-          "status": "none",
+          "status": "untested",
           "blockedBy": "brain",
-          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. **Seen rather than reasoned about, 2026-08-27.** The Office briefing at 17:59 on the 26th and the Home briefing at 07:00 on the 27th carry the identical remark — *\"An umbrella, unless you’ve grown fond of arriving wet.\"* — and differ only in their figures, 51% against 65% with a storm line added. Two mornings, one sentence. It also cost a diagnosis: the changed figures read as rotated wording from the phone, and the gateway was briefly suspected of having gone silent.",
+          "note": "The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. **Seen rather than reasoned about, 2026-08-27.** The Office briefing at 17:59 on the 26th and the Home briefing at 07:00 on the 27th carry the identical remark — *\"An umbrella, unless you’ve grown fond of arriving wet.\"* — and differ only in their figures, 51% against 65% with a storm line added. Two mornings, one sentence. It also cost a diagnosis: the changed figures read as rotated wording from the phone, and the gateway was briefly suspected of having gone silent. **2026-08-31: the rotation is written and deployed.** `02604c6` on `feat/cloud-gateway` ports this repo's `briefingVoice.ts` line for line rather than inventing a second voice, and `fix/durable-state` is merged, so the cursor survives a redeploy — which was the reason it had to wait. **Owed: two gateway briefings on different days, compared.** The pair that proved the defect were word-for-word identical, so word-for-word difference is the check.",
           "goal": "reachable"
         },
         {
           "id": "speaks-first",
           "name": "He speaks first, once a day",
-          "status": "broken",
+          "status": "untested",
           "blockedBy": "brain",
-          "note": "Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids.",
+          "note": "Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. **2026-08-31: the fix is deployed.** `c86d176` is contained in `origin/feat/cloud-gateway`, which is the branch Render watches — verified from this repo with `git branch -r --contains`, which is as much as this laptop can check. So the substring bug and the capitalised `Sir` are both live. **What is owed is a morning:** he speaks once a day at most, so this is proved by looking rather than by triggering.",
           "goal": "reachable"
         },
         {

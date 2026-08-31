@@ -177,3 +177,48 @@ describe('the battery restrictions row', () => {
     await waitFor(() => expect(openSettings).toHaveBeenCalled());
   });
 });
+
+/**
+ * Proving the unarmed sentence, which until now could not be seen at all.
+ *
+ * `fallback-armed` has sat `partial` since 2026-08-26 for one reason: the armed half
+ * was proved on the device, and the other half — "says so when it is not" — could
+ * not be induced. The app re-arms itself at launch and on every visit to this
+ * screen, so the state the row exists to report heals before anyone can look at it.
+ *
+ * So it is made inducible on purpose. Unregistering is the one thing that cannot be
+ * faked from outside, and the repair is already automatic: leaving Places and coming
+ * back arms it again, which is the same path that fixed the real occurrence.
+ */
+describe('proving the fallback says so when it is not armed', () => {
+  it('unregisters the task when asked, rather than only describing what would happen', async () => {
+    const { getByTestId } = await mount();
+    await waitFor(() => expect(getByTestId('commute-health')).toBeTruthy());
+
+    mockHealth.mockResolvedValue(reading({ health: 'unarmed', beat: null }));
+    fireEvent.press(getByTestId('commute-disarm'));
+
+    await waitFor(() => expect(mockSet).toHaveBeenCalledWith(false));
+  });
+
+  it('shows the unarmed sentence afterwards, which is the whole point of the exercise', async () => {
+    const { getByTestId } = await mount();
+    await waitFor(() => expect(getByTestId('commute-health')).toBeTruthy());
+
+    mockHealth.mockResolvedValue(reading({ health: 'unarmed', beat: null }));
+    fireEvent.press(getByTestId('commute-disarm'));
+
+    await waitFor(() =>
+      expect(getByTestId('commute-health').props.children).toContain('not armed')
+    );
+  });
+
+  it('is not offered when there is nothing armed to disarm', async () => {
+    // an action that would do nothing is worse than an absent one: it teaches that
+    // the row's controls are decoration
+    mockHealth.mockResolvedValue(reading({ health: 'unarmed', beat: null }));
+    const { queryByTestId } = await mount();
+    await waitFor(() => expect(mockSet).toHaveBeenCalledWith(true));
+    expect(queryByTestId('commute-disarm')).toBeNull();
+  });
+});

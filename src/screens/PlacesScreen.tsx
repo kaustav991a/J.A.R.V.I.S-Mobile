@@ -102,6 +102,26 @@ export function PlacesScreen() {
   };
 
   /**
+   * Unregister the task deliberately, so the unarmed sentence can be read.
+   *
+   * The row above is the only place the app says the fallback is not armed, and that
+   * sentence had never been seen by anybody: the app re-arms at launch and on every
+   * visit here, so the state heals faster than it can be looked at. This is the only
+   * way to hold it still.
+   *
+   * Deliberately not re-armed on the same breath. The sentence is the thing being
+   * checked, so it has to survive long enough to read — and the repair is one step
+   * away and automatic, which the toast says out loud so nobody is left believing
+   * they have broken their own briefing.
+   */
+  const disarmForCheck = async () => {
+    await setCommuteTask(false);
+    setHealth(await commuteTaskHealth());
+    haptic.good();
+    toast.show('Unregistered. Read the line above, then leave Places and come back to re-arm.');
+  };
+
+  /**
    * Take the person to the screen that actually decides this.
    *
    * `openSettings()` opens the app's own settings page, from which the battery
@@ -426,6 +446,38 @@ export function PlacesScreen() {
             {health ? healthLine(health) : 'Checking.'}
           </Text>
         </View>
+        {/**
+         * Take the registration away, so the sentence above can be read for real.
+         *
+         * `fallback-armed` sat `partial` for days over exactly this: the armed half
+         * was proved on the device, and "says so when it is not" could not be
+         * induced, because the app re-arms itself at launch and on every visit to
+         * this screen. The state the row exists to report healed before anyone could
+         * look at it.
+         *
+         * Unregistering is the only way to see it, and it is safe to offer because
+         * the repair is already automatic and already proved: leaving this screen
+         * and coming back arms it again, by the same path that fixed the real
+         * occurrence on 2026-08-26. It does not touch the stored schedule, so
+         * nothing about what he owes you changes — only whether Android is holding
+         * the job right now.
+         *
+         * Offered only while something is actually armed. An action that would do
+         * nothing teaches that the controls on this row are decoration.
+         */}
+        {health && health.health !== 'unarmed' && health.health !== 'off' ? (
+          <Touchable
+            testID="commute-disarm"
+            accessibilityRole="button"
+            accessibilityLabel="Unregister the background briefing, to see what the app says when it is not armed"
+            hitSlop={8}
+            onPress={() => {
+              void disarmForCheck();
+            }}
+          >
+            <Text style={[styles.action, { color: COLOR.dim }]}>TEST</Text>
+          </Touchable>
+        ) : null}
         <Touchable
           testID="commute-reset-runs"
           accessibilityRole="button"

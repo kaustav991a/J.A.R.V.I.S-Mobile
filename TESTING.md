@@ -86,6 +86,13 @@ At most one unprompted remark a day, and it is not a briefing.
 | 2.1 | A remark arrives at most once a day | Nothing. Between 9 AM and 9 PM | One notification titled `J.A.R.V.I.S.`, one or two sentences | Two in a day, or two days running on the same subject |
 | 2.2 | **It is true** | Read it against what you actually told him | Something that is genuinely true today | An assertion about another day, or an invented detail. Copy the exact text — the wording is the evidence |
 | 2.3 | Silence needs no excuse | Most days | Nothing at all | A "nothing to report" message. That is the message you learn to swipe |
+| 2.4 | **The Saturday shift is gone** | Read the next one that mentions your hours or a shift | Nothing asserted about a day it has not watched | A weekday pattern stated as fact about a weekend. **This is the specific bug `c86d176` fixed**, deployed but never seen working |
+| 2.5 | `sir` is punctuation | Read the wording | Lowercase, once, or not at all | `Sir` capitalised mid-sentence |
+
+**Three things in this goal are fixed and merely unseen, as of 2026-08-31.** 2.4 above,
+6b.2 (the gateway briefing’s wording) and 6b.1 (the unarmed fallback). None of them
+needs code — they need somebody to look, and they are the whole distance between
+*He reaches you without the app being open* at 15 of 20 and at 18.
 
 ---
 
@@ -227,6 +234,24 @@ still needs `adb logcat`.
 | 6.1 | The alert reaches a closed app | With the desk running, trigger it | A notification that survives the app being shut | Nothing |
 | 6.2 | Tapping it opens the alert | Tap the notification | The alert screen, with the countdown | Any other screen |
 | 6.3 | The countdown is a readout | Watch it run out without answering | The desk locks itself | The phone deciding — it must never own that clock |
+
+---
+
+## 6b. He reaches you without the app being open — the last three
+
+**This goal is 15 of 20, and three of the five remaining are already built.** They have
+never been looked at, which is the only thing standing between them and closed. None
+of the three takes longer than a minute.
+
+| # | Feature | Do this | Pass | Fail |
+| --- | --- | --- | --- | --- |
+| 6b.1 | **The fallback says so when it is not armed** | Settings → Places, tap **TEST** beside *Background briefing* | The line changes to *"…The fallback is not armed."* with a reason after it. Then leave Places, come back, and it is armed again | Any other sentence, or a row that still claims it is fine. **The re-arm is the safety net — if it does not come back, that is a real fault and worth saying so loudly** |
+| 6b.2 | The gateway's briefing stops repeating | Compare two gateway-sent briefings on different days | Different wording, identical figures | Word-for-word the same remark. That was the defect, seen on 08-26 and 08-27 |
+| 6b.3 | He speaks first, correctly | Read the next unprompted remark | True about today, `sir` lowercase | A weekday habit asserted about a weekend — see 2.4 |
+
+The two that are **not** built are `presence` (he cannot tell a phone in a pocket from
+one being read) and `anticipate-pocket` (a remark that finds you). Both need a gateway
+route that does not exist; both are specced in `docs/brain-dependencies.md`.
 
 ---
 
