@@ -70,6 +70,8 @@ import { capabilityAnswer, isCapabilityQuestion } from '../lib/capabilities';
 import { asOpenAppCommand, matchApp } from '../lib/openApp';
 import { installed as installedApps, launch as launchApp } from '../../modules/app-launcher';
 import { commutePayload } from '../lib/commuteSync';
+import { photoTurnText } from '../lib/photoTurn';
+import { reshoot } from '../lib/vision';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { openChat } from '../navigation/RootNavigator';
 import { COLOR } from '../theme/tokens';
@@ -93,6 +95,8 @@ export type JarvisContextValue = {
   sendVoice: (clip: { base64: string; format: string }) => Promise<boolean>;
   /** send a photo for the far end to look at; the caption may be empty */
   sendPhoto: (shot: { base64: string; uri: string }, caption: string) => Promise<boolean>;
+  /** send a failed photo again, from the copy the chat kept; false means it is gone */
+  resendPhoto: (uri: string, caption: string) => Promise<boolean>;
   /** allow or deny a parked agent action */
   decide: (id: string, approved: boolean) => Promise<void>;
   /**
@@ -717,7 +721,10 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       const sentAt = Date.now();
       dispatch({
         type: 'local_command',
-        text: said ? `📷 ${said}` : '📷 Photo',
+        // `photoTurnText` rather than the marker inline: the retry path reads this
+        // string back to recover the caption, and two spellings of the marker would
+        // leave a stray emoji on the caption or lose it entirely
+        text: photoTurnText(said),
         at: sentAt,
         image: shot.uri,
       });
@@ -736,6 +743,27 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       return carried;
     },
     [sendWhenOpen]
+  );
+
+  /**
+   * Send a photo again from the copy the chat kept.
+   *
+   * A failed photo used to be unrecoverable for a dull reason: the send handed the
+   * socket base64 and handed the log a uri, so the retry had a picture on screen and
+   * no bytes. `reshoot` rebuilds them from that uri.
+   *
+   * **False means the picture itself is gone**, not that the send failed — the uri
+   * points into a cache Android may have cleared — and the caller has to say
+   * something different for it. Retrying forever against a file that no longer
+   * exists is the one outcome worse than admitting it.
+   */
+  const resendPhoto = useCallback(
+    async (uri: string, caption: string): Promise<boolean> => {
+      const shot = await reshoot(uri);
+      if (!shot) return false;
+      return sendPhoto(shot, caption);
+    },
+    [sendPhoto]
   );
 
   const decide = useCallback(
@@ -1441,6 +1469,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       sendCommand,
       sendVoice,
       sendPhoto,
+      resendPhoto,
       api,
       decide,
       answerWatch,
@@ -1489,6 +1518,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       // pointing at a socket that has since been replaced.
       sendVoice,
       sendPhoto,
+      resendPhoto,
       api,
       decide,
       answerWatch,

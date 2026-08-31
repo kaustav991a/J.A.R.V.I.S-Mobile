@@ -10,6 +10,8 @@ import {
 } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import { COLOR } from './tokens';
+import { live } from '../state/live';
+import { loadAppearance, saveAppearance } from './appearanceStore';
 
 export type AccentKey = 'blue' | 'violet' | 'pink' | 'green' | 'amber';
 
@@ -51,12 +53,26 @@ const AppearanceContext = createContext<AppearanceState | null>(null);
  * tints the reactor, the tab bar and every primary button; glow scales shadow
  * radii; and turning animations off actually stops the reactor's loops.
  *
- * It is deliberately in-memory for now. Persisting it belongs with the token
- * storage work, so that there is one place that owns writing to the device.
+ * **It survives a launch as of 2026-08-31.** It was in-memory for months on the
+ * reasoning that persisting it belonged with the token storage work, so one place
+ * would own writing to the device — which never happened, and meanwhile every launch
+ * reset the app to blue. A setting that does not survive reads as a setting that did
+ * not work, and this one is visible on the first frame.
+ *
+ * The write is the last thing that happens, never the first: nothing is stored until
+ * the stored look has been read, or an empty disk would be written over the real one
+ * during the very first render.
  */
 export function AppearanceProvider({ children }: PropsWithChildren) {
   const [accentKey, setAccentKey] = useState<AccentKey>(DEFAULTS.accentKey);
   const [glow, setGlow] = useState(DEFAULTS.glow);
+  /**
+   * Whether the stored look has been read yet.
+   *
+   * Guards the write-back below. Without it the first render writes the defaults
+   * before the read lands, and the look is lost by the very effect meant to keep it.
+   */
+  const [hydrated, setHydrated] = useState(false);
 
   /**
    * Motion follows the phone until somebody says otherwise.
@@ -78,6 +94,55 @@ export function AppearanceProvider({ children }: PropsWithChildren) {
     overridden.current = true;
     setAnimationsState(on);
   }, []);
+
+  /**
+   * Read the stored look once, before anything is written.
+   *
+   * Ordered against the reduced-motion effect below deliberately: a stored
+   * `animations` is a choice somebody made, so it sets `overridden` and the OS stops
+   * being consulted — while a stored `null` means the switch was never touched and
+   * the phone keeps deciding. Getting that backwards would override reduced motion
+   * for someone who had asked their phone for less of it.
+   */
+  useEffect(() => {
+    // `live()` rather than a hand-rolled `alive` flag: this settles into provider
+    // state, and a bare settle after unmount corrupts the act environment until
+    // every later `render` in the file returns an empty tree. It did exactly that
+    // here before this line existed
+    const l = live();
+    void loadAppearance()
+      .then(
+        l.only((stored) => {
+          if (stored) {
+            setAccentKey(stored.accentKey);
+            setGlow(stored.glow);
+            if (stored.animations !== null) {
+              overridden.current = true;
+              setAnimationsState(stored.animations);
+            }
+          }
+          setHydrated(true);
+        })
+      )
+      .catch(() => {
+        // an unreadable look is the default look, and the write-back must still
+        // arm or the next choice would not be kept either
+        l.only(() => setHydrated(true))();
+      });
+    return l.end;
+  }, []);
+
+  /** write only after the read, and only what was actually chosen */
+  useEffect(() => {
+    if (!hydrated) return;
+    void saveAppearance({
+      accentKey,
+      glow,
+      // null rather than the current value: an untouched switch must stay untouched
+      // on disk, or the next launch stops following the phone
+      animations: overridden.current ? animations : null,
+    });
+  }, [hydrated, accentKey, glow, animations]);
 
   useEffect(() => {
     let alive = true;

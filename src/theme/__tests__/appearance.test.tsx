@@ -1,6 +1,8 @@
 import { AccessibilityInfo, Text } from 'react-native';
-import { act, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppearanceProvider, useAppearance } from '../appearance';
+import { loadAppearance, saveAppearance } from '../appearanceStore';
 
 /**
  * Motion, and who gets to decide it.
@@ -92,5 +94,102 @@ describe('motion, defaulted from the phone', () => {
       listener?.(true);
     });
     expect(view.getByTestId('animations').props.children).toBe('true');
+  });
+});
+
+/**
+ * The look, surviving a launch.
+ *
+ * In-memory until 2026-08-31, so every launch reset accent, glow and motion to the
+ * defaults — and the ledger claimed this row as built for days, which is its own
+ * lesson about believing a document over a phone.
+ *
+ * The rule that matters is the one about motion: a stored `null` means the switch
+ * was never touched, and the OS must still decide. Restoring `true` for that case
+ * would override reduced motion for somebody who had asked the phone for less of it.
+ */
+describe('the look, across launches', () => {
+  const Look = () => {
+    const { accentKey, glow, animations, setAccentKey, setGlow } = useAppearance();
+    return (
+      <>
+        <Text testID="accent">{accentKey}</Text>
+        <Text testID="glow">{String(glow)}</Text>
+        <Text testID="animations">{String(animations)}</Text>
+        <Text testID="set-violet" onPress={() => setAccentKey('violet')}>
+          violet
+        </Text>
+        <Text testID="set-glow" onPress={() => setGlow(0.2)}>
+          dim
+        </Text>
+      </>
+    );
+  };
+
+  const launch = () =>
+    render(
+      <AppearanceProvider>
+        <Look />
+      </AppearanceProvider>
+    );
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('starts on the defaults with nothing stored', async () => {
+    const view = await launch();
+    await waitFor(() => expect(view.getByTestId('accent').props.children).toBe('blue'));
+  });
+
+  it('writes the accent it was given, so a later launch has something to open on', async () => {
+    const view = await launch();
+    fireEvent.press(view.getByTestId('set-violet'));
+    await waitFor(async () => expect((await loadAppearance())?.accentKey).toBe('violet'));
+  });
+
+  it('opens on the accent that was stored', async () => {
+    // seeded rather than written by a previous mount: mounting, unmounting and
+    // mounting again inside one test settles a promise outside `act`, and enough of
+    // those empty every later render in the file — the failure AGENTS.md describes
+    await saveAppearance({ accentKey: 'violet', glow: 0.6, animations: null });
+    const view = await launch();
+    await waitFor(() => expect(view.getByTestId('accent').props.children).toBe('violet'));
+  });
+
+  it('writes the glow too, which is the other half of the look', async () => {
+    const view = await launch();
+    fireEvent.press(view.getByTestId('set-glow'));
+    await waitFor(async () => expect((await loadAppearance())?.glow).toBe(0.2));
+  });
+
+  it('opens on the glow that was stored', async () => {
+    await saveAppearance({ accentKey: 'blue', glow: 0.2, animations: null });
+    const view = await launch();
+    await waitFor(() => expect(view.getByTestId('glow').props.children).toBe('0.2'));
+  });
+  it('does not record a motion choice nobody made', async () => {
+    // the OS has to keep deciding until the switch is actually touched
+    const view = await launch();
+    fireEvent.press(view.getByTestId('set-violet'));
+    await waitFor(async () => expect(await loadAppearance()).not.toBeNull());
+    expect((await loadAppearance())?.animations).toBeNull();
+  });
+
+  it('remembers a motion choice that was made, over what the phone says', async () => {
+    reduced = true;
+    await saveAppearance({ accentKey: 'blue', glow: 0.6, animations: true });
+    const view = await launch();
+    // the phone is asking for less motion and the switch says otherwise; the switch
+    // is the more specific instruction and it was stored for exactly this moment
+    await waitFor(() => expect(view.getByTestId('animations').props.children).toBe('true'));
+  });
+
+  it('still follows the phone when nothing was ever chosen', async () => {
+    reduced = true;
+    await saveAppearance({ accentKey: 'pink', glow: 0.6, animations: null });
+    const view = await launch();
+    await waitFor(() => expect(view.getByTestId('accent').props.children).toBe('pink'));
+    expect(view.getByTestId('animations').props.children).toBe('false');
   });
 });

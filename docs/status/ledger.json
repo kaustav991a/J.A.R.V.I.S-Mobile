@@ -33,11 +33,11 @@
   ],
   "meta": {
     "repo": "jarvis-mobile",
-    "read": "2026-08-29",
+    "read": "2026-08-31",
     "branch": "feat/mobile-hud",
-    "head": "6d7961a",
-    "tests": 1149,
-    "suites": 81,
+    "head": "843ffa7",
+    "tests": 1176,
+    "suites": 84,
     "typecheck": "clean",
     "sources": {
       "status": "this file",
@@ -442,17 +442,17 @@
         {
           "id": "photo-thumb",
           "name": "A thumbnail in the chat instead of the word “Photo”",
-          "status": "none",
+          "status": "untested",
           "blockedBy": "app",
-          "note": "A reply about a photo cannot be judged without the photo.",
+          "note": "**Already built, and the row was wrong.** `sendPhoto` carries the shrunk copy `uri` on the turn and `SentPhoto` renders it above the caption, with an `onError` fallback for a cache Android has cleared. Found on 2026-08-31 by reading the code the row said did not exist. Never deliberately looked at on the phone, so `untested` rather than `proved`.",
           "goal": "conversation"
         },
         {
           "id": "photo-inflight",
           "name": "Photo-in-flight indicator; a failed send stays recoverable",
-          "status": "none",
+          "status": "untested",
           "blockedBy": "app",
-          "note": "The longest wait in the app, and the least visible.",
+          "note": "**Recovery built 2026-08-31; the in-flight half was already there.** A photo turn has carried `SENDING` / `NOT SENT` since the marks shipped, because `sendPhoto` settles its own turn. What was missing was the recovery the row names: the send handed base64 to the socket and kept only a `uri` in the log, so a failed photo had a picture on screen and no bytes to re-send. `reshoot` rebuilds them through the same shrink the first send used — a retry that skipped it would put a full-size frame on a socket sized for 200 KB — and the caption comes back off the turn through `captionOf`, one place owning the marker so a retry cannot send the word \"Photo\" as though it had been typed. **A picture the cache has lost says so** rather than retrying forever: `resendPhoto` answers false and the chat says the photo is no longer on the phone. 11 tests. Unproved on the device.",
           "goal": "conversation"
         },
         {
@@ -926,9 +926,9 @@
         {
           "id": "appearance-persist",
           "name": "Appearance surviving a launch",
-          "status": "none",
+          "status": "untested",
           "blockedBy": "app",
-          "note": "In-memory only. Accent, glow and motion all reset. The ledger claimed this for days.",
+          "note": "**Built 2026-08-31 and never launched on the phone.** `src/theme/appearanceStore.ts` keeps accent, glow and motion in AsyncStorage; the provider reads them once through `live()` and only writes after that read, so an empty disk cannot overwrite the real look during the first render. **Motion is tri-state on disk and that is the whole subtlety:** `null` means the switch was never touched and the OS keeps deciding, so a stored look cannot silently override reduced motion for somebody who asked their phone for less of it. 12 tests. The row claimed this for days while it was in-memory, which is why the claim now names the file.",
           "goal": "product"
         },
         {
@@ -1130,17 +1130,17 @@
     {
       "n": 9,
       "title": "The photo half of the chat",
-      "state": "open",
+      "state": "shipped",
       "blockedBy": "app",
-      "detail": "A thumbnail instead of the word Photo — a reply about a photo cannot be judged without the photo — plus an in-flight indicator, and a failed send that stays recoverable with its caption. The longest wait in the app and the least visible.",
+      "detail": "**Two of the three parts were already built, which the queue did not know.** The thumbnail renders and a photo turn already marks itself `SENDING` / `NOT SENT`. What was genuinely missing, and is now built (2026-08-31), is recovery: a failed photo could not be re-sent, because the bytes went to the socket and only a local uri stayed in the log. It now re-encodes from that uri, keeps the caption, and says so plainly when the cached file is gone. Unpublished and unproved on the phone.",
       "goal": "conversation"
     },
     {
       "n": 10,
       "title": "Appearance surviving a launch",
-      "state": "open",
+      "state": "shipped",
       "blockedBy": "app",
-      "detail": "In-memory only: accent, glow and motion all reset. The ledger claimed this for days, which is its own lesson. Cheap, ships over the air, and the kind of thing a person notices immediately.",
+      "detail": "**Built 2026-08-31.** Accent, glow and motion survive a launch, with motion stored tri-state so an untouched switch keeps following the OS. Cheap, ships over the air, and immediately visible — which is exactly why it mattered that the row claimed it for days while it was in-memory.",
       "goal": "product"
     },
     {
@@ -1226,9 +1226,9 @@
     {
       "n": 21,
       "title": "A day boundary in the chat",
-      "state": "open",
+      "state": "shipped",
       "blockedBy": "app",
-      "detail": "The log renders times with no date, so Saturday noon reads as this morning — it misled a debugging session on 2026-08-24 before the timestamps were read directly. Small, and it is the difference between a log you can trust and one you have to decode.",
+      "detail": "**Already built, found 2026-08-31 by reading the screen rather than the row.** `DayRule` renders a rule with the day's name between one day's turns and the next (`ChatScreen.tsx`), placed on the oldest turn of each day, with `dayHeading` pinned by its own tests. Nothing was written for this today except this correction.",
       "goal": "conversation"
     },
     {

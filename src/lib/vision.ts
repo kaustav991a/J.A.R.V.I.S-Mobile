@@ -63,7 +63,7 @@ async function allowed(source: Source): Promise<boolean> {
  * Height is left null so the aspect ratio is kept: passing both edges stretches a
  * portrait photo, and a distorted photo is a worse answer than a smaller one.
  */
-async function shrink(uri: string): Promise<Shot | null> {
+export async function shrink(uri: string): Promise<Shot | null> {
   try {
     const context = ImageManipulator.manipulate(uri);
     context.resize({ width: LONG_EDGE, height: null });
@@ -122,3 +122,22 @@ export async function takeShot(source: Source): Promise<ShotResult> {
   if (!shot) return { ok: false, cancelled: false, problem: 'Could not read that photo' };
   return { ok: true, shot };
 }
+
+/**
+ * Rebuild a photo's bytes from the shrunk copy the chat kept.
+ *
+ * For retrying a send that failed. The original `takeShot` handed the socket base64
+ * and handed the log a `uri`, so a failed photo turn had a picture on screen and
+ * nothing to re-send — the most expensive thing in this app to lose, since it cost a
+ * walk to wherever the picture was taken.
+ *
+ * The same `shrink` the first send used, deliberately: a retry that skipped it would
+ * put a full-size frame on a socket that was sized for 200 KB, which is the failure
+ * the resize exists to prevent. Re-encoding an already-shrunk JPEG costs a little
+ * quality and nothing else that matters at 1280px.
+ *
+ * Null when the file is gone. The uri points into a cache Android is entitled to
+ * clear, which is a photo that genuinely cannot be re-sent and has to be said out
+ * loud rather than retried forever.
+ */
+export const reshoot = (uri: string): Promise<Shot | null> => shrink(uri);

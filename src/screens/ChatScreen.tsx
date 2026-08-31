@@ -12,6 +12,7 @@ import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { situationLine } from '../lib/situation';
 import * as Clipboard from 'expo-clipboard';
 import { turnMark } from '../lib/turnMark';
+import { captionOf } from '../lib/photoTurn';
 import { anticipate } from '../lib/anticipate';
 import { loadSpoken, noteSpoken } from '../lib/spokenStore';
 import { absentFrom, daysSeenAt, hereEarly, loadSeen, placesSeen, stillHereLate, usuallyGoneBy } from '../lib/timeline';
@@ -88,7 +89,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, sendVoice, sendPhoto, connected, markChatRead, setChatFocused, mode, place, dropTurn, removeTurn } =
+  const { hud, sendCommand, sendVoice, sendPhoto, resendPhoto, connected, markChatRead, setChatFocused, mode, place, dropTurn, removeTurn } =
     useJarvis();
 
   /**
@@ -745,6 +746,24 @@ export function ChatScreen() {
                   onLongPress={item.from === 'user' ? () => setMenuFor(item) : undefined}
                   onRetry={(text) => {
                     dropTurn(item.at);
+                    /**
+                     * A photo goes back as a photo, not as its caption.
+                     *
+                     * Sending `text` here would have re-sent the marker and the
+                     * caption as an ordinary message, so the picture — the whole
+                     * point of the turn, and the part that cost a walk to wherever
+                     * it was taken — would silently not go. The bytes are rebuilt
+                     * from the copy the log kept.
+                     */
+                    if (item.image) {
+                      const uri = item.image;
+                      void resendPhoto(uri, captionOf(text)).then((sent) => {
+                        // false means the picture is gone from the cache, which is
+                        // not the same as a send that failed and must not read as one
+                        if (!sent) toast.show('That photo is no longer on the phone', 'bad');
+                      });
+                      return;
+                    }
                     void sendCommand(text).catch(() => {});
                   }}
                 />
