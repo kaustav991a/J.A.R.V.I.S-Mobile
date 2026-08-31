@@ -88,6 +88,7 @@ delivered/read ticks cannot begin on this side at all, and reply-to-a-message wa
 same id.
 
 **`jarvis-brain` also has CI now**, on branch `ci/gateway-tests` and not merged:
+
 `.github/workflows/gateway-tests.yml` runs the 121 harnesses on every push touching
 `jarvis-backend`. Two things in it are load-bearing — `-o testpaths=.`, because
 `pytest.ini` points at a `tests/` directory that does not exist and a bare `pytest` would
@@ -95,6 +96,38 @@ collect nothing and exit green, and **no secrets at all**, because a test that c
 without one is reaching the live service. **Unverified**: there is no Python on this
 laptop, which is the whole reason it exists. Merging it to `feat/cloud-gateway` is what
 makes it a gate in front of Render, which currently has none.
+
+### Where the day left the goal
+
+**"He reaches you without the app being open" is 16 of 20 — 80%**, from 15 this morning,
+and **it moved without a line of feature code.** `fallback-armed` was never broken; the
+state simply could not be observed. Two other rows elsewhere in this repo turned out
+already built with the ledger reading `none`. **This goal has been losing more to
+unobserved work than to unwritten work**, which is the thing to remember before building
+anything else for it.
+
+### What to pick up, in order
+
+1. **Read the 19:00 Office briefing** — Kaustav is screenshotting it, expanded, and the
+   Activity panel keeps its own copy, so there are two sources. On its own it proves
+   nothing: the rotation is proved by **two briefings on different days differing in
+   wording while their figures stay put**. Tomorrow's 07:00 Home briefing is the pair.
+   That is the same comparison that proved the defect on 08-26/27.
+2. **Read the next unprompted remark** for `speaks-first` — nothing asserted about a day it
+   has not watched, and `sir` lowercase. Both were live-fixed in `c86d176` and neither has
+   been seen working. **1 and 2 together take the goal to 18 of 20 with no code at all.**
+3. **`presence` and `anticipate-pocket`** are the last two, and both are gateway work with
+   nothing owed on this side until a field exists. Specced in `docs/brain-dependencies.md`.
+4. **Queue 20, promote what he is told into what he knows** — the largest app-only item
+   left anywhere, and the one design decision in it is unanswered: what earns storage, and
+   whether a derived fact needs consent before it is kept or merely appears on the Memory
+   screen to be deleted. **Ask before building.**
+5. **Merge `ci/gateway-tests`** in the other repo when its first run is green, which is what
+   puts a gate in front of Render.
+
+**Do not re-diagnose two things from the phone.** The transcript with no question above it
+(`6d8be2d`) and the master-token counter (`38a05cb`) both shipped in tonight's publish; if
+either looks wrong now, it is a real finding, but neither was broken this morning.
 
 
 
