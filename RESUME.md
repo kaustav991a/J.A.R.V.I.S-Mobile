@@ -16,7 +16,87 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## ⛔ FROZEN — 2026-08-29. This repo is closed until the desk is 100%.
+## 🛑 STOP POINT — 2026-08-31, 18:55. Start here. **The freeze below was lifted today.**
+
+**Kaustav lifted it in the session, verbally: "work on app".** The banner under this entry
+is left as written rather than edited, because it is the record of a decision that was
+taken and then reversed — and he also said the new rhythm is **brain Mon–Fri, desktop at
+weekends**, which is the opposite of what was worked today. **That contradiction is
+unresolved and the banner was deliberately not rewritten to guess at it.** Ask before
+believing either.
+
+**`feat/mobile-hud` pushed at `0169772`. 1179 tests, 84 suites, `tsc` clean,
+`build-status --check` up to date.** Runtime still `31c64113`.
+
+### The phone was reached, and one row closed on evidence
+
+**Published `01a057f3` at 18:42** — seven commits' worth, including everything from 08-28
+that had never shipped. Confirmed landed on the device: Settings → Updates reads
+*updated 31 Aug 18:42*, and the **Diagnostics** row is visible in the Settings list, so
+Friday's crash screen is on the phone.
+
+**Wireless debugging worked, and is how the rest of this happened.** Paired to
+`192.168.1.27`; the phone appears as `adb-84f40716-2ctNRF._adb-tls-connect._tcp` over mDNS
+with no `adb connect` needed. **The pairing dialog mints a fresh port and code every time
+it opens** — the first pair failed because the dialog had closed, which reads as a network
+fault and is not one.
+
+**`fallback-armed` is PROVED, both halves and the repair**, after sitting `partial` since
+08-26. Armed beforehand: `JOB #u0a495/629`. `TEST` pressed by `adb shell input tap`; the
+row then read *"Switched on, and Android holds no registration for it. The fallback is not
+armed. It was armed 1 minute ago and Android has since dropped it."* and
+`dumpsys jobscheduler` had **no JOB entry for the uid at all**. Leaving Places and
+returning brought back `JOB #u0a495/630` — a new id, so the repair is a real
+re-registration rather than a stale read. **The screen and the platform were checked
+against each other**, which is the only reason this counts as proof.
+
+**That control exists because the state could not otherwise be seen** — the app re-arms at
+launch and on every visit to Places. It was built as a `Touchable` first, and `Touchable`
+refuses synthetic taps, so the button added to make a laptop-driven check possible would
+have needed a finger. Changed to a `Pressable` an hour later, which is the only reason the
+proof above exists. **Reach for `Pressable` on anything meant to be driven remotely.**
+
+**Goal `reachable` is 16 of 20.** Two more are fixed upstream and merely unseen —
+`speaks-first` (`c86d176`) and `gateway-briefing-wording` (`02604c6`). Both need a
+notification to actually arrive; the shade was empty at 18:45. **PREVIEW does not help
+with the second one:** it exercises the phone's own briefing path, which already rotates,
+where the row is about the gateway's `_briefing_text`. The Office departure is 19:00 and
+the phone is cloud-armed, so the gateway is the sender — tonight's Office briefing against
+tomorrow's 07:00 Home one is the same comparison that proved the defect.
+
+### Built before the phone came into it
+
+- **Queue 10, appearance persists.** Motion is tri-state on disk: `null` means the switch
+  was never touched and the OS keeps deciding, so a stored look cannot override reduced
+  motion for somebody who asked their phone for less of it.
+- **Queue 9's real gap, a failed photo.** The send handed base64 to the socket and kept
+  only a uri, so a failed photo had a picture on screen and no bytes. `reshoot` rebuilds
+  them through the same shrink; a lost cache file says so rather than retrying forever.
+- **Two rows were already built and the ledger said `none`** — the chat's day rule and the
+  photo thumbnail. Nothing was written for either. **Read the screen before believing the
+  row.**
+- **`live()` was walked into again** — a bare settle in the new appearance effect emptied
+  every later render in that file. The rule is in `AGENTS.md` and was still missed.
+
+### For the machine that can run the gateway
+
+`docs/brain-dependencies.md` now leads with **what to pick up, in order**, rather than only
+what is blocked — the weekend of 08-29 proved the handoff works, since items 24 and 25 were
+both fixed there from that page. **First is a per-message id**: checked against
+`origin/feat/cloud-gateway` today, there is no `msg_id` anywhere in `cloud_gateway.py`, so
+delivered/read ticks cannot begin on this side at all, and reply-to-a-message wants the
+same id.
+
+**`jarvis-brain` also has CI now**, on branch `ci/gateway-tests` and not merged:
+`.github/workflows/gateway-tests.yml` runs the 121 harnesses on every push touching
+`jarvis-backend`. Two things in it are load-bearing — `-o testpaths=.`, because
+`pytest.ini` points at a `tests/` directory that does not exist and a bare `pytest` would
+collect nothing and exit green, and **no secrets at all**, because a test that cannot pass
+without one is reaching the live service. **Unverified**: there is no Python on this
+laptop, which is the whole reason it exists. Merging it to `feat/cloud-gateway` is what
+makes it a gate in front of Render, which currently has none.
+
+
 
 **Kaustav's decision, and it governs every session until he lifts it: no further
 work on the phone app until the DESK is finished.** Not a blocker that arrived —
