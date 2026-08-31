@@ -246,6 +246,22 @@ function mdDeferred(key) {
     out.push('');
   }
 
+  // The queue below says what is blocked; this says what to DO about it, in order.
+  // Written because the weekend of 2026-08-29 proved the handoff works — two items
+  // were picked up from this page and fixed on the machine that can run them — and a
+  // list of blockers is not the same document as a list of next moves.
+  if (d.owedNext?.length) {
+    out.push(`## What to pick up, in order — ${d.owedNext.length}`);
+    out.push('');
+    out.push(
+      'For the machine that can run this code. Ordered by what unblocks most on the phone, ' +
+        'not by size.'
+    );
+    out.push('');
+    d.owedNext.forEach((item, i) => out.push(`${i + 1}. ${item}`));
+    out.push('');
+  }
+
   out.push(`## The queue items — ${items.length}`);
   out.push('');
   if (!items.length) out.push('_None._');
