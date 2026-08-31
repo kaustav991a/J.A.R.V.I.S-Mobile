@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Linking, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Hint, Screen, SectionLabel } from '../components/ui/Atoms';
@@ -466,7 +466,21 @@ export function PlacesScreen() {
          * nothing teaches that the controls on this row are decoration.
          */}
         {health && health.health !== 'unarmed' && health.health !== 'off' ? (
-          <Touchable
+          /**
+           * A plain `Pressable`, and that is the whole reason this control works.
+           *
+           * `Touchable` is an animated `Pressable`, and `adb shell input` cannot
+           * press one — measured on 2026-08-26 across a tap, a held swipe and an
+           * explicit motionevent, none of which fired. This control exists so the
+           * unarmed sentence can be checked, and most of the checking on this
+           * project is driven from a laptop with the phone on wireless debugging.
+           * Built as a `Touchable` it would have been a button that only a finger
+           * could reach, on a row whose entire purpose is remote diagnosis.
+           *
+           * `SettingsRow` takes `input tap` normally for the same reason, which is
+           * how Settings → Places is opened from a laptop at all.
+           */
+          <Pressable
             testID="commute-disarm"
             accessibilityRole="button"
             accessibilityLabel="Unregister the background briefing, to see what the app says when it is not armed"
@@ -474,9 +488,10 @@ export function PlacesScreen() {
             onPress={() => {
               void disarmForCheck();
             }}
+            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
           >
             <Text style={[styles.action, { color: COLOR.dim }]}>TEST</Text>
-          </Touchable>
+          </Pressable>
         ) : null}
         <Touchable
           testID="commute-reset-runs"
@@ -543,6 +558,9 @@ function Stepper({
 }
 
 const styles = StyleSheet.create({
+  // Pressable has no feedback of its own, and Touchable's is what was given up to
+  // make this reachable by adb
+  pressed: { opacity: 0.55 },
   group: {
     backgroundColor: COLOR.panel,
     borderRadius: 16,
