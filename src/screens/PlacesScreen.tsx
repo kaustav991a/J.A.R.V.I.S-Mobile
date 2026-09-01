@@ -16,6 +16,7 @@ import { currentFix } from '../lib/place';
 import {
   askForBackgroundLocation,
   backgroundLocationState,
+  previewLeaving,
   startWatchingPlaces,
   stopWatchingPlaces,
   watchingPlaces,
@@ -153,6 +154,20 @@ export function PlacesScreen() {
           ? 'Android took the permission back. Allow all the time, in Settings.'
           : 'This build cannot watch places. It needs the newer app installed.'
     );
+  };
+
+  /**
+   * Post the departure notification now, since the real one needs a walk.
+   *
+   * A notification nobody has ever seen is a notification nobody knows is silent, on
+   * the wrong channel, or cut off in the shade — all three of which this app has
+   * shipped before. It writes no sighting and spends no cooldown, so pressing it
+   * cannot teach him a departure that never happened.
+   */
+  const previewDeparture = async () => {
+    await previewLeaving(places[0]?.label ?? 'Office');
+    haptic.tap();
+    toast.show('Sent. That is what a real departure will look like.');
   };
 
   /**
@@ -666,7 +681,7 @@ export function PlacesScreen() {
             {watching
               ? 'Android is watching ' +
                 (places.length === 1 ? 'one place' : places.length + ' places') +
-                ' and will report you arriving or leaving within a few minutes, with the app closed.'
+                ' with the app closed, and will tell you when you leave one. Arrivals are recorded quietly.'
               : bgLocation === 'ready'
                 ? 'The permission is there and nothing is registered, so leaving a place still goes unseen.'
                 : bgLocation === 'foreground-only'
@@ -674,6 +689,24 @@ export function PlacesScreen() {
                   : 'Location is off for this app, so places are only named when you ask.'}
           </Text>
         </View>
+        {/*
+          Offered only while something is being watched, since a preview of a
+          notification that cannot arrive teaches the wrong thing.
+        */}
+        {watching ? (
+          <Pressable
+            testID="geofence-preview"
+            accessibilityRole="button"
+            accessibilityLabel="Send a departure notification now, to see what it looks like"
+            hitSlop={8}
+            onPress={() => {
+              void previewDeparture();
+            }}
+            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+          >
+            <Text style={[styles.action, { color: COLOR.dim }]}>TEST</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           testID="geofence-toggle"
           accessibilityRole="button"

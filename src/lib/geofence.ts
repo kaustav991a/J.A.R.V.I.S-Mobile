@@ -1,8 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
+import { clockLabel } from './commute';
 import { AT_PLACE_KM } from './knownPlaces';
 import type { KnownPlace } from './knownPlaces';
+import { postNow } from './notify';
 import { noteSeen } from './timeline';
 
 /**
@@ -95,7 +98,13 @@ export async function onGeofenceEvent(event: GeofenceEvent, at: number = Date.no
     const leaving = kind === 'exit' || kind === Location.GeofencingEventType.Exit;
     if (!entering && !leaving) return;
 
-    await noteSeen(label, Number.isFinite(at) ? at : Date.now(), entering ? 'enter' : 'exit');
+    const when = Number.isFinite(at) ? at : Date.now();
+    await noteSeen(label, when, entering ? 'enter' : 'exit');
+
+    // the sighting is written first and separately: a notification that cannot be
+    // posted is an annoyance, a departure that was never recorded is the figure this
+    // whole file exists to measure
+    if (leaving) await announceLeaving(label, when);
   } catch {
     // see above: nothing above this can catch anything, so nothing may escape
   }
@@ -143,6 +152,83 @@ export async function startWatchingPlaces(
     // a build whose manifest lacks the permission lands here, which is the state the
     // whole app is in until queue 23 ships
     return 'unavailable';
+  }
+}
+
+/**
+ * How long a place stays quiet after it has said you left.
+ *
+ * A geofence boundary is a line, and standing near it makes Android report crossing
+ * it several times: each event is real and only the first is a departure. Forty-five
+ * minutes is longer than any wobble and shorter than a genuine second departure from
+ * the same place — going back for a forgotten bag and leaving again still gets a word.
+ */
+export const LEAVE_COOLDOWN_MS = 45 * 60_000;
+
+const LEFT_SAID_KEY = 'jarvis_left_said';
+
+type LeftSaid = Record<string, number>;
+
+const loadLeftSaid = async (): Promise<LeftSaid> => {
+  try {
+    const raw = await AsyncStorage.getItem(LEFT_SAID_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === 'object' ? (parsed as LeftSaid) : {};
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * Say you left, once per place per cooldown.
+ *
+ * **Exits only, and that is the whole design.** Ten named places reporting both
+ * crossings is a phone that buzzes all day for things you already know; the departure
+ * is the one carrying a figure the app could never measure before.
+ *
+ * The cooldown is per place rather than per phone, because leaving home and reaching
+ * the office are fifteen minutes apart on the same morning and both are worth a word.
+ */
+export async function announceLeaving(place: string, at: number): Promise<void> {
+  const said = await loadLeftSaid();
+  const last = said[place];
+  if (typeof last === 'number' && at - last < LEAVE_COOLDOWN_MS && at >= last) return;
+
+  // written before the notification, not after: if posting throws, the alternative is
+  // a phone that says the same thing again on the next wobble
+  await AsyncStorage.setItem(LEFT_SAID_KEY, JSON.stringify({ ...said, [place]: at }));
+
+  const when = new Date(at);
+  await postNow({
+    title: `Left ${place}`,
+    body: `${clockLabel(when.getHours(), when.getMinutes())}. Noted, sir.`,
+    data: { kind: 'left-place', place, at },
+  });
+}
+
+/**
+ * Post the departure notification without recording a departure.
+ *
+ * The real thing cannot be induced from a laptop — it needs a person to walk out of a
+ * 120 m circle — and a notification nobody has ever seen is a notification nobody
+ * knows is silent, on the wrong channel, or truncated. This posts the same content and
+ * touches neither the sighting store nor the cooldown, so pressing it cannot teach the
+ * app a departure that never happened.
+ */
+export async function previewLeaving(place: string, at: number = Date.now()): Promise<void> {
+  const when = new Date(at);
+  await postNow({
+    title: `Left ${place}`,
+    body: `${clockLabel(when.getHours(), when.getMinutes())}. Noted, sir.`,
+    data: { kind: 'left-place', place, at, preview: true },
+  });
+}
+/** forget what has been said, so the next exit speaks — the CLEAR lever for this row */
+export async function forgetLeaving(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(LEFT_SAID_KEY);
+  } catch {
+    /* nothing stored */
   }
 }
 

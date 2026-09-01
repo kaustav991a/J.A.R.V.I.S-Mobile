@@ -5,6 +5,7 @@ import {
   backgroundLocationState,
   geofenceRegions,
   onGeofenceEvent,
+  previewLeaving,
   askForBackgroundLocation,
   startWatchingPlaces,
   stopWatchingPlaces,
@@ -12,6 +13,13 @@ import {
 } from '../geofence';
 import { loadSeen } from '../timeline';
 import type { KnownPlace } from '../knownPlaces';
+
+const mockPosted = jest.fn().mockResolvedValue('id');
+jest.mock('../notify', () => ({
+  postNow: (...a: unknown[]) => mockPosted(...a),
+  GENERAL_CHANNEL: 'general-v8',
+}));
+const posted = mockPosted;
 
 /**
  * Sightings that happen whether or not anybody is holding the phone.
@@ -41,6 +49,10 @@ const place = (label: string, lat: number, lon: number): KnownPlace => ({
 
 const HOME = place('Home', 22.81556, 88.37106);
 const OFFICE = place('Office', 22.5769, 88.4344);
+
+/** a time today, so the notification body can be checked against a clock */
+const at = (hour: number, minute: number): number =>
+  new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
 
 /** inside the store's twelve-week window, or the read filters it back out */
 const recent = Date.now() - 60_000;
@@ -150,5 +162,72 @@ describe('what is being watched right now', () => {
     // Android 11 opens Settings for the second rather than showing a dialog, so
     // "foreground-only" is a normal outcome and not a failure
     expect(['ready', 'foreground-only', 'refused']).toContain(await askForBackgroundLocation());
+  });
+});
+
+describe('being told you left', () => {
+  beforeEach(() => {
+    posted.mockClear();
+  });
+
+  it('says where and when, because a time is the whole point of the row', async () => {
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
+    expect(posted).toHaveBeenCalledTimes(1);
+    const [opts] = posted.mock.calls[0];
+    expect(opts.title).toContain('Office');
+    expect(opts.body).toContain('6:47 PM');
+  });
+
+  it('says nothing when you arrive, which is what was asked for', async () => {
+    // ten places, both crossings, would be a phone that buzzes all day. Only the
+    // departure carries a figure the app could not measure before
+    await onGeofenceEvent({ eventType: 'enter', region: { identifier: 'Office' } }, at(9, 20));
+    expect(posted).not.toHaveBeenCalled();
+  });
+
+  it('stays quiet on a second exit inside the cooldown', async () => {
+    // standing at the edge of a 120 m circle makes Android report crossing it
+    // repeatedly, and each one is a real event that is not a real departure
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 52));
+    expect(posted).toHaveBeenCalledTimes(1);
+  });
+
+  it('speaks again once the cooldown is spent, since leaving twice is a real thing', async () => {
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(13, 0));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    expect(posted).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a cooldown per place, not one for the whole phone', async () => {
+    // leaving home and reaching the office are minutes apart on the same morning
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(9, 25));
+    expect(posted).toHaveBeenCalledTimes(2);
+  });
+
+  it('still writes the sighting when the notification cannot be posted', async () => {
+    // the sighting is the thing that matters: a lost notification is an annoyance,
+    // a lost departure is the figure this whole file exists to measure
+    posted.mockRejectedValueOnce(new Error('no channel'));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
+    expect((await loadSeen())[0].via).toBe('exit');
+  });
+});
+
+describe('seeing the notification without leaving', () => {
+  it('posts the same words, so what is checked is what will arrive', async () => {
+    posted.mockClear();
+    await previewLeaving('Office', at(19, 10));
+    expect(posted.mock.calls[0][0].body).toContain('7:10 PM');
+  });
+
+  it('records nothing, so a preview cannot teach a departure that never happened', async () => {
+    await previewLeaving('Office', at(19, 10));
+    expect(await loadSeen()).toEqual([]);
+    // and it does not spend the cooldown either
+    posted.mockClear();
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 12));
+    expect(posted).toHaveBeenCalledTimes(1);
   });
 });
