@@ -594,3 +594,43 @@ describe('taking the sweeps back out of the history', () => {
     expect(kept.map((s) => s.via)).toEqual(['enter', undefined]);
   });
 });
+
+describe('you can only leave where you were', () => {
+  const t = (hour: number, minute: number) =>
+    new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
+
+  it('drops an exit from a place you were not at, alone though it is', async () => {
+    // 2026-09-01 18:40, at the office: Android reported leaving Home, because a sweep
+    // reports every region the phone is OUTSIDE of. One event, so no burst to catch it
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([
+        { place: 'Office', at: t(17, 50) },
+        { place: 'Home', at: t(18, 40), via: 'exit' },
+      ])
+    );
+    await pruneSweepExits();
+    expect((await loadSeen()).map((s) => s.place)).toEqual(['Office']);
+  });
+
+  it('keeps the departure that follows being seen there', async () => {
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([
+        { place: 'Office', at: t(17, 50) },
+        { place: 'Office', at: t(19, 5), via: 'exit' },
+      ])
+    );
+    await pruneSweepExits();
+    expect(await loadSeen()).toHaveLength(2);
+  });
+
+  it('keeps an exit with nothing before it, since silence is not evidence', async () => {
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([{ place: 'Office', at: t(19, 5), via: 'exit' }])
+    );
+    await pruneSweepExits();
+    expect(await loadSeen()).toHaveLength(1);
+  });
+});

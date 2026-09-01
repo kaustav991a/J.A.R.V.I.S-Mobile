@@ -187,9 +187,28 @@ export async function pruneSweepExits(windowMs: number = 90_000): Promise<number
   try {
     const seen = await loadSeen();
     const exits = seen.filter((s) => s.via === 'exit');
-    if (exits.length < 2) return 0;
+    if (!exits.length) return 0;
 
     const swept = new Set<number>();
+
+    /**
+     * You can only leave where you were.
+     *
+     * A sweep reports every region the phone is OUTSIDE of, so at the office it says
+     * you left Home — and when only one place is named there is no burst to recognise.
+     * The tell is what came immediately before: a departure from somewhere the app was
+     * not just seeing you is the platform describing geometry, not a person walking
+     * out of a door.
+     *
+     * Nothing before it means nothing to judge it by, and it stands. Silence is not
+     * evidence, and a real first departure has to be allowed to be the first thing in
+     * the history.
+     */
+    for (const a of exits) {
+      const before = seen.filter((b) => b.at < a.at && b.at > a.at - 6 * 3600_000).pop();
+      if (before && before.place !== a.place) swept.add(a.at);
+    }
+
     for (const a of exits) {
       const burst = exits.filter((b) => b.place !== a.place && Math.abs(a.at - b.at) <= windowMs);
       if (burst.length) {
