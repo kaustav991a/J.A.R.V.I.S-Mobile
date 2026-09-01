@@ -64,7 +64,19 @@ export const ENOUGH_PLACE_DAYS = 4;
 /** how far past the usual hour before it is worth remarking on */
 export const LATE_BY_MIN = 45;
 
-export type Seen = { place: string; at: number };
+export type Seen = {
+  place: string;
+  at: number;
+  /**
+   * How the sighting was made, absent on everything written before 2026-09-01.
+   *
+   * `'exit'` and `'enter'` come from a geofence and mean the boundary was actually
+   * crossed, whether or not the app was open. Everything else is an app-open: the
+   * phone happened to resolve a place because somebody was using it, which is why
+   * every figure derived from those is a bound rather than a time.
+   */
+  via?: 'enter' | 'exit';
+};
 
 const dayKey = (at: number): string => {
   const d = new Date(at);
@@ -105,13 +117,20 @@ export async function loadSeen(): Promise<Seen[]> {
  * Silent on every failure. A sighting that cannot be written is a sighting that never
  * happened, and nothing above this may fail because of it.
  */
-export async function noteSeen(place: string, at: number = Date.now()): Promise<void> {
+export async function noteSeen(
+  place: string,
+  at: number = Date.now(),
+  via?: 'enter' | 'exit'
+): Promise<void> {
   if (!place) return;
   try {
     const seen = await loadSeen();
     const last = seen[seen.length - 1];
-    if (last && last.place === place && at - last.at < SAME_VISIT_MIN * 60_000) return;
-    await AsyncStorage.setItem(KEY, JSON.stringify([...seen, { place, at }].slice(-SEEN_KEEP)));
+    // a crossing is never a duplicate: two of them 20 minutes apart are a real
+    // departure and a real return, which is exactly what the app-open store cannot see
+    if (!via && last && last.place === place && at - last.at < SAME_VISIT_MIN * 60_000) return;
+    const sighting = via ? { place, at, via } : { place, at };
+    await AsyncStorage.setItem(KEY, JSON.stringify([...seen, sighting].slice(-SEEN_KEEP)));
   } catch {
     /* see above */
   }
@@ -155,6 +174,49 @@ export function usuallyGoneBy(seen: Seen[], place: string, now: Date): number | 
   return sorted.length % 2 ? sorted[mid] : sorted[mid - 1];
 }
 
+
+/**
+ * When you usually leave a place, and whether that is measured or merely bounded.
+ *
+ * **The whole point of the geofence, expressed in one return value.** With exits, the
+ * median is a departure: Android reported the boundary being crossed, app open or
+ * not, a couple of minutes late rather than hours. Without them, the best available
+ * is the last app-open — which said 3:40 PM about an office he leaves at seven — and
+ * `measured: false` is how every caller is told not to word it as a departure.
+ *
+ * Exits are only trusted once there are as many as any other habit here needs. Two
+ * of them is a coincidence with a timestamp.
+ */
+export function leftBy(
+  seen: Seen[],
+  place: string,
+  now: Date
+): { minute: number; measured: boolean } | null {
+  const today = dayKey(now.getTime());
+  const exits = new Map<string, number>();
+
+  for (const s of seen) {
+    if (s.place !== place || s.via !== 'exit') continue;
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    // the last exit of a day: stepping out for lunch is not going home
+    const held = exits.get(key);
+    const minute = minuteOfDay(s.at);
+    if (held === undefined || minute > held) exits.set(key, minute);
+  }
+
+  if (exits.size >= ENOUGH_PLACE_DAYS) {
+    const times = [...exits.values()].sort((a, b) => a - b);
+    const mid = Math.floor(times.length / 2);
+    return {
+      minute: times.length % 2 ? times[mid] : times[mid - 1],
+      measured: true,
+    };
+  }
+
+  const floor = usuallyGoneBy(seen, place, now);
+  return floor === null ? null : { minute: floor, measured: false };
+}
 /**
  * How many distinct EARLIER days he has been seen at a place.
  *

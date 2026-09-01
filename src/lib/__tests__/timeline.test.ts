@@ -4,6 +4,7 @@ import {
   absentFrom,
   daysSeenAt,
   hereEarly,
+  leftBy,
   nextSeenElsewhere,
   placesSeen,
   seenElsewhereBy,
@@ -481,5 +482,64 @@ describe('the hour and the place agree with each other', () => {
       place: 'Sealdah Rail Station',
       minute: 20 * 60 + 4,
     });
+  });
+});
+
+/**
+ * A sighting that says how it was seen, and a departure that is a departure.
+ *
+ * Everything above is built on sightings written when the app happens to be opened,
+ * and 2026-09-01 spent the day discovering what that costs: an arrival that was a
+ * first app-open, a departure that was a last one, and a repair that could only ever
+ * be an upper bound. Three wrong figures, one root.
+ *
+ * A geofence exit is the real thing — Android reports crossing the boundary whether
+ * the app is open or not, a couple of minutes late rather than hours. So a sighting
+ * now carries how it was made, and the departure figure uses exits where it has them
+ * and says so where it does not.
+ */
+describe('departures from geofence exits', () => {
+  const exits = (...rows: Array<[number, number, number, string]>): Seen[] =>
+    rows.map(([d, h, m, place]) => ({ place, at: day(d, h, m), via: 'exit' as const }));
+
+  it('takes the exit itself when the phone has been reporting them', () => {
+    const left = [
+      ...seen([17, 15, 40, 'Office'], [18, 15, 30, 'Office'], [19, 15, 50, 'Office'], [20, 15, 35, 'Office']),
+      ...exits([17, 19, 10, 'Office'], [18, 19, 5, 'Office'], [19, 19, 20, 'Office'], [20, 19, 12, 'Office']),
+    ];
+    // 19:05, 19:10, 19:12, 19:20 -> 19:10 (lower middle of an even count)
+    expect(leftBy(left, 'Office', NOW)).toEqual({ minute: 19 * 60 + 10, measured: true });
+  });
+
+  it('says it is only a floor when every sighting came from the app being opened', () => {
+    const opens = seen(
+      [17, 15, 40, 'Office'],
+      [18, 15, 30, 'Office'],
+      [19, 15, 50, 'Office'],
+      [20, 15, 35, 'Office']
+    );
+    expect(leftBy(opens, 'Office', NOW)?.measured).toBe(false);
+  });
+
+  it('ignores exits from somewhere else entirely', () => {
+    const elsewhere = [
+      ...seen([17, 15, 40, 'Office'], [18, 15, 30, 'Office'], [19, 15, 50, 'Office'], [20, 15, 35, 'Office']),
+      ...exits([17, 8, 10, 'Home'], [18, 8, 5, 'Home'], [19, 8, 20, 'Home'], [20, 8, 12, 'Home']),
+    ];
+    expect(leftBy(elsewhere, 'Office', NOW)?.measured).toBe(false);
+  });
+
+  it('waits for enough exits before calling them usual', () => {
+    const two = [
+      ...seen([17, 15, 40, 'Office'], [18, 15, 30, 'Office'], [19, 15, 50, 'Office'], [20, 15, 35, 'Office']),
+      ...exits([19, 19, 20, 'Office'], [20, 19, 12, 'Office']),
+    ];
+    // two exits is not a habit; the floor is still the honest answer
+    expect(two.length).toBeGreaterThan(0);
+    expect(leftBy(two, 'Office', NOW)?.measured).toBe(false);
+  });
+
+  it('has nothing to say about a place it has never seen', () => {
+    expect(leftBy([], 'Office', NOW)).toBeNull();
   });
 });
