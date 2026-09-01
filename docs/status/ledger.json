@@ -1273,5 +1273,162 @@
       "goal": "conversation",
       "detail": "**BOTH HALVES ARE WRITTEN, on the home machine, 2026-08-29 — and neither is live.** Gateway `2301ad7` on `feat/cloud-gateway`: the transcript `emit()` result is read rather than discarded, and when the socket died before it left, the text rides on the reply's push as `data.transcript`. App half in this repo: `replyFromData` reads that field for `kind: reply` only, `take()` dispatches a `transcript` frame above the answer with the same `at`, and the reducer deduplicates a user turn the way it already did a pushed reply — the tray sweep re-enters the same notification on every return to the foreground, which would otherwise have appended his question again under its own answer. **What is owed is a deploy and a publish, not code:** Render has to take the gateway commit and the app half has to go out over the air before anyone can see it. Then the device proof, which is the original repro — ask by voice, pocket the phone, and read what the chat shows when it comes back. Tests: `test_app_link.py` 42 -> 46 (three drive the real handler with `send_json` failing on exactly the frame a pocketed phone loses; one pins the discarded-`emit` statement form a refactor would restore), and 1119 jest across 80 suites here, typecheck clean. **2026-08-31: both halves are committed and neither is on the phone.** The gateway half is live; the app half is `6d8be2d` here, waiting with everything else on an OTA publish. Until that publish, a spoken turn that outlives its socket still arrives as an answer with no question above it — which looks exactly like the original defect and is not it."
     }
-  ]
+  ],
+  "anticipations": {
+    "note": "What the phone can notice, and what each one costs. The rule every entry obeys: a remark names the figure it is arguing from, so a wrong estimate is arguable rather than authoritative — and silence is the default, since one remark a day is the whole budget.",
+    "items": [
+      {
+        "id": "still-here-late",
+        "name": "Still somewhere you are usually gone from",
+        "says": "Still at Office, sir. You are usually gone by 6:40 PM.",
+        "from": "Sightings, median of the last sighting each day",
+        "needs": "Four days at that place. Nothing else",
+        "state": "live"
+      },
+      {
+        "id": "left-early",
+        "name": "Gone earlier than this weekday goes",
+        "says": "Last seen at Home at 7:05 AM, sir. On 4 days like this one you are there until 8:10 AM.",
+        "from": "Sightings, weekday-matched, and where you are now",
+        "needs": "Three matching days, and being demonstrably somewhere else",
+        "state": "live"
+      },
+      {
+        "id": "elsewhere-now",
+        "name": "Somewhere your own weekdays say you are not",
+        "says": "Around now, sir, 4 days like this one have you at Home.",
+        "from": "The routine: where you are at this hour on this kind of day",
+        "needs": "Three matching days, and a named place to be at",
+        "state": "live"
+      },
+      {
+        "id": "arrival-early",
+        "name": "Arrived somewhere well before you usually do",
+        "says": "At Office early, sir — usually you are there by 9:00 AM.",
+        "from": "Sightings, arrivals only — a stay that began somewhere else",
+        "needs": "Four arrivals. The weak one: arrival is barely observable without background location",
+        "state": "live"
+      },
+      {
+        "id": "absent-from",
+        "name": "Missing from somewhere you usually are by now",
+        "says": "Not at Office, sir. You are usually there by 9:00 AM.",
+        "from": "Sightings, matched to the same weekday",
+        "needs": "Four of that weekday, and an hour past the usual",
+        "state": "live"
+      },
+      {
+        "id": "app-moved",
+        "name": "The app that moved, rather than the day that did",
+        "says": "2h 40m in Instagram today against a usual 50m, sir.",
+        "from": "The journal, per-app days",
+        "needs": "Usage access, three days of history, and 45 minutes in the app",
+        "state": "live"
+      },
+      {
+        "id": "heavy-day",
+        "name": "A day well past your own usual",
+        "says": "4h on the phone today against a usual 1h 40m, sir.",
+        "from": "The journal",
+        "needs": "Usage access and three days",
+        "state": "live"
+      },
+      {
+        "id": "fidgety-day",
+        "name": "Many more pickups than usual",
+        "says": "120 pickups today against a usual 45, sir.",
+        "from": "The journal, unlock events",
+        "needs": "Usage access and three days",
+        "state": "live"
+      },
+      {
+        "id": "schedule-drift",
+        "name": "A departure time that no longer matches you",
+        "says": "Your Office departure is set for 9:00 AM, sir, and you were last seen there by 8:30 AM on 4 days.",
+        "from": "The Places schedule against the sighting median",
+        "needs": "Four measured days and a 30-minute gap",
+        "state": "live"
+      },
+      {
+        "id": "late-night",
+        "name": "A night that ran much later than yours do",
+        "says": "On the phone until 1:12 AM, sir — three hours past your usual last pickup.",
+        "from": "The journal: the last unlock of each day",
+        "needs": "Nothing new. Said the next morning, since the quiet hours forbid saying it live",
+        "state": "possible"
+      },
+      {
+        "id": "up-early",
+        "name": "Awake earlier than you usually are",
+        "says": "First pickup at 5:40 AM, sir — two hours before your usual.",
+        "from": "The journal: the first unlock of each day, weekday-matched",
+        "needs": "Nothing new",
+        "state": "possible"
+      },
+      {
+        "id": "commute-slow",
+        "name": "A journey that took longer than it usually does",
+        "says": "An hour and ten from Home to Office, sir. Usually forty minutes.",
+        "from": "Sightings: the gap between last-seen at one place and first-seen at the next",
+        "needs": "Nothing new, and it is the best use of the sighting log that is not yet built",
+        "state": "possible"
+      },
+      {
+        "id": "app-untouched",
+        "name": "Something you use daily that you have not opened",
+        "says": "Nothing in Gmail today, sir, against every other weekday this month.",
+        "from": "The journal, per-app days",
+        "needs": "Usage access. Risks nagging, so it wants a high bar before it speaks",
+        "state": "possible"
+      },
+      {
+        "id": "turn-never-sent",
+        "name": "Something you asked that never left the phone",
+        "says": "One thing you asked yesterday never went, sir.",
+        "from": "The chat log: a turn still marked failed or interrupted",
+        "needs": "Nothing new",
+        "state": "possible"
+      },
+      {
+        "id": "briefing-missed",
+        "name": "A briefing that was due and did not run",
+        "says": "No briefing ran this morning, sir. The schedule is armed and the task has not fired since Tuesday.",
+        "from": "The task heartbeat, which already records every run",
+        "needs": "Nothing new",
+        "state": "possible"
+      },
+      {
+        "id": "battery-before-leaving",
+        "name": "Leaving with a battery that will not last the journey",
+        "says": "12 per cent, sir, and you usually leave in twenty minutes.",
+        "from": "Battery level against the departure",
+        "needs": "expo-battery — a native module, so an APK",
+        "state": "needs-build"
+      },
+      {
+        "id": "floor-changed",
+        "name": "Which floor you are on",
+        "says": "Back at your desk, sir — six floors up.",
+        "from": "A barometer, which reads relative height to about a metre",
+        "needs": "expo-sensors and a calibration point. GPS height cannot do it: the error is tens of metres against a floor of three",
+        "state": "needs-build"
+      },
+      {
+        "id": "left-without-opening",
+        "name": "Anything at all noticed while the phone is in your pocket",
+        "says": "(any of the above, without the app being opened first)",
+        "from": "Geofence enter and exit at named places",
+        "needs": "ACCESS_BACKGROUND_LOCATION, so an APK. **This is the one that unbiases every figure above** — today a sighting only exists when the app is opened, which is why \"usually at Home by 10:49 AM\" was ever said",
+        "state": "needs-build"
+      },
+      {
+        "id": "reaches-you-in-pocket",
+        "name": "A remark that finds you rather than waiting to be met",
+        "says": "(delivery, not a new observation)",
+        "from": "The phone decides, the gateway pushes",
+        "needs": "A gateway route. The phone measurably cannot run unattended on this device",
+        "state": "needs-gateway"
+      }
+    ]
+  }
 }

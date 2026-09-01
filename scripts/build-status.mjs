@@ -575,6 +575,49 @@ function html() {
     timeline.reduce((acc, t) => ({ ...acc, [t.kind]: (acc[t.kind] ?? 0) + 1 }), {})
   );
 
+
+  /**
+   * Every remark the phone could make, and what each one costs.
+   *
+   * Asked for on 2026-09-01: name them, say what they do, say what they depend on.
+   * Grouped by what stands in the way rather than by feature, because that is the
+   * question somebody reading this is actually asking. It lives in the ledger like
+   * every other claim; this only renders it.
+   */
+  const ANTICIPATION_STATES = {
+    live: { label: 'Shipped', note: 'Built, and on the phone.' },
+    possible: {
+      label: 'Buildable now',
+      note: 'Needs nothing the phone does not already have — no new permission, no new build.',
+    },
+    'needs-build': {
+      label: 'Needs an APK',
+      note: 'A native module or a manifest entry, so it waits for the next build.',
+    },
+    'needs-gateway': { label: 'Needs the gateway', note: 'The other repo owns it.' },
+  };
+
+  const anticipations = ledger.anticipations ?? { items: [] };
+  const anticipationBlocks = Object.entries(ANTICIPATION_STATES)
+    .map(([state, meta]) => {
+      const items = (anticipations.items ?? []).filter((i) => i.state === state);
+      if (!items.length) return '';
+      const rows = items
+        .map(
+          (i) =>
+            `<tr><td><b>${h(i.name)}</b><div class="sec-note">${rich(i.says)}</div></td>` +
+            `<td>${rich(i.from)}</td><td>${rich(i.needs)}</td></tr>`
+        )
+        .join('\n');
+      return (
+        `<h3>${meta.label} — ${items.length}</h3>` +
+        `<p class="sec-note">${h(meta.note)}</p>` +
+        `<div class="scroll"><table><thead><tr><th>What he notices</th>` +
+        `<th>What it reads</th><th>What it needs</th></tr></thead>` +
+        `<tbody>${rows}</tbody></table></div>`
+      );
+    })
+    .join('\n');
   return `<title>JARVIS Mobile Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1115,6 +1158,12 @@ function html() {
     </div>
 
     <div id="areas">${areaBlocks}</div>
+  </section>
+
+  <section>
+    <h2>What he can notice, and what it costs</h2>
+    <p class="sec-note">${h(anticipations.note ?? '')}</p>
+    ${anticipationBlocks}
   </section>
 
   <section>
