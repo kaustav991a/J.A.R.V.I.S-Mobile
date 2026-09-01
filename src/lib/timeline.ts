@@ -175,6 +175,54 @@ export function daysSeenAt(seen: Seen[], place: string, now: Date): number {
 }
 
 /**
+ * Where and when you are usually next seen after a place.
+ *
+ * The hour alone said "by 8:04 PM you are usually elsewhere", and the answer came
+ * back in one sentence: *8:04 is generally in the train at Sealdah*. That is the
+ * argument for carrying the place — a figure with a name attached can be confirmed
+ * or contradicted immediately, and this one was confirmed immediately.
+ *
+ * The place is the one seen most often across those days rather than the first ever
+ * seen: one detour should not rename a commute.
+ */
+export function nextSeenElsewhere(
+  seen: Seen[],
+  place: string,
+  now: Date
+): { minute: number; place: string } | null {
+  const today = dayKey(now.getTime());
+  const sorted = [...seen].sort((a, b) => a.at - b.at);
+  const lastHere = new Map<string, number>();
+  const firstAfter = new Map<string, Seen>();
+
+  for (const s of sorted) {
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    if (s.place === place) {
+      lastHere.set(key, s.at);
+      // back at the place: whatever came before was not the end of the day here
+      firstAfter.delete(key);
+      continue;
+    }
+    const here = lastHere.get(key);
+    if (here !== undefined && !firstAfter.has(key)) firstAfter.set(key, s);
+  }
+
+  if (firstAfter.size < ENOUGH_PLACE_DAYS) return null;
+
+  const rows = [...firstAfter.values()];
+  const times = rows.map((r) => minuteOfDay(r.at)).sort((a, b) => a - b);
+  const mid = Math.floor(times.length / 2);
+  const minute = times.length % 2 ? times[mid] : times[mid - 1];
+
+  const tally = new Map<string, number>();
+  for (const r of rows) tally.set(r.place, (tally.get(r.place) ?? 0) + 1);
+  let best = rows[0].place;
+  for (const [name, n] of tally) if (n > (tally.get(best) ?? 0)) best = name;
+
+  return { minute, place: best };
+}
+/**
  * The minute of the day you are usually next seen SOMEWHERE ELSE, or null.
  *
  * **Reported from the phone on 2026-09-01, and it is the honest half of a departure.**
@@ -193,29 +241,7 @@ export function daysSeenAt(seen: Seen[], place: string, now: Date): number {
  * a pocket, and counting it would rebuild the same false claim one level up.
  */
 export function seenElsewhereBy(seen: Seen[], place: string, now: Date): number | null {
-  const today = dayKey(now.getTime());
-  const sorted = [...seen].sort((a, b) => a.at - b.at);
-  const lastHere = new Map<string, number>();
-  const firstAfter = new Map<string, number>();
-
-  for (const s of sorted) {
-    const key = dayKey(s.at);
-    if (key === today) continue;
-    if (s.place === place) {
-      lastHere.set(key, s.at);
-      // a later sighting at the place means he had not left after all
-      firstAfter.delete(key);
-      continue;
-    }
-    const here = lastHere.get(key);
-    if (here !== undefined && !firstAfter.has(key)) firstAfter.set(key, s.at);
-  }
-
-  if (firstAfter.size < ENOUGH_PLACE_DAYS) return null;
-  const times = [...firstAfter.values()].map(minuteOfDay).sort((a, b) => a - b);
-  const mid = Math.floor(times.length / 2);
-  // the lower of the two middles on an even count, which errs toward saying nothing
-  return times.length % 2 ? times[mid] : times[mid - 1];
+  return nextSeenElsewhere(seen, place, now)?.minute ?? null;
 }
 /**
  * Whether you are at a place well past the hour you are usually gone from it.

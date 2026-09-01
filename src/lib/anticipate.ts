@@ -63,8 +63,10 @@ export type Observations = {
    * arguable instead of authoritative.
    */
   stillHereLate: boolean;
-  /** the minute of the day he is usually gone by, for the figure in the remark */
+  /** the minute he is usually seen elsewhere by, for the figure in the remark */
   goneBy: number | null;
+  /** and where that is, when the sightings name a place */
+  goneTo?: string | null;
   /**
    * The app that is furthest past its OWN usual today, from `appDeltas`.
    *
@@ -204,7 +206,9 @@ function placeRemark(o: Observations): Remark | null {
   if (!o.place || !o.stillHereLate || o.goneBy === null) return null;
   return {
     about: 'place',
-    line: `Still at ${o.place}, sir — by ${clock(o.goneBy)} you are usually somewhere else.`,
+    line: o.goneTo
+      ? `Still at ${o.place}, sir — by ${clock(o.goneBy)} you are usually at ${o.goneTo}.`
+      : `Still at ${o.place}, sir — by ${clock(o.goneBy)} you are usually somewhere else.`,
   };
 }
 

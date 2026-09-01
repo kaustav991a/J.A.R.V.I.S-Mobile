@@ -4,6 +4,7 @@ import {
   absentFrom,
   daysSeenAt,
   hereEarly,
+  nextSeenElsewhere,
   placesSeen,
   seenElsewhereBy,
   stillHereLate,
@@ -379,5 +380,54 @@ describe('still being somewhere, judged against the honest bound', () => {
       [20, 15, 35, 'Office']
     );
     expect(stillHereLate(noEvidence, 'Office', new Date(2026, 7, 21, 23, 30))).toBe(false);
+  });
+});
+
+/**
+ * Naming where you are next seen, because a named place is checkable.
+ *
+ * The panel said "by 8:04 PM you are usually elsewhere" and the answer came back
+ * instantly: *8:04 is generally in the train at Sealdah*. That is the whole argument
+ * for naming it — a figure with a place attached can be confirmed or contradicted in
+ * one sentence, and this one was confirmed in one sentence.
+ */
+describe('where you are next seen, not only when', () => {
+  const commute = seen(
+    [17, 18, 30, 'Office'],
+    [17, 20, 4, 'Sealdah Rail Station'],
+    [17, 21, 30, 'Home'],
+    [18, 18, 45, 'Office'],
+    [18, 20, 10, 'Sealdah Rail Station'],
+    [19, 18, 40, 'Office'],
+    [19, 19, 58, 'Sealdah Rail Station'],
+    [20, 18, 35, 'Office'],
+    [20, 20, 12, 'Sealdah Rail Station']
+  );
+
+  it('names the place you are usually seen at next', () => {
+    expect(nextSeenElsewhere(commute, 'Office', NOW)?.place).toBe('Sealdah Rail Station');
+  });
+
+  it('carries the hour with it', () => {
+    // 20:04, 20:10, 19:58, 20:12 -> 20:04 (lower middle of an even count)
+    expect(nextSeenElsewhere(commute, 'Office', NOW)?.minute).toBe(20 * 60 + 4);
+  });
+
+  it('picks the place seen most often, not merely the first ever seen', () => {
+    const mostly = [
+      ...commute,
+      ...seen([16, 18, 30, 'Office'], [16, 20, 0, 'Ichapur Station']),
+    ];
+    expect(nextSeenElsewhere(mostly, 'Office', NOW)?.place).toBe('Sealdah Rail Station');
+  });
+
+  it('says nothing when no day ever showed him leaving', () => {
+    const noEvidence = seen(
+      [17, 15, 40, 'Office'],
+      [18, 15, 30, 'Office'],
+      [19, 15, 50, 'Office'],
+      [20, 15, 35, 'Office']
+    );
+    expect(nextSeenElsewhere(noEvidence, 'Office', NOW)).toBeNull();
   });
 });

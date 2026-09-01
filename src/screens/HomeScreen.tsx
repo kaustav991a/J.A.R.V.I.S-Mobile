@@ -23,7 +23,7 @@ import { cloudArmedState, dayKey } from '../lib/commute';
 import type { CloudArmedState } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
-import { daysSeenAt, loadSeen, seenElsewhereBy } from '../lib/timeline';
+import { daysSeenAt, loadSeen, nextSeenElsewhere } from '../lib/timeline';
 import { forgetSpoken, loadSpoken } from '../lib/spokenStore';
 import { loadKnown } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
@@ -173,9 +173,16 @@ export function HomeScreen() {
             place,
             // what it actually learned, so the row can say it rather than call itself
             // ready — the same figure the anticipation remark uses, from the same call
-            // the hour he is usually elsewhere, not the hour he last opened the app
-            // here — the panel said 3:40 PM about an office he leaves at seven
-            goneBy: place ? seenElsewhereBy(seen, place, now) : null,
+            /**
+             * The hour he is usually seen somewhere else, and where that is.
+             *
+             * Not the hour he last opened the app here: that said 3:40 PM about an
+             * office he leaves at seven. Naming the place is what made the new
+             * figure checkable — 8:04 PM turned out to be the train at Sealdah, and
+             * he could say so the moment he read it.
+             */
+            goneBy: place ? nextSeenElsewhere(seen, place, now)?.minute ?? null : null,
+            goneTo: place ? nextSeenElsewhere(seen, place, now)?.place ?? null : null,
             spokenToday: spoken?.day === dayKey(now),
           };
           /**

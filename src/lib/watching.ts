@@ -47,6 +47,8 @@ export type WatchFacts = {
    * `ENOUGH_PLACE_DAYS`, and the row must not invent a time to fill the space.
    */
   goneBy: number | null;
+  /** where he is usually seen at that hour, when the sightings name one */
+  goneTo?: string | null;
   /** whether the one remark a day has already been spent */
   spokenToday: boolean;
 };
@@ -102,7 +104,7 @@ export function watching(f: WatchFacts): WatchRow[] {
        * old figure, so the row said "last seen there" above a number that meant the
        * opposite. Both now say the same thing.
        */
-      label: 'By now you are usually elsewhere',
+      label: 'By now you are usually gone',
       // the place he is at now, because that is the one he could be remarked on for.
       // Naming it matters: "4 more days" with no subject reads as a countdown to
       // nothing at all
@@ -113,8 +115,8 @@ export function watching(f: WatchFacts): WatchRow[] {
               // the figure itself, because that is the whole point of having learned it
               word: clockLabel(Math.floor(f.goneBy / 60), f.goneBy % 60),
               note: f.place
-                ? `The hour you are first seen somewhere other than ${f.place}, from ${f.placeDays} days. Not when you leave — the app only sees you when it is open.`
-                : `The hour you are first seen somewhere else, from ${f.placeDays} days. Not when you leave — the app only sees you when it is open.`,
+                ? `Usually at ${f.goneTo ?? 'another named place'} by then, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`
+                : `The hour you are next seen somewhere else, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`,
             }
           : // enough days, and still no median — every sighting landed on one of them.
             // `ready` because the signal is armed; no time, because there is not one

@@ -23,7 +23,7 @@ import {
   leftEarly,
   loadSeen,
   placesSeen,
-  seenElsewhereBy,
+  nextSeenElsewhere,
   stillHereLate,
   usuallyGoneBy,
 } from '../lib/timeline';
@@ -253,7 +253,8 @@ export function ChatScreen() {
             // the hour he is usually somewhere ELSE, which is the only bound the
             // sightings can put on leaving — the last-seen median said 3:40 PM about
             // an office he leaves at seven
-            goneBy: place ? seenElsewhereBy(seen, place, now) : null,
+            goneBy: place ? nextSeenElsewhere(seen, place, now)?.minute ?? null : null,
+            goneTo: place ? nextSeenElsewhere(seen, place, now)?.place ?? null : null,
             // the app that moved, rather than the day that did. Already sorted by
             // how far each is past its own usual, so the first is the finding
             topApp: apps[0] ?? null,
