@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -7,7 +7,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Ellipse, Line, Rect, Text as SvgText } from 'react-native-svg';
 
 import { labelAt, mapPlot } from '../lib/placeMap';
 import { tilesFor } from '../lib/tiles';
@@ -42,7 +42,16 @@ export function PlaceMap({
   size?: number;
 }) {
   const { accent, animations } = useAppearance();
-  const plot = mapPlot({ places, fix, size });
+  /**
+   * Flat by default, and that is not timidity.
+   *
+   * The tilt is what makes a height visible, and it costs the thing this panel was
+   * built to answer: tilted, the match circles become ellipses, and two ellipses
+   * cannot be compared by eye the way two circles can. So the overlap question keeps
+   * the flat view, and the tilt is a look.
+   */
+  const [tilt, setTilt] = useState(false);
+  const plot = mapPlot({ places, fix, size, tilt });
 
   /**
    * The sonar ring under the reading, on a View rather than an SVG attribute.
@@ -120,11 +129,12 @@ export function PlaceMap({
 
       <Svg width={size} height={size}>
         {plot.places.map((p) => (
-          <Circle
+          <Ellipse
             key={`ring-${p.label}`}
             cx={p.x}
             cy={p.y}
-            r={p.r}
+            rx={p.r}
+            ry={p.r * plot.groundSquash}
             fill={accent}
             fillOpacity={0.07}
             stroke={accent}
@@ -136,7 +146,7 @@ export function PlaceMap({
           <Circle
             testID="place-map-accuracy"
             cx={plot.you.x}
-            cy={plot.you.y}
+            cy={plot.you.y - (tilt ? plot.you.lift : 0)}
             r={plot.you.r}
             fill={COLOR.green}
             fillOpacity={0.08}
@@ -166,7 +176,53 @@ export function PlaceMap({
             </SvgText>
           );
         })}
-        {plot.you ? <Circle cx={plot.you.x} cy={plot.you.y} r={4.5} fill={COLOR.green} /> : null}
+        {plot.you && tilt && plot.you.lift > 0 ? (
+          <>
+            {/* the stalk, from the ground up to the reading */}
+            <Line
+              x1={plot.you.x}
+              y1={plot.you.y}
+              x2={plot.you.x}
+              y2={plot.you.y - plot.you.lift}
+              stroke={COLOR.green}
+              strokeOpacity={0.5}
+              strokeDasharray="2 3"
+            />
+            {/*
+              The error, drawn as the band it is.
+
+              GPS vertical error runs one and a half to three times the horizontal, so
+              this band is usually taller than a building. That is the finding, not a
+              flaw in the drawing: a floor is three metres and lives inside it.
+            */}
+            <Rect
+              testID="place-map-height-band"
+              x={plot.you.x - 5}
+              y={plot.you.y - plot.you.lift - plot.you.liftError}
+              width={10}
+              height={Math.max(plot.you.liftError * 2, 2)}
+              fill={COLOR.green}
+              fillOpacity={0.14}
+            />
+            {/* where the ground under you is, so the height has something to be above */}
+            <Ellipse
+              cx={plot.you.x}
+              cy={plot.you.y}
+              rx={5}
+              ry={5 * plot.groundSquash}
+              fill={COLOR.green}
+              fillOpacity={0.3}
+            />
+          </>
+        ) : null}
+        {plot.you ? (
+          <Circle
+            cx={plot.you.x}
+            cy={plot.you.y - (tilt ? plot.you.lift : 0)}
+            r={4.5}
+            fill={COLOR.green}
+          />
+        ) : null}
         {/* the scale bar, bottom left, so the circles are a measurement */}
         <Line
           x1={10}
@@ -198,6 +254,17 @@ export function PlaceMap({
           ]}
         />
       ) : null}
+
+      <Pressable
+        testID="place-map-tilt"
+        accessibilityRole="button"
+        accessibilityLabel={tilt ? 'Lay the map flat' : 'Tilt the map to show height'}
+        hitSlop={8}
+        onPress={() => setTilt((on) => !on)}
+        style={({ pressed }) => [styles.tilt, pressed ? styles.pressed : null]}
+      >
+        <Text style={[styles.tiltText, { color: accent }]}>{tilt ? 'FLAT' : '3D'}</Text>
+      </Pressable>
 
       <Text testID="place-map-caption" style={styles.caption}>
         {plot.overlapping
@@ -255,4 +322,7 @@ const styles = StyleSheet.create({
   /** the tiles are clipped to the canvas, or they spill across the whole screen */
   frame: { overflow: 'hidden', borderRadius: RADIUS.lg, backgroundColor: 'rgba(4,14,32,0.6)' },
   credit: { ...TYPE.meta, fontSize: 9, color: COLOR.dim, marginTop: 2 },
+  tilt: { position: 'absolute', right: 8, top: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  tiltText: { ...TYPE.dataLabel, fontSize: 10, letterSpacing: 1.5 },
+  pressed: { opacity: 0.55 },
 });

@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import { PlaceMap } from '../PlaceMap';
 import { AppearanceProvider } from '../../theme/appearance';
@@ -89,5 +89,23 @@ describe('roads under the circles', () => {
       <PlaceMap places={[HOME]} fix={{ lat: 22.75, lon: 88.37, accuracy: 20 }} />
     );
     expect(captionOf(await findByTestId('place-map-credit'))).toContain('OpenStreetMap');
+  });
+});
+
+describe('the tilted view', () => {
+  const HERE = { lat: 22.75, lon: 88.37, accuracy: 12, altitude: 24, altitudeAccuracy: 30 };
+
+  it('offers the tilt, and starts flat', async () => {
+    // flat answers the overlap question; tilted, the circles are ellipses and cannot
+    // be compared by eye — so the default is the one that measures
+    const { findByTestId, queryByTestId } = await mount(<PlaceMap places={[HOME]} fix={HERE} />);
+    expect(await findByTestId('place-map-tilt')).toBeTruthy();
+    expect(queryByTestId('place-map-height-band')).toBeNull();
+  });
+
+  it('draws the height as a band once tilted', async () => {
+    const { findByTestId } = await mount(<PlaceMap places={[HOME]} fix={HERE} />);
+    fireEvent.press(await findByTestId('place-map-tilt'));
+    expect(await findByTestId('place-map-height-band')).toBeTruthy();
   });
 });
