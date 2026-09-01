@@ -24,7 +24,7 @@ import type { CloudArmedState } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
 import { daysSeenAt, loadSeen, usuallyGoneBy } from '../lib/timeline';
-import { loadSpoken } from '../lib/spokenStore';
+import { forgetSpoken, loadSpoken } from '../lib/spokenStore';
 import { loadKnown } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { FIX_TTL_MS, currentFix } from '../lib/place';
@@ -494,7 +494,18 @@ export function HomeScreen() {
       {watch ? (
         <>
           <SectionLabel>What he is watching</SectionLabel>
-          <WatchingPanel facts={watch} />
+          <WatchingPanel
+            facts={watch}
+            /**
+             * Give the day back, and show the result immediately.
+             *
+             * The remark itself is decided when Chat comes into focus, so this only
+             * clears the budget — the next visit to Chat is what actually speaks.
+             */
+            onClearToday={() => {
+              void forgetSpoken().then(() => setWatch({ ...watch, spokenToday: false }));
+            }}
+          />
         </>
       ) : null}
 

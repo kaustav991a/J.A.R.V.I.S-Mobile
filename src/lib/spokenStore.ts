@@ -109,3 +109,24 @@ export function spokeRecently(
   const days = daysBetween(last, now);
   return days !== null && days < cooldownDays;
 }
+
+/**
+ * Forget what was said, so a remark can be induced rather than waited for.
+ *
+ * One remark a day is the whole budget, which makes the anticipation the hardest
+ * thing in this app to observe: a wrong remark, or simply an early one, costs a day
+ * before the next can be seen. `anticipate-v1` sat `untested` on exactly that — the
+ * rebuilt triggers were never broken, they were unobservable on demand.
+ *
+ * The marker is dropped whole rather than backdated. The cooldowns are per subject,
+ * so a half-cleared marker would leave some subjects able to speak and others silent
+ * — a state stranger than either of the two it sits between, and one nobody reading
+ * the screen could account for.
+ */
+export async function forgetSpoken(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(SPOKEN_KEY);
+  } catch {
+    // nothing to be done, and the budget simply stays spent
+  }
+}

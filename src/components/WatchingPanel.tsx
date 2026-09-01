@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { readyCount, watching } from '../lib/watching';
@@ -21,7 +21,26 @@ import type { WatchFacts } from '../lib/watching';
  * is not knowable in advance, and a promise this panel cannot keep would be worse than
  * no panel.
  */
-export function WatchingPanel({ facts, testID = 'watching-panel' }: { facts: WatchFacts; testID?: string }) {
+/**
+ * The panel gains one control, and only while the budget is spent.
+ *
+ * One remark a day makes anticipation the hardest thing here to watch: a wrong
+ * remark, or an early one, costs a day before the next can be seen — which is why
+ * `anticipate-v1` sat unexercised while its triggers were fine. Clearing the marker
+ * lets the next remark be induced instead of waited for.
+ *
+ * Hidden when nothing has been said today, because a control that would do nothing
+ * teaches that the rest of the panel is decoration.
+ */
+export function WatchingPanel({
+  facts,
+  onClearToday,
+  testID = 'watching-panel',
+}: {
+  facts: WatchFacts;
+  onClearToday?: () => void;
+  testID?: string;
+}) {
   const rows = watching(facts);
   const ready = readyCount(rows);
 
@@ -32,6 +51,18 @@ export function WatchingPanel({ facts, testID = 'watching-panel' }: { facts: Wat
         <Text testID="watching-summary" style={styles.count}>
           {`${ready} OF ${rows.length} READY`}
         </Text>
+        {facts.spokenToday && onClearToday ? (
+          <Pressable
+            testID="watching-clear"
+            accessibilityRole="button"
+            accessibilityLabel="Clear today's remark, so the next one can be seen now"
+            hitSlop={8}
+            onPress={onClearToday}
+            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+          >
+            <Text style={styles.clear}>CLEAR</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {rows.map((r) => (
@@ -68,6 +99,8 @@ export function WatchingPanel({ facts, testID = 'watching-panel' }: { facts: Wat
 }
 
 const styles = StyleSheet.create({
+  clear: { ...TYPE.dataLabel, fontSize: 10, letterSpacing: 1.5, color: COLOR.dim, marginLeft: SPACE.sm },
+  pressed: { opacity: 0.55 },
   panel: {
     backgroundColor: COLOR.panel,
     borderRadius: RADIUS.md,
