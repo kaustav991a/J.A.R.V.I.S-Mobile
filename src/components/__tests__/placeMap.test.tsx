@@ -61,3 +61,33 @@ describe('the place map', () => {
     expect(await findByTestId('place-map-empty')).toBeTruthy();
   });
 });
+
+describe('the reading pulses, and stops when asked to', () => {
+  it('draws a sonar ring over the reading', async () => {
+    const { findByTestId } = await mount(
+      <PlaceMap places={[HOME]} fix={{ lat: 22.75, lon: 88.37, accuracy: 20 }} />
+    );
+    expect(await findByTestId('place-map-pulse')).toBeTruthy();
+  });
+
+  it('has nothing to pulse when there is no reading', async () => {
+    const { queryByTestId } = await mount(<PlaceMap places={[HOME]} fix={null} />);
+    expect(queryByTestId('place-map-pulse')).toBeNull();
+  });
+});
+
+describe('roads under the circles', () => {
+  it('draws map tiles when it knows where to centre them', async () => {
+    const { findAllByTestId } = await mount(
+      <PlaceMap places={[HOME]} fix={{ lat: 22.75, lon: 88.37, accuracy: 20 }} />
+    );
+    expect((await findAllByTestId('place-map-tile')).length).toBeGreaterThan(0);
+  });
+
+  it('credits OpenStreetMap, because the licence asks and the servers are donated', async () => {
+    const { findByTestId } = await mount(
+      <PlaceMap places={[HOME]} fix={{ lat: 22.75, lon: 88.37, accuracy: 20 }} />
+    );
+    expect(captionOf(await findByTestId('place-map-credit'))).toContain('OpenStreetMap');
+  });
+});
