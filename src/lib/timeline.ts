@@ -190,22 +190,27 @@ export function stillHereLate(seen: Seen[], place: string, now: Date): boolean {
  */
 export function usuallyHereBy(seen: Seen[], place: string, now: Date): number | null {
   const today = dayKey(now.getTime());
-  const firstPerDay = new Map<string, number>();
+  const sorted = [...seen].sort((a, b) => a.at - b.at);
+  const arrivals = new Map<string, number>();
 
-  for (const s of seen) {
+  for (let i = 0; i < sorted.length; i += 1) {
+    const s = sorted[i];
     if (s.place !== place) continue;
     const key = dayKey(s.at);
-    if (key === today) continue;
-    const minute = minuteOfDay(s.at);
-    const held = firstPerDay.get(key);
-    if (held === undefined || minute < held) firstPerDay.set(key, minute);
+    if (key === today || arrivals.has(key)) continue;
+    // an arrival is a stay that began somewhere else. Without this the median is of
+    // first-app-opens, which for the place you wake up in is not an arrival at all —
+    // and it produced "usually you are there by 10:49 AM" about somebody's own home
+    const before = sorted[i - 1];
+    if (!before || before.place === place) continue;
+    arrivals.set(key, minuteOfDay(s.at));
   }
 
-  if (firstPerDay.size < ENOUGH_PLACE_DAYS) return null;
-  const sorted = [...firstPerDay.values()].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
+  if (arrivals.size < ENOUGH_PLACE_DAYS) return null;
+  const times = [...arrivals.values()].sort((a, b) => a - b);
+  const mid = Math.floor(times.length / 2);
   // the lower of the two middles on an even count, matching `usuallyGoneBy`
-  return sorted.length % 2 ? sorted[mid] : sorted[mid - 1];
+  return times.length % 2 ? times[mid] : times[mid - 1];
 }
 
 /** how far before the usual arrival before being early is worth a remark */
@@ -226,7 +231,21 @@ export function hereEarly(
 ): { usualBy: number; at: number } | null {
   const usualBy = usuallyHereBy(seen, place, now);
   if (usualBy === null) return null;
-  const at = minuteOfDay(now.getTime());
+
+  /**
+   * You have to have arrived, and it is the ARRIVAL that is early — not the clock.
+   *
+   * Without this the remark fires on a stay that began yesterday: on 2026-09-01 it
+   * told somebody who had been at home all night that he was at Home early. The visit
+   * he was in had started the previous evening, and nothing about that morning was an
+   * arrival at all.
+   */
+  const visit = visitNow(seen, now);
+  if (!visit || visit.place !== place || !visit.arrived) return null;
+  // the same day, too: a stay that began yesterday is not today's arrival
+  if (dayKey(visit.since) !== dayKey(now.getTime())) return null;
+
+  const at = minuteOfDay(visit.since);
   return at <= usualBy - EARLY_BY_MIN ? { usualBy, at } : null;
 }
 
@@ -279,4 +298,164 @@ export function absentFrom(
 /** every place this store has ever seen him at, each named once */
 export function placesSeen(seen: Seen[]): string[] {
   return [...new Set(seen.map((s) => s.place))];
+}
+
+/**
+ * Where you usually are at this hour, and what today is doing instead.
+ *
+ * **Added 2026-09-01, replacing an arrival model that produced a wrong remark on its
+ * first outing.** It said *"At Home early, sir — usually you are there by 10:49 AM"*
+ * to somebody who had been home all night and was leaving for the office. Two faults,
+ * and the smaller one was the wording: nothing had arrived, and 10:49 was never an
+ * arrival time. A sighting is written whenever the app resolves a named place, so the
+ * first sighting of a day is the first time the app was OPENED there — which, for the
+ * place you wake up in, has nothing to do with arriving.
+ *
+ * So this leans on what the data can actually carry. **Presence and departure are
+ * observable** — the app gets opened at home before leaving, so "last seen at Home
+ * around 08:10 on a Tuesday" is a real measurement. **Arrival is barely observable**
+ * and is treated as the weak signal it is.
+ *
+ * Everything here is weekday-matched. A Mon–Fri pattern asserted onto a Saturday is
+ * what made the gateway announce a shift that did not exist, and this file is where
+ * that mistake would be repeated.
+ */
+
+/** how many of the same weekday before a routine is a routine rather than a coincidence */
+export const ROUTINE_DAYS = 3;
+
+/** how wide a window counts as "around now" when asking where you usually are */
+export const ROUTINE_WINDOW_MIN = 60;
+
+/** how much earlier than usual a departure has to be before it is worth saying */
+export const LEFT_EARLY_MIN = 30;
+
+export type Visit = {
+  place: string;
+  /** when this stay began — the start of the unbroken run of sightings here */
+  since: number;
+  /** whether it began by coming from somewhere else, rather than being the first thing ever seen */
+  arrived: boolean;
+};
+
+/**
+ * The stay you are in the middle of, and whether it began with an arrival.
+ *
+ * The trailing run of sightings at one place is one visit, however many app-opens it
+ * contains and however long it spans: last night at Home and this morning at Home are
+ * the same stay, which is precisely why "you are here early" must not fire on it.
+ */
+export function visitNow(seen: Seen[], _now: Date): Visit | null {
+  if (!seen.length) return null;
+  const sorted = [...seen].sort((a, b) => a.at - b.at);
+  const place = sorted[sorted.length - 1].place;
+  let i = sorted.length - 1;
+  while (i > 0 && sorted[i - 1].place === place) i -= 1;
+  // an earlier sighting exists and, by construction, is somewhere else
+  return { place, since: sorted[i].at, arrived: i > 0 };
+}
+
+/** every day this weekday has been watched, as day key to the sightings on it */
+function sameWeekdayDays(seen: Seen[], now: Date): Map<string, Seen[]> {
+  const today = dayKey(now.getTime());
+  const weekday = now.getDay();
+  const days = new Map<string, Seen[]>();
+  for (const s of seen) {
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    if (new Date(s.at).getDay() !== weekday) continue;
+    const held = days.get(key);
+    if (held) held.push(s);
+    else days.set(key, [s]);
+  }
+  return days;
+}
+
+/**
+ * The place you are usually at around this time on this weekday.
+ *
+ * Counted in days rather than in sightings, so a morning spent refreshing the app at
+ * home does not outvote four Tuesdays. Null whenever it has watched too few of this
+ * weekday, or has never watched this hour at all — an hour with no history is not an
+ * hour you are usually somewhere else.
+ */
+export function usualPlaceAt(
+  seen: Seen[],
+  now: Date,
+  windowMin: number = ROUTINE_WINDOW_MIN
+): { place: string; days: number } | null {
+  const minute = minuteOfDay(now.getTime());
+  const daysPerPlace = new Map<string, Set<string>>();
+
+  for (const [key, rows] of sameWeekdayDays(seen, now)) {
+    for (const s of rows) {
+      if (Math.abs(minuteOfDay(s.at) - minute) > windowMin) continue;
+      const held = daysPerPlace.get(s.place) ?? new Set<string>();
+      held.add(key);
+      daysPerPlace.set(s.place, held);
+    }
+  }
+
+  let best: { place: string; days: number } | null = null;
+  for (const [place, days] of daysPerPlace) {
+    if (!best || days.size > best.days) best = { place, days: days.size };
+  }
+  return best && best.days >= ROUTINE_DAYS ? best : null;
+}
+
+/**
+ * Being somewhere your own weekdays say you are not.
+ *
+ * Names where you usually are rather than merely observing that you are not there,
+ * because "you are not at the office" is an accusation and "you are usually at the
+ * office around now" is a measurement.
+ */
+export function elsewhereNow(
+  seen: Seen[],
+  place: string | null,
+  now: Date
+): { usual: string; days: number } | null {
+  if (!place) return null;
+  const usual = usualPlaceAt(seen, now);
+  if (!usual || usual.place === place) return null;
+  return { usual: usual.place, days: usual.days };
+}
+
+/**
+ * Leaving somewhere earlier than this weekday usually does.
+ *
+ * The strongest thing this data supports, and the one the routine was described by:
+ * *the app knows I am at home till about 8:10 Mon–Fri.* It measures **last seen**, not
+ * left — so it fires only once you are demonstrably somewhere else, which is what
+ * turns a quiet morning into an observed departure rather than a guess.
+ */
+export function leftEarly(
+  seen: Seen[],
+  place: string,
+  now: Date,
+  currentPlace: string | null
+): { place: string; lastSeen: number; usualBy: number; days: number } | null {
+  // still standing there: not a departure, whatever the clock says
+  if (!currentPlace || currentPlace === place) return null;
+
+  const today = dayKey(now.getTime());
+  const todayHere = seen.filter((s) => s.place === place && dayKey(s.at) === today);
+  if (!todayHere.length) return null;
+  const lastSeen = Math.max(...todayHere.map((s) => minuteOfDay(s.at)));
+
+  const lastPerDay: number[] = [];
+  for (const [, rows] of sameWeekdayDays(seen, now)) {
+    const here = rows.filter((s) => s.place === place);
+    if (here.length) lastPerDay.push(Math.max(...here.map((s) => minuteOfDay(s.at))));
+  }
+  if (lastPerDay.length < ROUTINE_DAYS) return null;
+
+  const sorted = [...lastPerDay].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  // the lower of the two middles on an even count, which errs toward saying nothing
+  const usualBy = sorted.length % 2 ? sorted[mid] : sorted[mid - 1];
+
+  return lastSeen <= usualBy - LEFT_EARLY_MIN
+    ? { place, lastSeen, usualBy, days: sorted.length }
+    : null;
 }

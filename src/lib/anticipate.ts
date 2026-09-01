@@ -73,8 +73,26 @@ export type Observations = {
    * fallback for a heavy day spread across everything.
    */
   topApp: { app: string; today: number; usual: number; days: number } | null;
-  /** somewhere well before the hour he is usually there, from `hereEarly` */
+  /**
+   * An arrival well before the hour he usually gets there, from `hereEarly`.
+   *
+   * The weak signal of the three, and it says so in its own guard: a sighting only
+   * happens when the app is opened, so an arrival is barely observable. It fires only
+   * on a stay that began today and began somewhere else — the repair for a remark
+   * that told somebody who had been home all night that he was at Home early.
+   */
   early: { place: string; usualBy: number; at: number } | null;
+  /**
+   * Gone from somewhere earlier than this weekday usually goes, from `leftEarly`.
+   *
+   * The strongest thing the sighting log supports and the one the routine was
+   * described by — *the app knows I am at home till about 8:10 Mon–Fri*. It fires
+   * only once he is demonstrably somewhere else, so it is an observed departure
+   * rather than a quiet morning being guessed at.
+   */
+  left: { place: string; lastSeen: number; usualBy: number; days: number } | null;
+  /** somewhere his own weekdays say he is not, naming where he usually is instead */
+  elsewhere: { usual: string; days: number } | null;
   /** not somewhere he is usually at by now on this weekday, from `absentFrom` */
   absent: { place: string; usualBy: number; days: number } | null;
   /**
@@ -152,7 +170,9 @@ export function anticipate(o: Observations): Remark | null {
    */
   const candidates = [
     placeRemark(o),
+    leftRemark(o),
     absentRemark(o),
+    elsewhereRemark(o),
     earlyRemark(o),
     scheduleRemark(o),
     appRemark(o),
@@ -292,5 +312,46 @@ function usageRemark(o: Observations): Remark | null {
   return {
     about: 'usage',
     line: `${spell(u.today)} on the phone today against a usual ${spell(u.usual)}, sir.`,
+  };
+}
+
+/**
+ * Gone earlier than this weekday usually goes.
+ *
+ * Ranked directly under still-being-somewhere-late and above everything about a day's
+ * totals, because it is the sharpest thing the sighting log can say: not that you are
+ * somewhere, but that today broke a pattern the app measured rather than was told.
+ *
+ * **It says "seen", never "left".** A sighting happens when the app is opened, so the
+ * honest claim is about the last time he was observed there — and the day count is
+ * quoted for the same reason the other figures are, so a wrong estimate is arguable
+ * rather than authoritative.
+ */
+function leftRemark(o: Observations): Remark | null {
+  const l = o.left;
+  if (!l) return null;
+  return {
+    about: 'left',
+    line:
+      `Last seen at ${l.place} at ${clock(l.lastSeen)}, sir. ` +
+      `On ${l.days} days like this one you are there until ${clock(l.usualBy)}.`,
+  };
+}
+
+/**
+ * Somewhere his own weekdays say he is not.
+ *
+ * Names where he usually is rather than observing where he is not: "you are not at
+ * the office" is an accusation, and "around now you are usually at the office" is a
+ * measurement he can disagree with. Ranked below the departure remark because it is
+ * the same fact with the interesting half removed — a morning that broke the routine
+ * is better described by when it broke than by where it ended up.
+ */
+function elsewhereRemark(o: Observations): Remark | null {
+  const e = o.elsewhere;
+  if (!e) return null;
+  return {
+    about: 'elsewhere',
+    line: `Around now, sir, ${e.days} days like this one have you at ${e.usual}.`,
   };
 }

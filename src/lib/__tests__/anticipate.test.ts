@@ -26,6 +26,8 @@ const seen = (over: Partial<Observations> = {}): Observations => ({
   topApp: null,
   early: null,
   absent: null,
+  left: null,
+  elsewhere: null,
   schedule: null,
   spokenBefore: null,
   ...over,
@@ -338,5 +340,67 @@ describe('a departure time that no longer matches what you do', () => {
   it('says what it measured, which is last seen and not left', () => {
     // sightings need the app open, so it cannot claim to know when you walked out
     expect(anticipate(drifted)?.line).toMatch(/seen/i);
+  });
+});
+
+/**
+ * Today against your other Tuesdays.
+ *
+ * The redesign of 2026-09-01. The first cut asked whether you had reached a place
+ * earlier than you usually reach it, which told somebody who had been home all night
+ * that he was at Home early. The question that actually earns a remark is **what is
+ * different about today** — you left before you usually do, or you are somewhere your
+ * own weekdays say you are not.
+ */
+describe('leaving earlier than you usually do', () => {
+  // 8:45, not 7:45: the quiet hours start at 8, so a remark about a 7:05 departure
+  // can only be made once the phone is allowed to speak at all
+  const left = seen({
+    now: at(8, 45),
+    left: { place: 'Home', lastSeen: 7 * 60 + 5, usualBy: 8 * 60 + 10, days: 4 },
+  });
+
+  it('names both times and the days behind them', () => {
+    const said = anticipate(left);
+    expect(said?.about).toBe('left');
+    expect(said?.line).toContain('Home');
+    expect(said?.line).toMatch(/7:05/);
+    expect(said?.line).toMatch(/8:10/);
+    expect(said?.line).toContain('4');
+  });
+
+  it('says seen rather than left, because that is what was measured', () => {
+    // a sighting needs the app open, so the app knows when it last SAW you there
+    expect(anticipate(left)?.line).toMatch(/seen/i);
+  });
+
+  it('outranks being somewhere unusual, which is the same fact with less in it', () => {
+    const said = anticipate({ ...left, elsewhere: { usual: 'Home', days: 4 } });
+    expect(said?.about).toBe('left');
+  });
+
+  it('spends `sir` once', () => {
+    expect(anticipate(left)!.line.match(/\bsir\b/gi)).toHaveLength(1);
+  });
+});
+
+describe('being somewhere your weekdays say you are not', () => {
+  const away = seen({ now: at(8, 30), elsewhere: { usual: 'Home', days: 4 } });
+
+  it('names where you usually are, rather than where you are not', () => {
+    const said = anticipate(away);
+    expect(said?.about).toBe('elsewhere');
+    expect(said?.line).toContain('Home');
+    expect(said?.line).toContain('4');
+  });
+
+  it('loses to still being somewhere late, which is about right now', () => {
+    const said = anticipate({
+      ...away,
+      place: 'Office',
+      stillHereLate: true,
+      goneBy: 18 * 60 + 40,
+    });
+    expect(said?.about).toBe('place');
   });
 });

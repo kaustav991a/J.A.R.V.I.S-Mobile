@@ -133,16 +133,36 @@ describe('when you are usually there', () => {
     expect(usuallyHereBy(seen([17, 9, 0, 'Office'], [18, 9, 10, 'Office']), 'Office', NOW)).toBeNull();
   });
 
-  it('takes the median of the first sighting each day', () => {
+  it('takes the median of the ARRIVALS, not of the first app-open', () => {
+    // Each day begins at Home and then reaches the Office: only the second of those
+    // is an arrival. Counting first-sightings instead is what produced "usually you
+    // are there by 10:49 AM" about somebody's own home on 2026-09-01 — the first
+    // sighting of a day is just the first time the app was opened there.
     // 9:00, 9:10, 8:50, 9:05 -> 9:00 (lower middle of an even count)
     const arrivals = seen(
+      [17, 7, 30, 'Home'],
       [17, 9, 0, 'Office'],
       [17, 18, 30, 'Office'],
+      [18, 7, 40, 'Home'],
+      [18, 9, 10, 'Office'],
+      [19, 7, 20, 'Home'],
+      [19, 8, 50, 'Office'],
+      [20, 7, 35, 'Home'],
+      [20, 9, 5, 'Office']
+    );
+    expect(usuallyHereBy(arrivals, 'Office', NOW)).toBe(9 * 60);
+  });
+
+  it('does not count a stay it never saw begin', () => {
+    // sightings at one place and nothing before them: the app has no evidence anybody
+    // arrived, so it has no arrival time to quote
+    const noArrivals = seen(
+      [17, 9, 0, 'Office'],
       [18, 9, 10, 'Office'],
       [19, 8, 50, 'Office'],
       [20, 9, 5, 'Office']
     );
-    expect(usuallyHereBy(arrivals, 'Office', NOW)).toBe(9 * 60);
+    expect(usuallyHereBy(noArrivals, 'Office', NOW)).toBeNull();
   });
 
   it('ignores today, which is the day being judged', () => {
@@ -151,27 +171,60 @@ describe('when you are usually there', () => {
   });
 });
 
-describe('being somewhere earlier than usual', () => {
+describe('arriving somewhere earlier than usual', () => {
+  /** four days of leaving Home and reaching the Office around nine */
   const arrivals = seen(
+    [17, 7, 30, 'Home'],
     [17, 9, 0, 'Office'],
+    [18, 7, 40, 'Home'],
     [18, 9, 10, 'Office'],
+    [19, 7, 20, 'Home'],
     [19, 8, 50, 'Office'],
+    [20, 7, 35, 'Home'],
     [20, 9, 5, 'Office']
   );
 
-  it('is nothing to remark on ten minutes early', () => {
-    expect(hereEarly(arrivals, 'Office', new Date(2026, 7, 21, 8, 50))).toBeNull();
-  });
+  /** today: left Home at 7:10 and reached the Office at 7:55 */
+  const today = [...arrivals, ...seen([21, 7, 10, 'Home'], [21, 7, 55, 'Office'])];
 
   it('is worth saying an hour early, with the usual named', () => {
-    expect(hereEarly(arrivals, 'Office', new Date(2026, 7, 21, 7, 55))).toEqual({
+    expect(hereEarly(today, 'Office', new Date(2026, 7, 21, 8, 0))).toEqual({
       usualBy: 9 * 60,
       at: 7 * 60 + 55,
     });
   });
 
+  it('times the arrival, not the moment somebody looked at the phone', () => {
+    // asked at 8:30, the remark is still about a 7:55 arrival
+    expect(hereEarly(today, 'Office', new Date(2026, 7, 21, 8, 30))?.at).toBe(7 * 60 + 55);
+  });
+
+  it('is nothing to remark on ten minutes early', () => {
+    const barely = [...arrivals, ...seen([21, 7, 10, 'Home'], [21, 8, 50, 'Office'])];
+    expect(hereEarly(barely, 'Office', new Date(2026, 7, 21, 9, 0))).toBeNull();
+  });
+
   it('says nothing about arriving late, which the departure side does not cover either', () => {
-    expect(hereEarly(arrivals, 'Office', new Date(2026, 7, 21, 10, 30))).toBeNull();
+    const late = [...arrivals, ...seen([21, 7, 10, 'Home'], [21, 10, 30, 'Office'])];
+    expect(hereEarly(late, 'Office', new Date(2026, 7, 21, 10, 35))).toBeNull();
+  });
+
+  it('**says nothing about a stay that began yesterday**', () => {
+    // the bug, pinned: at Home all night, leaving for the office, told he was at Home
+    // early. Nothing arrived — the visit he was in had started the evening before
+    const overnight = seen(
+      [17, 19, 0, 'Home'],
+      [17, 9, 0, 'Office'],
+      [18, 19, 10, 'Home'],
+      [18, 9, 0, 'Office'],
+      [19, 19, 5, 'Home'],
+      [19, 9, 0, 'Office'],
+      [20, 19, 30, 'Home'],
+      [20, 9, 0, 'Office'],
+      [20, 22, 0, 'Home'],
+      [21, 7, 40, 'Home']
+    );
+    expect(hereEarly(overnight, 'Home', new Date(2026, 7, 21, 8, 11))).toBeNull();
   });
 });
 

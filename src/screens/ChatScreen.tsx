@@ -15,7 +15,17 @@ import { turnMark } from '../lib/turnMark';
 import { captionOf } from '../lib/photoTurn';
 import { anticipate } from '../lib/anticipate';
 import { loadSpoken, noteSpoken } from '../lib/spokenStore';
-import { absentFrom, daysSeenAt, hereEarly, loadSeen, placesSeen, stillHereLate, usuallyGoneBy } from '../lib/timeline';
+import {
+  absentFrom,
+  daysSeenAt,
+  elsewhereNow,
+  hereEarly,
+  leftEarly,
+  loadSeen,
+  placesSeen,
+  stillHereLate,
+  usuallyGoneBy,
+} from '../lib/timeline';
 import { appDeltas, usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { dayKey, dueToday, loadCommute, scheduleDrift } from '../lib/commute';
@@ -266,6 +276,20 @@ export function ChatScreen() {
                   return a ? { place: label, ...a } : null;
                 })
                 .find(Boolean) ?? null,
+            /**
+             * Gone from somewhere earlier than this weekday usually goes.
+             *
+             * Every place the log knows, because the interesting one is the place he
+             * has *left* — by definition not the place the phone can see him at.
+             * `leftEarly` refuses unless he is demonstrably somewhere else, so this
+             * cannot fire about a room he is standing in.
+             */
+            left:
+              placesSeen(seen)
+                .map((label) => leftEarly(seen, label, now, place))
+                .find(Boolean) ?? null,
+            /** somewhere his own weekdays say he is not, naming where he usually is */
+            elsewhere: elsewhereNow(seen, place, now),
             // the schedule he typed against the hour he is measurably gone by
             schedule: scheduleDrift(commute, now, (label) => ({
               goneBy: usuallyGoneBy(seen, label, now),
