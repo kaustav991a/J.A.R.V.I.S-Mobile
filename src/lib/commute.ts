@@ -613,3 +613,33 @@ export function scheduleDrift(
   }
   return null;
 }
+
+/**
+ * Push the upload stamp past its window, so the stale state can be seen.
+ *
+ * `status-panel` sat `partial` from 2026-08-24 over exactly one thing: the briefing
+ * row's third state, `CANNOT TELL`, which needs this stamp older than
+ * `CLOUD_TTL_HOURS`. On a cloud-linked phone it refreshes on every connect, so it
+ * never goes stale on its own, and the only lever that would fake it is moving the
+ * phone's clock — **which must not be done here**: the location timeline is mid-count
+ * and the whole journal is time-keyed, so a clock move would cost far more than the
+ * row is worth.
+ *
+ * Aging the stamp itself costs nothing else. The schedule is untouched, the gateway's
+ * copy is untouched, and the next cloud connect writes a fresh stamp — the same
+ * self-healing shape as unregistering the fallback to read its unarmed sentence.
+ *
+ * **A phone that has never uploaded is left alone.** `never` and `stale` are different
+ * facts and the panel says different things about them; inventing a stamp here would
+ * make the app claim an upload that never happened.
+ */
+export async function ageCloudStamp(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(CLOUD_KEY);
+    if (!raw || !Number.isFinite(Number(raw))) return;
+    // an hour past the window: unambiguously stale, and still recognisably a stamp
+    await AsyncStorage.setItem(CLOUD_KEY, String(Date.now() - (CLOUD_TTL_HOURS + 1) * 3_600_000));
+  } catch {
+    // the state stays whatever it was, which is the same as not having asked
+  }
+}

@@ -13,6 +13,7 @@ import {
   loadCommute,
   markBriefed,
   markCloudArmed,
+  ageCloudStamp,
   saveCommute,
   scheduleDrift,
 } from '../commute';
@@ -651,5 +652,45 @@ describe('a schedule that no longer matches what you do', () => {
 
   it('ignores leaving LATER than the schedule, which the briefing already covers', () => {
     expect(scheduleDrift(at('office', 9), friday(12), measured(9 * 60 + 40, 6))).toBeNull();
+  });
+});
+
+/**
+ * Making the stale state reachable, so the panel that reports it can be read.
+ *
+ * `status-panel` has been `partial` since 2026-08-24 over one row: the briefing's third
+ * state, `CANNOT TELL`, which needs the upload stamp older than 48 hours. On a
+ * cloud-linked phone the stamp refreshes on every connect, so it never goes stale, and
+ * the only lever that would fake it is moving the phone's clock — **which must not be
+ * done**, because the timeline is mid-count and the journal is time-keyed.
+ *
+ * So the stamp is aged directly. Nothing else moves: not the clock, not the schedule,
+ * not the gateway's copy. The next cloud connect rewrites it, which is the same
+ * self-healing shape as the fallback's unregister check.
+ */
+describe('aging the cloud stamp, to see what stale looks like', () => {
+  it('turns an armed phone stale without touching the clock', async () => {
+    await markCloudArmed(Date.now());
+    expect(await cloudArmedState()).toBe('armed');
+
+    await ageCloudStamp();
+    expect(await cloudArmedState()).toBe('stale');
+  });
+
+  it('ages it past the window rather than to some arbitrary moment', async () => {
+    await markCloudArmed(Date.now());
+    await ageCloudStamp();
+    // an hour past, so it is unambiguously stale and still recognisably a stamp
+    const age = Date.now() - Number(await AsyncStorage.getItem('jarvis_commute_cloud'));
+    expect(age).toBeGreaterThan(CLOUD_TTL_HOURS * 3_600_000);
+    expect(age).toBeLessThan((CLOUD_TTL_HOURS + 4) * 3_600_000);
+  });
+
+  it('leaves a phone that has never uploaded alone', async () => {
+    // `never` and `stale` are different facts and the panel says different things for
+    // them; aging nothing must not invent an upload that never happened
+    await AsyncStorage.removeItem('jarvis_commute_cloud');
+    await ageCloudStamp();
+    expect(await cloudArmedState()).toBe('never');
   });
 });

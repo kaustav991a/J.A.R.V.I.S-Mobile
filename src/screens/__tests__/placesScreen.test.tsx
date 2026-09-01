@@ -1,5 +1,7 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cloudArmedState, markCloudArmed } from '../../lib/commute';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppearanceProvider } from '../../theme/appearance';
 import { PlacesScreen } from '../PlacesScreen';
@@ -220,5 +222,37 @@ describe('proving the fallback says so when it is not armed', () => {
     const { queryByTestId } = await mount();
     await waitFor(() => expect(mockSet).toHaveBeenCalledWith(true));
     expect(queryByTestId('commute-disarm')).toBeNull();
+  });
+});
+
+/**
+ * The gateway stamp, and making its stale state reachable.
+ *
+ * `status-panel` sat `partial` over one row: the briefing's `CANNOT TELL`, which needs
+ * the upload stamp older than 48 hours. It refreshes on every cloud connect, so it
+ * never goes stale on its own, and the only other lever is the phone's clock — which
+ * must not move, because the timeline is mid-count and the journal is time-keyed.
+ */
+describe('the gateway briefing stamp', () => {
+  it('says the gateway holds the schedule when the stamp is fresh', async () => {
+    await markCloudArmed(Date.now());
+    const { findByTestId } = await mount();
+    expect((await findByTestId('cloud-stamp')).props.children).toContain('holds');
+  });
+
+  it('ages the stamp when asked, so the panel can be read in its third state', async () => {
+    await markCloudArmed(Date.now());
+    const { findByTestId } = await mount();
+    fireEvent.press(await findByTestId('cloud-stamp-age'));
+    await waitFor(async () => expect(await cloudArmedState()).toBe('stale'));
+  });
+
+  it('offers nothing to age when nothing was ever uploaded', async () => {
+    // `never` and `stale` are different facts; a control that invented a stamp would
+    // make the app claim an upload that did not happen
+    await AsyncStorage.removeItem('jarvis_commute_cloud');
+    const { queryByTestId, findByTestId } = await mount();
+    await findByTestId('cloud-stamp');
+    expect(queryByTestId('cloud-stamp-age')).toBeNull();
   });
 });

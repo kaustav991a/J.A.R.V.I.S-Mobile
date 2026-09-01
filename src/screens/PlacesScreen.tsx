@@ -14,6 +14,8 @@ import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlace
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
 import {
+  ageCloudStamp,
+  cloudArmedState,
   DAY_INITIALS,
   DAY_NAMES,
   DEFAULT_COMMUTE,
@@ -22,7 +24,7 @@ import {
   loadCommute,
   saveCommute,
 } from '../lib/commute';
-import type { CommuteSettings, Departure } from '../lib/commute';
+import type { CloudArmedState, CommuteSettings, Departure } from '../lib/commute';
 import { commuteTaskAvailable, commuteTaskHealth, previewBriefing, setCommuteTask } from '../lib/commuteTask';
 import { forgetHeartbeat, healthLine } from '../lib/taskHealth';
 import type { HealthReading } from '../lib/taskHealth';
@@ -48,6 +50,15 @@ export function PlacesScreen() {
   const [busy, setBusy] = useState(false);
   const [bgReady, setBgReady] = useState(true);
   const [health, setHealth] = useState<HealthReading | null>(null);
+  /**
+   * Whether the gateway is believed to be holding the schedule.
+   *
+   * Read here as well as on the Home panel because this is where the lever lives:
+   * the stale state cannot happen on demand — the stamp refreshes on every cloud
+   * connect — and the only other way to reach it is moving the clock, which would
+   * cost the timeline and the journal.
+   */
+  const [cloudState, setCloudState] = useState<CloudArmedState>('never');
 
   /**
    * The one repair this screen can make, and it makes it once.
@@ -80,6 +91,7 @@ export function PlacesScreen() {
       void loadKnown().then(l.only(setPlaces));
       void loadCommute().then(l.only(setCommute));
       void commuteTaskAvailable().then(l.only(setBgReady));
+      void cloudArmedState().then(l.only(setCloudState));
       void readHealth(l);
       return l.end;
     }, [readHealth])
@@ -119,6 +131,27 @@ export function PlacesScreen() {
     setHealth(await commuteTaskHealth());
     haptic.good();
     toast.show('Unregistered. Read the line above, then leave Places and come back to re-arm.');
+  };
+
+  /**
+   * Age the gateway stamp, so the panel can be read in its third state.
+   *
+   * `CANNOT TELL` is the one state on the Home status panel nobody has ever seen, and
+   * it needs an upload older than two days. The stamp refreshes on every cloud
+   * connect, so it never goes stale on its own, and the only other lever is the
+   * phone's clock — which must not move, because the location timeline is mid-count
+   * and the journal is time-keyed.
+   *
+   * So the stamp is written back past its window and nothing else is touched: not the
+   * clock, not the schedule, not the copy the gateway holds. The next cloud connect
+   * writes a fresh one, which is the same self-healing shape as unregistering the
+   * fallback to read its unarmed sentence.
+   */
+  const ageStamp = async () => {
+    await ageCloudStamp();
+    setCloudState(await cloudArmedState());
+    haptic.good();
+    toast.show('Stamp aged. Home now reads CANNOT TELL; the next cloud connect clears it.');
   };
 
   /**
@@ -504,6 +537,40 @@ export function PlacesScreen() {
         >
           <Text style={[styles.action, { color: accent }]}>RESET</Text>
         </Touchable>
+      </View>
+
+      <View style={styles.row}>
+        <Ionicons name="cloud-done-outline" size={19} color={COLOR.dim} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Gateway briefing stamp</Text>
+          <Text style={styles.rowSub} testID="cloud-stamp">
+            {cloudState === 'armed'
+              ? 'The gateway holds your schedule and is briefing from it. The phone stays quiet underneath.'
+              : cloudState === 'stale'
+                ? 'The last upload is more than two days old, so it proves nothing now. Home reads CANNOT TELL.'
+                : 'No upload has ever been accepted, so this phone is the one briefing you.'}
+          </Text>
+        </View>
+        {/*
+          Offered only when there is a stamp to age. `never` and `stale` are
+          different facts and the panel says different things about them, so a
+          control that invented a stamp would make the app claim an upload that
+          never happened.
+        */}
+        {cloudState !== 'never' ? (
+          <Pressable
+            testID="cloud-stamp-age"
+            accessibilityRole="button"
+            accessibilityLabel="Age the gateway stamp, to see what the panel says when it is stale"
+            hitSlop={8}
+            onPress={() => {
+              void ageStamp();
+            }}
+            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+          >
+            <Text style={[styles.action, { color: COLOR.dim }]}>TEST</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.row}>
