@@ -7,7 +7,7 @@
 >
 > Head: 462fa4c on `feat/cloud-gateway`, which is what Render watches.
 >
-> **20 ledger rows and 7 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
+> **19 ledger rows and 7 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
 
 ## Read these before touching anything that looks broken
 
@@ -58,7 +58,7 @@ The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it 
 
 **WRITTEN on the home machine 2026-08-29 (`02604c6`) and NOT LIVE.** Ported from this repo's `src/lib/briefingVoice.ts` line for line rather than reinvented, because two senders with two voices is worse than the repetition: a pool per slot, one cursor object shared across departures, the figures never varied, and the actionable word (`umbrella`, `jacket`, `Water`, `hair`, `wait it out`) kept in every variant, since Android truncates a body in the shade. The cursor is spent only on a briefing that actually went out — `_push_all` returns whether anything left, and a push that reached nobody now leaves the day OPEN rather than marking it done, which is the rule the failed-forecast path already had. It persists through `_persist("briefing_voice")` and is restored on boot, the half that waited on durable state: a cursor a deploy resets restarts the rotation at the same line every time. `_briefing_text` without a cursor still draws the first line of every pool, so the prose the harness asserts is unchanged; `test_commute_briefing.py` 15 -> 26, negative-tested by committing the cursor before the push instead of after. **Owed: a deploy, then two mornings of looking at the notification.**
 
-## The ledger rows — 20
+## The ledger rows — 19
 
 Every row whose blocker is `brain`, in the order §0b renders them.
 
@@ -107,7 +107,6 @@ Also visible: `Kaustav asked about Marco Polo`, which is not a fact about him at
 
 | | Status | Why it is here |
 | --- | --- | --- |
-| Weather and distance from measured figures | broken | The search provider is unverified, and a silent search failure looks exactly like hallucination. Routing is a public server that knows the road graph and not the road, so durations are free-flowing and the context says so. **2026-08-27, from the Office:** both lookups answered with real figures — 39.3 km / 38 minutes by road, and a 95% precipitation chance against a clear sky now. So routing and forecast are reaching a server and returning measurements, which is the half that could be checked from the phone. `/health` reports `search: tavily`. **The named gap is unchanged:** that a TAVILY search answers is still unverified, and a silent search failure still looks exactly like a confident answer — the two lookups above are the route and forecast paths, not the search path. **BROKEN, found 2026-08-27, and it is one regex.** `_FAR_RE` (`cloud_gateway.py:2757`) accepts `to\|from\|until` before the destination, so *"how far is home **from here**"* extracts `dest="here"`. Nothing matches a known place called "here", geocoding it returns junk, and **no route fact reaches the model** — which then answers from its weights and stored facts. Seen twice within fifteen minutes: *"you're currently in Ichapur, sir, you've already arrived at home"*, then *"approximately 23 kilometers from the office to Ichapur — a local train from Bidhannagar Road should get you there in about 30 minutes"*, both invented, both confident. The same question phrased *"how far **to** home"* answered 39.3 km correctly at 12:41, which is why this survived: **the feature works on the phrasing the test script uses and fails on the phrasing a person uses.** This is the exact shape this row was already warning about for search — a silent lookup failure is indistinguishable from a confident answer. Gateway-side, so it waits with the rest. |
 | The situation sent to the persona | — | Place, battery, link — one field. The highest character-per-line change available anywhere in the plan. |
 | Scripts: create, update, delete, run by id | — | Which is why editing is disabled. |
 | Run history | — | Reports currently invents “Last run: 2h ago” from a fixture. |
