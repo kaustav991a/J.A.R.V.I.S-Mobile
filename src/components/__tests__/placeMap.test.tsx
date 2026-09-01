@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
-import { PlaceMap } from '../PlaceMap';
+import { PlaceMap, heightLine } from '../PlaceMap';
 import { AppearanceProvider } from '../../theme/appearance';
 
 /**
@@ -107,5 +107,25 @@ describe('the tilted view', () => {
     const { findByTestId } = await mount(<PlaceMap places={[HOME]} fix={HERE} />);
     fireEvent.press(await findByTestId('place-map-tilt'));
     expect(await findByTestId('place-map-height-band')).toBeTruthy();
+  });
+});
+
+describe('what the height reading is allowed to claim', () => {
+  it('does not call a one-metre error too loose to name a floor', () => {
+    // the phone printed "give or take 1 — too loose to name a floor", which is a
+    // figure and its own contradiction in one sentence
+    const line = heightLine(-19, 1);
+    expect(line).toContain('-19');
+    expect(line).not.toContain('Too loose');
+  });
+
+  it('says a wide reading is too wide, and why', () => {
+    expect(heightLine(24, 40)).toContain('Too loose');
+    expect(heightLine(24, 40)).toContain('three metres');
+  });
+
+  it('names the reference, which is what makes minus nineteen make sense', () => {
+    // measured from the ellipsoid, not the ground: a sixth-floor office read -19
+    expect(heightLine(-19, 1)).toContain('ellipsoid');
   });
 });

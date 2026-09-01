@@ -120,12 +120,22 @@ export function PlaceMap({
               top: t.top,
               width: view.tileSize,
               height: view.tileSize,
-              // a dark basemap belongs at nearly full strength: it was turned down to
-              // a third only because the light one fought the app
-              opacity: 0.85,
+              opacity: 0.9,
             }}
           />
         ))}
+
+        {/*
+          The darkening, drawn rather than bought.
+
+          A light map under this app reads as a hole cut in the screen, and the dark
+          basemap that would have fixed it now wants an API key and stamps a
+          watermark across every tile without one. A scrim over OSM gets most of the
+          way there and owes nobody anything.
+        */}
+        {view?.tiles.length ? (
+          <View style={[styles.scrim, { width: size, height: size }]} pointerEvents="none" />
+        ) : null}
 
       <Svg width={size} height={size}>
         {plot.places.map((p) => (
@@ -285,10 +295,7 @@ export function PlaceMap({
       */}
       {typeof fix?.altitude === 'number' ? (
         <Text testID="place-map-height" style={styles.credit}>
-          {`About ${Math.round(fix.altitude)} m above sea level` +
-            (typeof fix.altitudeAccuracy === 'number'
-              ? `, give or take ${Math.round(fix.altitudeAccuracy)} — too loose to name a floor.`
-              : '.')}
+          {heightLine(fix.altitude, fix.altitudeAccuracy)}
         </Text>
       ) : null}
       {view?.tiles.length ? (
@@ -297,6 +304,30 @@ export function PlaceMap({
         </Text>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * What the height reading can honestly be said to mean.
+ *
+ * The first version of this sentence said "too loose to name a floor" whatever the
+ * number was, and the phone then reported an error of one metre — so the panel
+ * printed a figure and contradicted it in the same breath. It reads the error now.
+ *
+ * The bigger caveat is the one the number itself hides: GPS height is measured from
+ * the WGS-84 ellipsoid, not from sea level and certainly not from the ground. In
+ * Kolkata that offset is tens of metres, which is why a sixth-floor office reported
+ * MINUS nineteen. The absolute figure is close to meaningless; a change in it is not.
+ */
+export function heightLine(altitude: number, accuracy?: number): string {
+  const m = Math.round(altitude);
+  const tight = typeof accuracy === "number" && accuracy <= 5;
+  const error = typeof accuracy === "number" ? `, give or take ${Math.round(accuracy)} m` : "";
+  return (
+    `Height reads ${m} m${error}. ` +
+    (tight
+      ? "Measured from the ellipsoid, not the ground, so only a change in it means anything."
+      : "Too loose to name a floor — a floor is about three metres.")
   );
 }
 
@@ -321,6 +352,8 @@ const styles = StyleSheet.create({
   caption: { ...TYPE.meta, fontSize: 11, lineHeight: 17, color: COLOR.dim, marginTop: SPACE.sm },
   /** the tiles are clipped to the canvas, or they spill across the whole screen */
   frame: { overflow: 'hidden', borderRadius: RADIUS.lg, backgroundColor: 'rgba(4,14,32,0.6)' },
+  /** what turns a light basemap into something this app can sit on */
+  scrim: { position: 'absolute', backgroundColor: 'rgba(3,10,24,0.62)' },
   credit: { ...TYPE.meta, fontSize: 9, color: COLOR.dim, marginTop: 2 },
   tilt: { position: 'absolute', right: 8, top: 8, paddingHorizontal: 8, paddingVertical: 4 },
   tiltText: { ...TYPE.dataLabel, fontSize: 10, letterSpacing: 1.5 },

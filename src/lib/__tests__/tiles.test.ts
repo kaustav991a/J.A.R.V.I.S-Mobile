@@ -43,8 +43,7 @@ describe('choosing tiles for a view', () => {
 
   it('addresses each tile properly', () => {
     for (const t of view.tiles) {
-      // host, style, then z/x/y — the dark basemap carries a style segment
-      expect(t.url).toMatch(/^https:\/\/[a-z.]+\/[a-z_]+\/\d+\/\d+\/\d+\.png$/);
+      expect(t.url).toMatch(/^https:\/\/[a-z.]+\/\d+\/\d+\/\d+\.png$/);
       expect(t.x).toBeGreaterThanOrEqual(0);
       expect(t.y).toBeGreaterThanOrEqual(0);
       expect(t.x).toBeLessThan(2 ** view.zoom);
