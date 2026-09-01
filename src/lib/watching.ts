@@ -92,7 +92,12 @@ export function watching(f: WatchFacts): WatchRow[] {
     {
       id: 'place',
       /**
-       * The label names the figure it is actually holding, which took two goes.
+       * The label names the figure it is actually holding, which took three goes.
+       *
+       * "By now you are usually gone — 8:04 PM" was the third wrong one: he leaves at
+       * about 7:10, and 8:04 is when the app next SEES him, at Home. A valid upper
+       * bound and not a departure, so the word *gone* had to go. What is left claims
+       * only the sighting.
        *
        * It read "When you are usually gone — 3:40 PM" to somebody who leaves at seven:
        * that was the median LAST SIGHTING at the place, and a sighting needs the app
@@ -104,7 +109,7 @@ export function watching(f: WatchFacts): WatchRow[] {
        * old figure, so the row said "last seen there" above a number that meant the
        * opposite. Both now say the same thing.
        */
-      label: 'By now you are usually gone',
+      label: 'Where you turn up next',
       // the place he is at now, because that is the one he could be remarked on for.
       // Naming it matters: "4 more days" with no subject reads as a countdown to
       // nothing at all
@@ -115,7 +120,7 @@ export function watching(f: WatchFacts): WatchRow[] {
               // the figure itself, because that is the whole point of having learned it
               word: clockLabel(Math.floor(f.goneBy / 60), f.goneBy % 60),
               note: f.place
-                ? `${f.goneTo ? `Usually at ${f.goneTo} by then. ` : ''}From ${f.placeDays} days at ${f.place}. It is when you are next SEEN, so you left some time before it.`
+                ? `${f.goneTo ? `${f.goneTo}, ` : ''}from ${f.placeDays} days after ${f.place}. **It cannot see you leave** — only where you turn up next, so your leaving time is somewhere before this.`
                 : `The hour you are next seen somewhere else, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`,
             }
           : // enough days, and still no median — every sighting landed on one of them.
