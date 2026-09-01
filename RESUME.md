@@ -80,6 +80,23 @@ unregistered while the app is being woken at every boundary.
 **Still unproved: an actual crossing.** The first real evidence is a departure whose
 recorded time matches the clock, and nothing on this laptop can manufacture one.
 
+### It survives the process dying, and the OTA landed on the new runtime — 18:21
+
+`am force-stop`, cold launch, back to Places: **still *"Android is watching 10 places"***
+with STOP beside it. Android holds the geofence registration itself, so unlike the
+briefing task nothing has to re-arm it at launch — and that is also why `STOP` had to
+exist, since otherwise there is no way back to the off state short of reinstalling.
+
+**The Updates screen closes the fingerprint loop.** Runtime `1818e1b7…`, channel
+`production`, **Running: Downloaded**, update `01a05d04…` — the exact Android update ID
+printed by the publish twenty minutes earlier. So the hand-baked hash worked: the new
+APK asks for the right runtime, the server answers, and the phone is running the OTA
+bundle rather than its embedded one. Publishing from here reaches this phone normally.
+
+The publish itself needed one flag that is easy to lose an evening to:
+`eas update --non-interactive` also demands `--environment production`, and without it
+the only visible line is `Error: update command failed.`
+
 ### What the build is for: departures the app can actually see
 
 Three wrong figures in one day, all from one root, each caught by the person they were
