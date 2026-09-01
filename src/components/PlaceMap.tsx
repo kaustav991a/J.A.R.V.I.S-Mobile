@@ -38,7 +38,7 @@ export function PlaceMap({
   size = 260,
 }: {
   places: KnownPlace[];
-  fix: { lat: number; lon: number; accuracy?: number } | null;
+  fix: { lat: number; lon: number; accuracy?: number; altitude?: number; altitudeAccuracy?: number } | null;
   size?: number;
 }) {
   const { accent, animations } = useAppearance();
@@ -111,9 +111,9 @@ export function PlaceMap({
               top: t.top,
               width: view.tileSize,
               height: view.tileSize,
-              // the instrument look, and it doubles as contrast: full-colour OSM
-              // under a dark app reads as a hole cut in the screen
-              opacity: 0.35,
+              // a dark basemap belongs at nearly full strength: it was turned down to
+              // a third only because the light one fought the app
+              opacity: 0.85,
             }}
           />
         ))}
@@ -207,6 +207,23 @@ export function PlaceMap({
           ? ` ${plot.hidden} other named ${plot.hidden === 1 ? 'place is' : 'places are'} too far away to draw at this scale.`
           : ''}
       </Text>
+      {/*
+        Height, and what it cannot tell you.
+
+        Asked as "we are on the sixth floor, can we do anything about it". GPS puts
+        vertical error at roughly one and a half to three times the horizontal, so a
+        reading good to 15 m on the ground is good to perhaps 40 in height — against
+        a floor of about three. Saying the number and its error is the honest form of
+        no; printing a floor from it would be inventing one.
+      */}
+      {typeof fix?.altitude === 'number' ? (
+        <Text testID="place-map-height" style={styles.credit}>
+          {`About ${Math.round(fix.altitude)} m above sea level` +
+            (typeof fix.altitudeAccuracy === 'number'
+              ? `, give or take ${Math.round(fix.altitudeAccuracy)} — too loose to name a floor.`
+              : '.')}
+        </Text>
+      ) : null}
       {view?.tiles.length ? (
         <Text testID="place-map-credit" style={styles.credit}>
           {`Roads ${view.attribution}`}

@@ -25,6 +25,18 @@ export type Fix = {
    * The place matcher refuses rather than guessing, and this is what it refuses on.
    */
   accuracy?: number;
+  /**
+   * Height above the reference ellipsoid, in metres, and how wide that is.
+   *
+   * Kept because it was asked for — "we are on the 6th floor, can we do anything
+   * about it" — and kept with its error beside it because the answer is no. GPS
+   * puts vertical error at roughly one and a half to three times the horizontal,
+   * so a reading good to 15 m on the ground is good to perhaps 40 m in height,
+   * against a floor of about three. It can say "a building", never "the sixth
+   * floor". A barometer could, and is a native build away.
+   */
+  altitude?: number;
+  altitudeAccuracy?: number;
   /** e.g. "Salt Lake, West Bengal" — empty when the geocoder had nothing */
   place: string;
 };
@@ -83,10 +95,12 @@ let fixCache: { fix: Fix; at: number } | null = null;
 /**
  * A single fix, with a name on it.
  *
- * `Balanced` accuracy rather than `Highest`: this answers "what is the weather
- * here" and "what is nearby", where a hundred metres is irrelevant and the highest
- * setting spins the GPS for seconds. The name is best-effort — a fix with no
- * address is still a usable fix.
+ * **`High` accuracy as of 2026-09-01, and this comment used to argue the opposite.**
+ * It said a hundred metres was irrelevant because the fix answered "what is the
+ * weather here" — true when it was written, and false once the same reading began
+ * deciding which named place you are standing in. That is the whole of the bug
+ * recorded at the accuracy setting below. The name is still best-effort: a fix with
+ * no address is a usable fix.
  *
  * `maxAgeMs` accepts a recent fix instead of taking a new one, and defaults to 0
  * — every existing caller still gets a fresh reading, because naming the place you
@@ -104,7 +118,7 @@ export async function currentFix(maxAgeMs = 0): Promise<Fix | null> {
   try {
     const position = await Location.getCurrentPositionAsync({
       /**
-       * , not , and the reason changed under this call.
+       * High accuracy, not balanced, and the reason changed under this call.
        *
        * The balanced setting is around a hundred metres and is derived from wifi and cell rather
        * than GPS. That was right while a fix only answered "what is the weather here";
@@ -138,7 +152,14 @@ export async function currentFix(maxAgeMs = 0): Promise<Fix | null> {
     } catch {
       // an unnamed fix is still worth sending; the gateway prints coordinates
     }
-    const fix = { lat: latitude, lon: longitude, place, accuracy: position.coords.accuracy ?? undefined };
+    const fix = {
+      lat: latitude,
+      lon: longitude,
+      place,
+      accuracy: position.coords.accuracy ?? undefined,
+      altitude: position.coords.altitude ?? undefined,
+      altitudeAccuracy: position.coords.altitudeAccuracy ?? undefined,
+    };
     fixCache = { fix, at: Date.now() };
     return fix;
   } catch {

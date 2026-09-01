@@ -27,7 +27,19 @@ const EQUATOR_MPP = 156_543.03392;
 /** no more than this many tiles for one panel, however odd the scale */
 const MAX_TILES = 16;
 
-const HOST = 'https://tile.openstreetmap.org';
+/**
+ * A dark basemap, rather than a light one turned down.
+ *
+ * The first cut drew standard OSM tiles at a third opacity, which under a dark app
+ * reads as washed-out grey — the honest description was "I turned the opacity down",
+ * not a style. CARTO publish a dark raster basemap in the same slippy format with no
+ * key required, so the map arrives black with pale roads and the accent circles sit
+ * on it rather than fighting it.
+ *
+ * Their terms ask for attribution to both them and OpenStreetMap, which the panel
+ * carries, and for the same light use the OSM policy asks for.
+ */
+const HOST = 'https://basemaps.cartocdn.com/dark_all';
 
 export type Tile = {
   x: number;
@@ -62,7 +74,7 @@ export function tilesFor(input: {
   size: number;
 }): TileView {
   const { centre, metresPerPixel, size } = input;
-  const attribution = '© OpenStreetMap';
+  const attribution = '© OpenStreetMap, © CARTO';
 
   /**
    * The zoom whose natural pixels are closest to the ones being drawn.
