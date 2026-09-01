@@ -35,8 +35,8 @@
     "repo": "jarvis-mobile",
     "read": "2026-09-01",
     "branch": "feat/mobile-hud",
-    "head": "7b8f00b",
-    "tests": 1245,
+    "head": "87fd15a",
+    "tests": 1251,
     "suites": 88,
     "typecheck": "clean",
     "sources": {
@@ -46,12 +46,12 @@
       "device script": "TESTING.md"
     },
     "otaVerified": {
-      "on": "2026-08-27",
+      "on": "2026-09-01",
       "channel": "production",
       "channelId": "01a01a04-f0d6-7718-90dc-dbae6930b0db",
       "runtime": "31c64113d7d13a400eb1c56ef81c4d0d4be3fa17",
       "group": "33ab8d55-2ea9-4af5-b3f3-1437d8f46b3c",
-      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it. Twice on 2026-08-27, fingerprint checked before each: 01a0422d (the bell and the tab root), 01a04293 and 01a0429e (the chat order, in two halves) and 01a042b3 (the interrupted turn)."
+      "note": "Checked against the phone on every publish since 2026-08-24, when a publish went to a runtime no device had. Runtime is byte-identical to the fingerprint the installed APK carries, so a JS-only publish reaches the phone. A LOCAL build still receives nothing unless the fingerprint is baked by hand. Checked again on 2026-08-27, before the publish rather than after: `fingerprint:generate` returned the same 31c64113 the APK carries, and update 01a0422d went out to it. Twice on 2026-08-27, fingerprint checked before each: 01a0422d (the bell and the tab root), 01a04293 and 01a0429e (the chat order, in two halves) and 01a042b3 (the interrupted turn). **2026-09-01: eleven publishes in one day, every one checked against the phone first, and the runtime never moved.** Everything shipped today was JavaScript — the crash record, the anticipation rebuild, the place accuracy, the map panel and its removal, and the two diagnostic levers. The last landed update is `01a05c5a`."
     },
     "hold": "frozen 2026-08-29 until the desk is 100% - see JARVIS_TRACKER.md 0.5"
   },
