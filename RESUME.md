@@ -52,6 +52,34 @@ Two things follow, both now in `AGENTS.md`:
   building. Without it the APK asks the update server for `file:fingerprint`, gets
   nothing, and runs its embedded bundle forever with no log line about it.
 
+### Installed, and it is watching — 18:14
+
+`adb install -r` took, and the checks that mattered came back right: `firstInstallTime`
+still **2026-08-14** and `dataDir` unchanged, so it was an update rather than a
+reinstall. On screen the header still named **Office**, the Chat card still carried the
+last exchange, and Places still read *379 runs recorded* against the 7:00 PM departure —
+twelve weeks of sightings, the chat log and the journal all still there.
+
+`ACCESS_BACKGROUND_LOCATION` was granted from the laptop
+(`adb shell pm grant … ACCESS_BACKGROUND_LOCATION`) rather than through the Settings
+trip, which is worth remembering: the Android 11 flow sends a human to a Settings page,
+and adb does not need it. The row read *"the permission is there and nothing is
+registered"* before the tap, which is the state it was written to describe.
+
+**WATCH was pressed by `adb shell input tap` and the row changed to *"Android is
+watching 10 places and will report you arriving or leaving within a few minutes, with
+the app closed"*.** Ten regions, against a platform ceiling of a hundred. The control is
+a plain `Pressable` for exactly this reason — a `Touchable` could not have been pressed
+from here.
+
+**`dumpsys location` says `Geofence Manager: service: unregistered`, and that is not a
+contradiction.** expo-location registers through Play Services, not the framework
+manager, so the framework dump is the wrong window to look through. It will say
+unregistered while the app is being woken at every boundary.
+
+**Still unproved: an actual crossing.** The first real evidence is a departure whose
+recorded time matches the clock, and nothing on this laptop can manufacture one.
+
 ### What the build is for: departures the app can actually see
 
 Three wrong figures in one day, all from one root, each caught by the person they were
