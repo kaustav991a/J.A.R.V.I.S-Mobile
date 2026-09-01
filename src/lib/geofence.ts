@@ -6,7 +6,7 @@ import { clockLabel } from './commute';
 import { AT_PLACE_KM } from './knownPlaces';
 import type { KnownPlace } from './knownPlaces';
 import { dismiss, postNow } from './notify';
-import { dropExitsAround, noteSeen } from './timeline';
+import { dropExitsAround, loadSeen, noteSeen } from './timeline';
 
 /**
  * Sightings that happen whether or not anybody is holding the phone.
@@ -63,6 +63,21 @@ export const GEOFENCE_RADIUS_M = Math.max(120, AT_PLACE_KM * 1000);
  */
 export const SWEEP_WINDOW_MS = 90_000;
 
+/**
+ * How long a departure has to stand before it is worth saying out loud.
+ *
+ * The first exit of a sweep is indistinguishable from a real one, so the choice is to
+ * speak and retract, or to wait. Speaking and retracting was tried on 2026-09-01 and
+ * left *"Left Home — 6:40 PM"* standing in the shade about a house he was nowhere
+ * near: the dismissal is best-effort and the shade is not. Ten seconds is longer than
+ * a burst takes to arrive and shorter than anyone notices in a notification about
+ * something they just did.
+ *
+ * The sighting is never delayed. If the process is killed inside this window the
+ * departure is still recorded, and only the word about it is lost.
+ */
+export const SPEAK_AFTER_MS = 10_000;
+
 export type Region = {
   identifier: string;
   latitude: number;
@@ -99,7 +114,11 @@ type GeofenceEvent = {
  * crash nobody sees, and the sighting is lost silently — which is the failure this
  * whole file exists to stop happening by accident.
  */
-export async function onGeofenceEvent(event: GeofenceEvent, at: number = Date.now()): Promise<void> {
+export async function onGeofenceEvent(
+  event: GeofenceEvent,
+  at: number = Date.now(),
+  speakAfterMs: number = SPEAK_AFTER_MS
+): Promise<void> {
   try {
     const kind = event?.eventType;
     const label = event?.region?.identifier;
@@ -129,7 +148,21 @@ export async function onGeofenceEvent(event: GeofenceEvent, at: number = Date.no
     // the sighting is written first and separately: a notification that cannot be
     // posted is an annoyance, a departure that was never recorded is the figure this
     // whole file exists to measure
-    if (leaving) await announceLeaving(label, when);
+    if (!leaving) return;
+
+    /**
+     * Wait, then check the sighting is still there before saying anything.
+     *
+     * A burst that arrives during this window takes the sighting out again, and a
+     * word about a departure that has been retracted is worse than silence: the
+     * notification outlives the correction.
+     */
+    if (speakAfterMs > 0) await new Promise((r) => setTimeout(r, speakAfterMs));
+    if (await inSweep(when)) return;
+    const kept = (await loadSeen()).some(
+      (s) => s.place === label && s.at === when && s.via === 'exit'
+    );
+    if (kept) await announceLeaving(label, when);
   } catch {
     // see above: nothing above this can catch anything, so nothing may escape
   }

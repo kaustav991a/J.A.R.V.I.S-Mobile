@@ -57,6 +57,10 @@ const at = (hour: number, minute: number): number =>
 /** inside the store's twelve-week window, or the read filters it back out */
 const recent = Date.now() - 60_000;
 
+/** the ten-second pause before speaking is real time, and no test wants to spend it */
+const fire = (event: Parameters<typeof onGeofenceEvent>[0], at?: number, ms = 0) =>
+  onGeofenceEvent(event, at, ms);
+
 beforeEach(async () => {
   await AsyncStorage.clear();
 });
@@ -90,24 +94,24 @@ describe('the regions it watches', () => {
 
 describe('what an event writes', () => {
   it('records an exit as an exit, so a departure can be measured', async () => {
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, recent);
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, recent);
     const [sighting] = await loadSeen();
     expect(sighting.place).toBe('Office');
     expect(sighting.via).toBe('exit');
   });
 
   it('records an entry too, which is the arrival the app could never see', async () => {
-    await onGeofenceEvent({ eventType: 'enter', region: { identifier: 'Home' } }, recent);
+    await fire({ eventType: 'enter', region: { identifier: 'Home' } }, recent);
     expect((await loadSeen())[0].via).toBe('enter');
   });
 
   it('ignores an event with no region, rather than writing a nameless sighting', async () => {
-    await onGeofenceEvent({ eventType: 'exit', region: null }, recent);
+    await fire({ eventType: 'exit', region: null }, recent);
     expect(await loadSeen()).toEqual([]);
   });
 
   it('ignores an event it cannot make sense of', async () => {
-    await onGeofenceEvent(null, recent);
+    await fire(null, recent);
     expect(await loadSeen()).toEqual([]);
   });
 
@@ -115,7 +119,7 @@ describe('what an event writes', () => {
     // this body is invoked by the OS with the app closed; a throw here is a crash
     // nobody sees and a sighting silently lost
     await expect(
-      onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, Number.NaN)
+      fire({ eventType: 'exit', region: { identifier: 'Office' } }, Number.NaN)
     ).resolves.toBeUndefined();
   });
 });
@@ -171,7 +175,7 @@ describe('being told you left', () => {
   });
 
   it('says where and when, because a time is the whole point of the row', async () => {
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
     expect(posted).toHaveBeenCalledTimes(1);
     const [opts] = posted.mock.calls[0];
     expect(opts.title).toContain('Office');
@@ -181,28 +185,28 @@ describe('being told you left', () => {
   it('says nothing when you arrive, which is what was asked for', async () => {
     // ten places, both crossings, would be a phone that buzzes all day. Only the
     // departure carries a figure the app could not measure before
-    await onGeofenceEvent({ eventType: 'enter', region: { identifier: 'Office' } }, at(9, 20));
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(9, 20));
     expect(posted).not.toHaveBeenCalled();
   });
 
   it('stays quiet on a second exit inside the cooldown', async () => {
     // standing at the edge of a 120 m circle makes Android report crossing it
     // repeatedly, and each one is a real event that is not a real departure
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 52));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 52));
     expect(posted).toHaveBeenCalledTimes(1);
   });
 
   it('speaks again once the cooldown is spent, since leaving twice is a real thing', async () => {
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(13, 0));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(13, 0));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
     expect(posted).toHaveBeenCalledTimes(2);
   });
 
   it('keeps a cooldown per place, not one for the whole phone', async () => {
     // leaving home and reaching the office are minutes apart on the same morning
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(9, 25));
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(9, 25));
     expect(posted).toHaveBeenCalledTimes(2);
   });
 
@@ -210,7 +214,7 @@ describe('being told you left', () => {
     // the sighting is the thing that matters: a lost notification is an annoyance,
     // a lost departure is the figure this whole file exists to measure
     posted.mockRejectedValueOnce(new Error('no channel'));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 47));
     expect((await loadSeen())[0].via).toBe('exit');
   });
 });
@@ -227,7 +231,7 @@ describe('seeing the notification without leaving', () => {
     expect(await loadSeen()).toEqual([]);
     // and it does not spend the cooldown either
     posted.mockClear();
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 12));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 12));
     expect(posted).toHaveBeenCalledTimes(1);
   });
 });
@@ -243,9 +247,9 @@ describe('the sweep Android fires at every restart', () => {
     // Services re-evaluates every region when the app process restarts and reports an
     // exit for each one the phone is outside of. Every event is real; not one is a
     // departure
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Musalman Para' } }, at(18, 31));
-    await onGeofenceEvent(
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Musalman Para' } }, at(18, 31));
+    await fire(
       { eventType: 'exit', region: { identifier: 'Barrackpore Railway Station' } },
       at(18, 31)
     );
@@ -256,21 +260,21 @@ describe('the sweep Android fires at every restart', () => {
     // the first exit of a sweep is indistinguishable from a departure. It is only the
     // second place in the same breath that gives it away, so the repair has to reach
     // backwards
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
     expect(await loadSeen()).toHaveLength(1);
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
     expect(await loadSeen()).toEqual([]);
   });
 
   it('says nothing more once it knows, and one buzz is the cost of finding out', async () => {
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
     expect(posted).toHaveBeenCalledTimes(1);
   });
 
   it('still believes a single departure, which is the whole feature', async () => {
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
     const seen = await loadSeen();
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ place: 'Office', via: 'exit' });
@@ -279,16 +283,47 @@ describe('the sweep Android fires at every restart', () => {
 
   it('lets two real departures stand when they are far enough apart', async () => {
     // leaving home in the morning and the office in the evening are both true
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
     expect(await loadSeen()).toHaveLength(2);
   });
 
   it('never drops an arrival, which no sweep produces', async () => {
-    await onGeofenceEvent({ eventType: 'enter', region: { identifier: 'Office' } }, at(18, 31));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
-    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
     const seen = await loadSeen();
     expect(seen).toEqual([expect.objectContaining({ place: 'Office', via: 'enter' })]);
+  });
+});
+
+describe('waiting a moment before speaking', () => {
+  beforeEach(() => {
+    posted.mockClear();
+  });
+
+  it('says nothing at all when the rest of the burst lands while it waits', async () => {
+    // the first exit of a sweep cannot be recognised when it arrives. Rather than
+    // buzzing and taking it back - which leaves a false departure standing in the
+    // shade if the dismissal does not land - the word waits until the sighting has
+    // survived. Measured on the phone: "Left Home 6:40 PM" stayed put after the
+    // retraction, about a home he was nowhere near
+    const settle = fire(
+      { eventType: 'exit', region: { identifier: 'Home' } },
+      at(18, 40),
+      200
+    );
+    // the sighting has to be written before the second event can recognise the burst,
+    // which on a phone is seconds and here is a tick
+    await new Promise((r) => setTimeout(r, 20));
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 40), 0);
+    await settle;
+    expect(posted).not.toHaveBeenCalled();
+    expect(await loadSeen()).toEqual([]);
+  });
+
+  it('still speaks for a departure that nothing contradicts', async () => {
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5), 0);
+    expect(posted).toHaveBeenCalledTimes(1);
   });
 });
