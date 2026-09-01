@@ -115,7 +115,7 @@ export function watching(f: WatchFacts): WatchRow[] {
               // the figure itself, because that is the whole point of having learned it
               word: clockLabel(Math.floor(f.goneBy / 60), f.goneBy % 60),
               note: f.place
-                ? `Usually at ${f.goneTo ?? 'another named place'} by then, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`
+                ? `${f.goneTo ? `Usually at ${f.goneTo} by then. ` : ''}From ${f.placeDays} days at ${f.place}. It is when you are next SEEN, so you left some time before it.`
                 : `The hour you are next seen somewhere else, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`,
             }
           : // enough days, and still no median — every sighting landed on one of them.
