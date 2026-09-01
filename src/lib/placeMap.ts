@@ -30,30 +30,12 @@ export type Plotted = {
 
 export type Plot = {
   places: Plotted[];
-  /**
-   * Where the reading puts you: its error as the radius, and its height above the
-   * ground plane when the view is tilted.
-   *
-   * `lift` is the height in pixels and `liftError` is how much of that is noise.
-   * They are separate because the second is usually most of the first: GPS vertical
-   * error runs one and a half to three times the horizontal, so a reading good to
-   * 15 m on the ground is good to perhaps 40 in height — against a floor of about
-   * three. Drawn as a point that would look like a measurement.
-   */
-  you: { x: number; y: number; r: number; lift: number; liftError: number } | null;
+  /** where the reading puts you, with its own error as the radius */
+  you: { x: number; y: number; r: number } | null;
   /** whether any two match circles touch — the thing the picture was asked for */
   overlapping: boolean;
   /** so a scale bar can be drawn, and the picture read as a measurement */
   metresPerPixel: number;
-  /**
-   * How much the ground plane is squashed vertically, 1 being flat on.
-   *
-   * The tilt is what makes a height readable at all, and it costs the thing the
-   * panel was built for: circles become ellipses, and two ellipses cannot be
-   * compared by eye the way two circles can. So the flat view stays the default and
-   * the answer to "do these overlap"; this one is for looking at.
-   */
-  groundSquash: number;
   /**
    * Named places left out for being nowhere near.
    *
@@ -74,8 +56,6 @@ const M_PER_DEG_LAT = 111_320;
  */
 export const NEAR_M = 800;
 
-/** how flat the ground lies when tilted — a shallow angle, so the map stays readable */
-const GROUND_SQUASH = 0.55;
 
 /** metres east and north of a reference point — flat, which is fine at this size */
 const project = (
@@ -88,20 +68,11 @@ const project = (
 
 export function mapPlot(input: {
   places: KnownPlace[];
-  fix: {
-    lat: number;
-    lon: number;
-    accuracy?: number;
-    /** metres above the ellipsoid, and how loose that figure is */
-    altitude?: number;
-    altitudeAccuracy?: number;
-  } | null;
+  fix: { lat: number; lon: number; accuracy?: number } | null;
   /** the match radius in metres; defaults to the one the matcher actually uses */
   radiusM?: number;
   /** how far from the centre a place can be and still be worth drawing, in metres */
   nearM?: number;
-  /** lay the ground plane back, so a height can be drawn above it */
-  tilt?: boolean;
   /** canvas edge, in pixels */
   size: number;
 }): Plot {
@@ -119,7 +90,7 @@ export function mapPlot(input: {
    */
   const centre = input.fix ?? input.places[0] ?? null;
   if (!centre) {
-    return { places: [], you: null, overlapping: false, metresPerPixel: 1, hidden: 0, groundSquash: 1 };
+    return { places: [], you: null, overlapping: false, metresPerPixel: 1, hidden: 0 };
   }
 
   const withDistance = input.places.map((place) => {
@@ -135,7 +106,7 @@ export function mapPlot(input: {
   ];
 
   if (!points.length) {
-    return { places: [], you: null, overlapping: false, metresPerPixel: 1, hidden, groundSquash: 1 };
+    return { places: [], you: null, overlapping: false, metresPerPixel: 1, hidden };
   }
 
   const origin = {
@@ -169,24 +140,11 @@ export function mapPlot(input: {
     r: radiusM / metresPerPixel,
   }));
 
-  /**
-   * How far back the ground is laid, and how the height above it is scaled.
-   *
-   * Height is drawn at a quarter of the ground scale on purpose. At the same scale a
-   * forty-metre error bar would be taller than the canvas and the panel would be a
-   * picture of its own uncertainty; at a quarter it is present, obvious, and still
-   * leaves the map visible underneath.
-   */
-  const groundSquash = input.tilt ? GROUND_SQUASH : 1;
-  const liftScale = input.tilt ? 0.25 / metresPerPixel : 0;
-
   const you = input.fix
     ? {
         ...toCanvas(project(input.fix, origin)),
         // a reading with no stated error still gets a dot rather than nothing
         r: Math.max(input.fix.accuracy ?? 0, 1) / metresPerPixel,
-        lift: Math.max(0, (input.fix.altitude ?? 0) * liftScale),
-        liftError: Math.max(0, (input.fix.altitudeAccuracy ?? 0) * liftScale),
       }
     : null;
 
@@ -201,7 +159,7 @@ export function mapPlot(input: {
     }
   }
 
-  return { places, you, overlapping, metresPerPixel, hidden, groundSquash };
+  return { places, you, overlapping, metresPerPixel, hidden };
 }
 
 /** how much of the canvas edge a label must keep clear of */
