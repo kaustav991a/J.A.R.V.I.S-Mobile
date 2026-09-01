@@ -192,7 +192,11 @@ export function anticipate(o: Observations): Remark | null {
  * Ranked above the screen-time remark because it is about right now — it can be
  * acted on, where a day's total can only be noted.
  *
- * Refuses to speak without `goneBy`. `stillHereLate` cannot be true without a
+ * **The figure is when he is usually somewhere ELSE, not when he was last seen here.**
+ * The last-seen median fired this every workday — 3:40 PM plus a margin, at an office
+ * he leaves at seven — because a sighting needs the app open. Reported 2026-09-01.
+ *
+ * Refuses to speak without a figure. `stillHereLate` cannot be true without a
  * baseline, so this is belt and braces — but a remark that cannot name its own
  * basis is the exact thing this file exists to refuse.
  */
@@ -200,7 +204,7 @@ function placeRemark(o: Observations): Remark | null {
   if (!o.place || !o.stillHereLate || o.goneBy === null) return null;
   return {
     about: 'place',
-    line: `Still at ${o.place}, sir. You are usually gone by ${clock(o.goneBy)}.`,
+    line: `Still at ${o.place}, sir — by ${clock(o.goneBy)} you are usually somewhere else.`,
   };
 }
 

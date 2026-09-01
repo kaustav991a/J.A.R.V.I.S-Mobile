@@ -5,6 +5,7 @@ import {
   daysSeenAt,
   hereEarly,
   placesSeen,
+  seenElsewhereBy,
   stillHereLate,
   usuallyGoneBy,
   usuallyHereBy,
@@ -72,26 +73,43 @@ describe('when you are usually gone', () => {
 });
 
 describe('whether you are still there, late', () => {
-  const gone = usuallyGoneBy(office, 'Office', NOW) as number;
+  /**
+   * Four days that show him leaving: last at Office, then Home in the evening.
+   *
+   * The fixture used to be Office sightings alone, and the rule changed under it on
+   * 2026-09-01 — without a later sighting somewhere else there is no evidence he ever
+   * leaves, and "still here" is a word the data cannot support.
+   */
+  const leaves = seen(
+    [17, 18, 30, 'Office'],
+    [17, 20, 10, 'Home'],
+    [18, 18, 45, 'Office'],
+    [18, 20, 30, 'Home'],
+    [19, 18, 40, 'Office'],
+    [19, 19, 50, 'Home'],
+    [20, 18, 35, 'Office'],
+    [20, 20, 20, 'Home']
+  );
+  const elsewhere = seenElsewhereBy(leaves, 'Office', NOW) as number;
 
-  it('is true well past the usual hour, in the same place', () => {
-    const late = new Date(2026, 7, 21, 19, 40);
-    expect(stillHereLate(office, 'Office', late)).toBe(true);
+  it('is true well past the hour he is usually elsewhere', () => {
+    const late = new Date(2026, 7, 21, 21, 10);
+    expect(stillHereLate(leaves, 'Office', late)).toBe(true);
   });
 
-  it('is false at the usual hour, because that is not news', () => {
-    const onTime = new Date(2026, 7, 21, 18, 45);
-    expect(stillHereLate(office, 'Office', onTime)).toBe(false);
+  it('is false at that hour, because that is not news', () => {
+    const onTime = new Date(2026, 7, 21, 20, 10);
+    expect(stillHereLate(leaves, 'Office', onTime)).toBe(false);
   });
 
   it('waits for a real margin, not a minute', () => {
     const barely = new Date(2026, 7, 21, 0, 0, 0);
-    barely.setHours(0, gone + Math.floor(LATE_BY_MIN / 2), 0, 0);
-    expect(stillHereLate(office, 'Office', barely)).toBe(false);
+    barely.setHours(0, elsewhere + Math.floor(LATE_BY_MIN / 2), 0, 0);
+    expect(stillHereLate(leaves, 'Office', barely)).toBe(false);
   });
 
   it('is false somewhere with no history', () => {
-    expect(stillHereLate(office, 'Airport', new Date(2026, 7, 21, 23, 0))).toBe(false);
+    expect(stillHereLate(leaves, 'Airport', new Date(2026, 7, 21, 23, 0))).toBe(false);
   });
 
   it('is false when nowhere is known', () => {
@@ -272,5 +290,94 @@ describe('which places it has ever seen you at', () => {
 
   it('is empty before anything has been seen', () => {
     expect(placesSeen([])).toEqual([]);
+  });
+});
+
+/**
+ * When you are next seen somewhere else, which is the only bound on leaving.
+ *
+ * **Reported from the phone, 2026-09-01:** the panel said *"When you are usually gone —
+ * 3:40 PM"* about an office he leaves at seven. The figure was the median of the LAST
+ * SIGHTING at Office, and a sighting needs the app open — so it measured when he stops
+ * checking his phone at work, and then called it leaving.
+ *
+ * The app cannot see a departure. It can see two things that bracket one: the last
+ * time he was at the place, and the first time he was somewhere else. Between them is
+ * where the leaving happened, and that is the honest thing to hold.
+ */
+describe('when you are next seen elsewhere', () => {
+  /** four days: last at Office mid-afternoon, then Home in the evening */
+  const commutes = seen(
+    [17, 15, 40, 'Office'],
+    [17, 20, 10, 'Home'],
+    [18, 15, 30, 'Office'],
+    [18, 20, 30, 'Home'],
+    [19, 15, 50, 'Office'],
+    [19, 19, 50, 'Home'],
+    [20, 15, 35, 'Office'],
+    [20, 20, 20, 'Home']
+  );
+
+  it('takes the median of the first sighting somewhere else', () => {
+    // 20:10, 20:30, 19:50, 20:20 -> 20:10 (lower middle of an even count)
+    expect(seenElsewhereBy(commutes, 'Office', NOW)).toBe(20 * 60 + 10);
+  });
+
+  it('says nothing on days that never showed him anywhere else', () => {
+    // without a later sighting elsewhere there is no evidence he left at all
+    const noEvidence = seen(
+      [17, 15, 40, 'Office'],
+      [18, 15, 30, 'Office'],
+      [19, 15, 50, 'Office'],
+      [20, 15, 35, 'Office']
+    );
+    expect(seenElsewhereBy(noEvidence, 'Office', NOW)).toBeNull();
+  });
+
+  it('ignores a sighting elsewhere that came before the day at that place', () => {
+    // Home in the morning is not evidence of leaving the Office in the evening
+    const morningsOnly = seen(
+      [17, 8, 0, 'Home'],
+      [17, 15, 40, 'Office'],
+      [18, 8, 0, 'Home'],
+      [18, 15, 30, 'Office'],
+      [19, 8, 0, 'Home'],
+      [19, 15, 50, 'Office'],
+      [20, 8, 0, 'Home'],
+      [20, 15, 35, 'Office']
+    );
+    expect(seenElsewhereBy(morningsOnly, 'Office', NOW)).toBeNull();
+  });
+});
+
+describe('still being somewhere, judged against the honest bound', () => {
+  const commutes = seen(
+    [17, 15, 40, 'Office'],
+    [17, 20, 10, 'Home'],
+    [18, 15, 30, 'Office'],
+    [18, 20, 30, 'Home'],
+    [19, 15, 50, 'Office'],
+    [19, 19, 50, 'Home'],
+    [20, 15, 35, 'Office'],
+    [20, 20, 20, 'Home']
+  );
+
+  it('**stays quiet at half four, which the old figure called late**', () => {
+    // the reported bug: last seen 3:40 plus a 45 minute margin fired every workday
+    expect(stillHereLate(commutes, 'Office', new Date(2026, 7, 21, 16, 25))).toBe(false);
+  });
+
+  it('speaks once you are past the hour you are usually elsewhere', () => {
+    expect(stillHereLate(commutes, 'Office', new Date(2026, 7, 21, 21, 10))).toBe(true);
+  });
+
+  it('says nothing when nothing bounds the leaving', () => {
+    const noEvidence = seen(
+      [17, 15, 40, 'Office'],
+      [18, 15, 30, 'Office'],
+      [19, 15, 50, 'Office'],
+      [20, 15, 35, 'Office']
+    );
+    expect(stillHereLate(noEvidence, 'Office', new Date(2026, 7, 21, 23, 30))).toBe(false);
   });
 });

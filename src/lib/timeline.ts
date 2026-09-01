@@ -175,15 +175,68 @@ export function daysSeenAt(seen: Seen[], place: string, now: Date): number {
 }
 
 /**
+ * The minute of the day you are usually next seen SOMEWHERE ELSE, or null.
+ *
+ * **Reported from the phone on 2026-09-01, and it is the honest half of a departure.**
+ * The panel had been saying *"When you are usually gone — 3:40 PM"* about an office
+ * he leaves at seven. `usuallyGoneBy` is the median of the last sighting at a place,
+ * and a sighting needs the app open — so it had measured when he stops checking his
+ * phone at work and called it leaving.
+ *
+ * The app cannot watch a departure. It can see two things that bracket one: the last
+ * time he was there, and the first time he was somewhere else. This is the second,
+ * and it is the bound worth judging "still here" against — being at the office at
+ * 4:25 is nothing, being there when you are normally home is something.
+ *
+ * **Only days that actually showed him elsewhere afterwards count.** A day with no
+ * later sighting is not evidence of a late night; it is evidence of a phone left in
+ * a pocket, and counting it would rebuild the same false claim one level up.
+ */
+export function seenElsewhereBy(seen: Seen[], place: string, now: Date): number | null {
+  const today = dayKey(now.getTime());
+  const sorted = [...seen].sort((a, b) => a.at - b.at);
+  const lastHere = new Map<string, number>();
+  const firstAfter = new Map<string, number>();
+
+  for (const s of sorted) {
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    if (s.place === place) {
+      lastHere.set(key, s.at);
+      // a later sighting at the place means he had not left after all
+      firstAfter.delete(key);
+      continue;
+    }
+    const here = lastHere.get(key);
+    if (here !== undefined && !firstAfter.has(key)) firstAfter.set(key, s.at);
+  }
+
+  if (firstAfter.size < ENOUGH_PLACE_DAYS) return null;
+  const times = [...firstAfter.values()].map(minuteOfDay).sort((a, b) => a - b);
+  const mid = Math.floor(times.length / 2);
+  // the lower of the two middles on an even count, which errs toward saying nothing
+  return times.length % 2 ? times[mid] : times[mid - 1];
+}
+/**
  * Whether you are at a place well past the hour you are usually gone from it.
  *
  * `false` whenever it cannot know — no history, not enough days, or not yet past the
  * margin. Silence is the default and needs no excuse.
  */
 export function stillHereLate(seen: Seen[], place: string, now: Date): boolean {
-  const gone = usuallyGoneBy(seen, place, now);
-  if (gone === null) return false;
-  return minuteOfDay(now.getTime()) > gone + LATE_BY_MIN;
+  /**
+   * Judged against when he is usually somewhere ELSE, not when he was last seen here.
+   *
+   * The last-seen figure fired this every workday: 3:40 PM plus a 45 minute margin
+   * is 4:25, and he leaves at seven. The bound that means anything is the hour he is
+   * normally elsewhere — being at the office then is genuinely unusual.
+   *
+   * No evidence of ever leaving means no claim. A place he is seen at and never seen
+   * away from cannot support the word "still".
+   */
+  const elsewhere = seenElsewhereBy(seen, place, now);
+  if (elsewhere === null) return false;
+  return minuteOfDay(now.getTime()) > elsewhere + LATE_BY_MIN;
 }
 
 /**

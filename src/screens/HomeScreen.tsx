@@ -23,7 +23,7 @@ import { cloudArmedState, dayKey } from '../lib/commute';
 import type { CloudArmedState } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
-import { daysSeenAt, loadSeen, usuallyGoneBy } from '../lib/timeline';
+import { daysSeenAt, loadSeen, seenElsewhereBy } from '../lib/timeline';
 import { forgetSpoken, loadSpoken } from '../lib/spokenStore';
 import { loadKnown } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
@@ -173,7 +173,9 @@ export function HomeScreen() {
             place,
             // what it actually learned, so the row can say it rather than call itself
             // ready — the same figure the anticipation remark uses, from the same call
-            goneBy: place ? usuallyGoneBy(seen, place, now) : null,
+            // the hour he is usually elsewhere, not the hour he last opened the app
+            // here — the panel said 3:40 PM about an office he leaves at seven
+            goneBy: place ? seenElsewhereBy(seen, place, now) : null,
             spokenToday: spoken?.day === dayKey(now),
           };
           /**
