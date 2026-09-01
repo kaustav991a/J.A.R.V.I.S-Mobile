@@ -90,14 +90,19 @@ export function watching(f: WatchFacts): WatchRow[] {
     {
       id: 'place',
       /**
-       * It says LAST SEEN, because that is what it is.
+       * The label names the figure it is actually holding, which took two goes.
        *
-       * It read "When you are usually gone — 3:40 PM" to somebody who leaves at seven,
-       * and the figure was never a departure: a sighting needs the app open, so it is
-       * the hour he stops checking his phone at work. Reported 2026-09-01. The label
-       * now claims only what the sightings can carry.
+       * It read "When you are usually gone — 3:40 PM" to somebody who leaves at seven:
+       * that was the median LAST SIGHTING at the place, and a sighting needs the app
+       * open, so it measured when he stops checking his phone at work. Reported
+       * 2026-09-01.
+       *
+       * The value became the hour he is first seen SOMEWHERE ELSE — the only bound the
+       * sightings put on leaving — and for one publish the label still described the
+       * old figure, so the row said "last seen there" above a number that meant the
+       * opposite. Both now say the same thing.
        */
-      label: 'When you were last seen there',
+      label: 'By now you are usually elsewhere',
       // the place he is at now, because that is the one he could be remarked on for.
       // Naming it matters: "4 more days" with no subject reads as a countdown to
       // nothing at all
@@ -108,8 +113,8 @@ export function watching(f: WatchFacts): WatchRow[] {
               // the figure itself, because that is the whole point of having learned it
               word: clockLabel(Math.floor(f.goneBy / 60), f.goneBy % 60),
               note: f.place
-                ? `The app has to be open to see you, so this is a floor, not your leaving time. From ${f.placeDays} days at ${f.place}.`
-                : `The app has to be open to see you, so this is a floor, not your leaving time. From ${f.placeDays} days.`,
+                ? `The hour you are first seen somewhere other than ${f.place}, from ${f.placeDays} days. Not when you leave — the app only sees you when it is open.`
+                : `The hour you are first seen somewhere else, from ${f.placeDays} days. Not when you leave — the app only sees you when it is open.`,
             }
           : // enough days, and still no median — every sighting landed on one of them.
             // `ready` because the signal is armed; no time, because there is not one
