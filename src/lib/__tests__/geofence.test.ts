@@ -1,6 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { GEOFENCE_TASK, geofenceRegions, onGeofenceEvent } from '../geofence';
+import {
+  GEOFENCE_TASK,
+  backgroundLocationState,
+  geofenceRegions,
+  onGeofenceEvent,
+  askForBackgroundLocation,
+  startWatchingPlaces,
+  stopWatchingPlaces,
+  watchingPlaces,
+} from '../geofence';
 import { loadSeen } from '../timeline';
 import type { KnownPlace } from '../knownPlaces';
 
@@ -103,5 +112,43 @@ describe('the task name', () => {
   it('is stable, because Android remembers it across launches', () => {
     // renaming it would orphan a registration that nothing in the app can then stop
     expect(GEOFENCE_TASK).toBe('jarvis-place-geofence');
+  });
+});
+
+describe('asking for the permission', () => {
+  it('reports the three states apart, because two of them are not refusals', async () => {
+    // Android asks in two steps: fine first, background in its own dialog after. A
+    // phone halfway through is neither refusing nor ready, and a screen that offers
+    // this has to say which
+    const state = await backgroundLocationState();
+    expect(['ready', 'foreground-only', 'refused']).toContain(state);
+  });
+
+  it('says why it cannot start, rather than answering false', async () => {
+    // "the manifest has no permission" and "you said no" are different facts and the
+    // fix for each is different: one is a build, the other is a dialog
+    const why = await startWatchingPlaces([HOME]);
+    expect(['watching', 'no-permission', 'nothing-named', 'unavailable']).toContain(why);
+  });
+
+  it('has nothing to watch before a place is named', async () => {
+    expect(await startWatchingPlaces([])).toBe('nothing-named');
+  });
+});
+
+describe('what is being watched right now', () => {
+  it('is nothing, on a build that cannot watch', async () => {
+    // the question a screen asks on every visit, so it answers rather than throwing
+    expect(await watchingPlaces()).toBe(false);
+  });
+
+  it('stops without complaining when nothing is registered', async () => {
+    await expect(stopWatchingPlaces()).resolves.toBeUndefined();
+  });
+
+  it('asks for the two grants as one answer, not two booleans', async () => {
+    // Android 11 opens Settings for the second rather than showing a dialog, so
+    // "foreground-only" is a normal outcome and not a failure
+    expect(['ready', 'foreground-only', 'refused']).toContain(await askForBackgroundLocation());
   });
 });

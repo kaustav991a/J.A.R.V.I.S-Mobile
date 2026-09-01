@@ -14,6 +14,13 @@ import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlace
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
 import {
+  askForBackgroundLocation,
+  backgroundLocationState,
+  startWatchingPlaces,
+  stopWatchingPlaces,
+  watchingPlaces,
+} from '../lib/geofence';
+import {
   ageCloudStamp,
   cloudArmedState,
   DAY_INITIALS,
@@ -61,6 +68,16 @@ export function PlacesScreen() {
   const [cloudState, setCloudState] = useState<CloudArmedState>('never');
 
   /**
+   * Whether Android is reporting the boundaries of your places being crossed.
+   *
+   * Two facts, not one: whether the permission is there, and whether a registration
+   * is live. A phone can hold the grant and be watching nothing, which is what every
+   * launch before this one looked like.
+   */
+  const [bgLocation, setBgLocation] = useState<'ready' | 'foreground-only' | 'refused'>('refused');
+  const [watching, setWatching] = useState(false);
+
+  /**
    * The one repair this screen can make, and it makes it once.
    *
    * `unarmed` is the state the device was found in on 2026-08-26: two departures
@@ -92,10 +109,65 @@ export function PlacesScreen() {
       void loadCommute().then(l.only(setCommute));
       void commuteTaskAvailable().then(l.only(setBgReady));
       void cloudArmedState().then(l.only(setCloudState));
+      void backgroundLocationState().then(l.only(setBgLocation));
+      void watchingPlaces().then(l.only(setWatching));
       void readHealth(l);
       return l.end;
     }, [readHealth])
   );
+
+  /**
+   * Turn the watching on, asking for whatever is missing first.
+   *
+   * One control rather than a permission button and a start button, because the two
+   * are never usefully separate: a grant with nothing registered watches nothing, and
+   * a registration without the grant is refused. What it cannot do is say yes on your
+   * behalf. On Android 11 and later the second dialog is a trip to Settings, so
+   * "still foreground only" is a normal answer and the toast says where to go.
+   */
+  const startWatching = async () => {
+    const granted = await askForBackgroundLocation();
+    setBgLocation(granted);
+    if (granted !== 'ready') {
+      haptic.bad();
+      toast.show(
+        granted === 'refused'
+          ? 'Location is off for this app, so nothing can be watched.'
+          : 'Android needs Allow all the time, in Settings, before it will report you leaving.'
+      );
+      return;
+    }
+
+    const why = await startWatchingPlaces(places);
+    setWatching(await watchingPlaces());
+    if (why === 'watching') {
+      haptic.good();
+      toast.show('Watching your places. Leaving one is now something he can see.');
+      return;
+    }
+    haptic.bad();
+    toast.show(
+      why === 'nothing-named'
+        ? 'Name a place first, there is nothing to watch yet.'
+        : why === 'no-permission'
+          ? 'Android took the permission back. Allow all the time, in Settings.'
+          : 'This build cannot watch places. It needs the newer app installed.'
+    );
+  };
+
+  /**
+   * Stop watching, which is also how the row is checked.
+   *
+   * Android holds the registration across launches, so without this there is no way
+   * back to the off state short of reinstalling, and no way to read the sentence this
+   * row shows when nothing is being watched.
+   */
+  const stopWatching = async () => {
+    await stopWatchingPlaces();
+    setWatching(await watchingPlaces());
+    haptic.good();
+    toast.show('Stopped. Departures go back to being guessed from when you open the app.');
+  };
 
   /**
    * Start the reboot check.
@@ -571,6 +643,53 @@ export function PlacesScreen() {
             <Text style={[styles.action, { color: COLOR.dim }]}>TEST</Text>
           </Pressable>
         ) : null}
+      </View>
+
+      {/**
+       * The row that ends the app-open bias.
+       *
+       * Every timing in this app came from a sighting written when somebody happened
+       * to open it, and 2026-09-01 spent the day paying for that: an office he leaves
+       * at seven reported as gone by 3:40 PM, an arrival called early for a man who
+       * had slept there. Android reports a boundary crossing with the app closed,
+       * which is the only way a departure is ever measured rather than inferred.
+       *
+       * It says which of the two things is missing, because the fixes are different:
+       * a permission is a dialog, a registration is this button, and an old build is
+       * an install.
+       */}
+      <View style={styles.row}>
+        <Ionicons name="navigate-circle-outline" size={19} color={COLOR.dim} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Watching your places</Text>
+          <Text style={styles.rowSub} testID="geofence-state">
+            {watching
+              ? 'Android is watching ' +
+                (places.length === 1 ? 'one place' : places.length + ' places') +
+                ' and will report you arriving or leaving within a few minutes, with the app closed.'
+              : bgLocation === 'ready'
+                ? 'The permission is there and nothing is registered, so leaving a place still goes unseen.'
+                : bgLocation === 'foreground-only'
+                  ? 'Location works only while the app is open, so your departures are guessed from when you last used it.'
+                  : 'Location is off for this app, so places are only named when you ask.'}
+          </Text>
+        </View>
+        <Pressable
+          testID="geofence-toggle"
+          accessibilityRole="button"
+          accessibilityLabel={
+            watching ? 'Stop watching your places' : 'Watch your places in the background'
+          }
+          hitSlop={8}
+          onPress={() => {
+            void (watching ? stopWatching() : startWatching());
+          }}
+          style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+        >
+          <Text style={[styles.action, { color: watching ? COLOR.dim : accent }]}>
+            {watching ? 'STOP' : 'WATCH'}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.row}>

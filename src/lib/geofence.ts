@@ -176,3 +176,35 @@ try {
 } catch {
   // a harness without the native side cannot define tasks, and does not need to
 }
+
+/**
+ * Ask for both grants, in the order Android insists on.
+ *
+ * Fine location first; the background dialog is refused outright if it is asked for
+ * on its own. On Android 11 and later the second one does not even appear as a
+ * dialog — it opens Settings, where the choice is *Allow all the time* — so this can
+ * return `foreground-only` with nothing having gone wrong, and the row that calls it
+ * says what to do next rather than reporting a failure.
+ */
+export async function askForBackgroundLocation(): Promise<'ready' | 'foreground-only' | 'refused'> {
+  try {
+    const fine = await Location.requestForegroundPermissionsAsync();
+    if (!fine.granted) return 'refused';
+    const background = await Location.requestBackgroundPermissionsAsync();
+    return background.granted ? 'ready' : 'foreground-only';
+  } catch {
+    // a manifest without the permission throws rather than refusing
+    return 'refused';
+  }
+}
+
+/** whether Android is holding a registration right now, as opposed to having been asked once */
+export async function watchingPlaces(): Promise<boolean> {
+  try {
+    // compared rather than returned: a platform that answers undefined is not
+    // watching, and a screen that renders undefined as a state shows nothing at all
+    return (await Location.hasStartedGeofencingAsync(GEOFENCE_TASK)) === true;
+  } catch {
+    return false;
+  }
+}

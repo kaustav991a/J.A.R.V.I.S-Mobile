@@ -256,3 +256,23 @@ describe('the gateway briefing stamp', () => {
     expect(queryByTestId('cloud-stamp-age')).toBeNull();
   });
 });
+
+describe('watching your places', () => {
+  it('says departures are guessed while nothing is watching, rather than showing a badge', async () => {
+    // the sentence has to name the consequence: an unwatched phone is exactly the
+    // state that produced "usually gone by 3:40 PM" about an office left at seven
+    const { getByTestId } = await mount();
+    await waitFor(() =>
+      expect(getByTestId('geofence-state').props.children).toMatch(
+        /only named when you ask|only while the app is open|nothing is registered/
+      )
+    );
+  });
+
+  it('offers one control, because a grant with nothing registered watches nothing', async () => {
+    const { getByTestId } = await mount();
+    await waitFor(() =>
+      expect(getByTestId('geofence-toggle').props.accessibilityLabel).toMatch(/Watch/)
+    );
+  });
+});
