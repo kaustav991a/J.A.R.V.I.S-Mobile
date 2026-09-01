@@ -366,7 +366,7 @@
           "name": "The voice rule applied to what the model writes",
           "status": "broken",
           "blockedBy": "brain",
-          "note": "**Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it.",
+          "note": "**Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it. **Seen again 2026-09-01 on the current bundle**, in a reply about a photo: *\"…is a rather grim sight, Sir.\"* Capitalised, mid-sentence. So the gateway fix is still not deployed, and this row has fresh evidence rather than only the August sighting. Seen a second time the same afternoon, in the reply to the retried photo: *\"…scribbled notes, Sir.\"* Twice in one hour on the current bundle.",
           "goal": "conversation"
         },
         {
@@ -444,17 +444,17 @@
         {
           "id": "photo-thumb",
           "name": "A thumbnail in the chat instead of the word “Photo”",
-          "status": "untested",
-          "blockedBy": "app",
-          "note": "**Already built, and the row was wrong.** `sendPhoto` carries the shrunk copy `uri` on the turn and `SentPhoto` renders it above the caption, with an `onError` fallback for a cache Android has cleared. Found on 2026-08-31 by reading the code the row said did not exist. Never deliberately looked at on the phone, so `untested` rather than `proved`.",
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "**Already built, and the row was wrong.** `sendPhoto` carries the shrunk copy `uri` on the turn and `SentPhoto` renders it above the caption, with an `onError` fallback for a cache Android has cleared. Found on 2026-08-31 by reading the code the row said did not exist. Never deliberately looked at on the phone, so `untested` rather than `proved`. **PROVED on the phone 2026-09-01, 14:46.** A photo sent from the composer renders in the bubble at its full width with the marker beneath it, under a `Today` rule. The camera control is a `Touchable`, so `adb shell input` cannot reach it and the send needed a finger — the third time that has decided how a check gets done.",
           "goal": "conversation"
         },
         {
           "id": "photo-inflight",
           "name": "Photo-in-flight indicator; a failed send stays recoverable",
-          "status": "untested",
-          "blockedBy": "app",
-          "note": "**Recovery built 2026-08-31; the in-flight half was already there.** A photo turn has carried `SENDING` / `NOT SENT` since the marks shipped, because `sendPhoto` settles its own turn. What was missing was the recovery the row names: the send handed base64 to the socket and kept only a `uri` in the log, so a failed photo had a picture on screen and no bytes to re-send. `reshoot` rebuilds them through the same shrink the first send used — a retry that skipped it would put a full-size frame on a socket sized for 200 KB — and the caption comes back off the turn through `captionOf`, one place owning the marker so a retry cannot send the word \"Photo\" as though it had been typed. **A picture the cache has lost says so** rather than retrying forever: `resendPhoto` answers false and the chat says the photo is no longer on the phone. 11 tests. Unproved on the device.",
+          "status": "proved",
+          "blockedBy": "none",
+          "note": "**Recovery built 2026-08-31; the in-flight half was already there.** A photo turn has carried `SENDING` / `NOT SENT` since the marks shipped, because `sendPhoto` settles its own turn. What was missing was the recovery the row names: the send handed base64 to the socket and kept only a `uri` in the log, so a failed photo had a picture on screen and no bytes to re-send. `reshoot` rebuilds them through the same shrink the first send used — a retry that skipped it would put a full-size frame on a socket sized for 200 KB — and the caption comes back off the turn through `captionOf`, one place owning the marker so a retry cannot send the word \"Photo\" as though it had been typed. **A picture the cache has lost says so** rather than retrying forever: `resendPhoto` answers false and the chat says the photo is no longer on the phone. 11 tests. Unproved on the device. **The in-flight half is PROVED on the phone 2026-09-01:** the turn settled rather than sitting at `SENDING`, and the answer came back inside a minute — *\"An empty cup at nearly three in the afternoon is a rather grim sight, Sir.\"* — so the vision path is end to end as well. **The named gap is the recovery**, which is the half built on 08-31 and still never exercised: it wants a send that fails with the network off, and then `RETRY`. Both the camera and the retry control are `Touchable`, so that check cannot be driven from the laptop. **The recovery is PROVED on the phone, 2026-09-01, 14:59.** Airplane mode on, a photo sent, and the turn marked `NOT SENT` with `SEND AGAIN` beside it and the picture still rendered — a failure that stays recoverable rather than a bubble that sits at `SENDING`. Network back, `SEND AGAIN` tapped: the failed turn was withdrawn and re-sent, and **the reply is about the photograph** — *\"A capped pen and some scribbled notes, Sir…\"* — so `reshoot` rebuilt the bytes from the cached uri and they reached the vision model. Before 08-31 that was impossible: the base64 went to the socket and only a local uri stayed in the log, so a retry could only have sent the caption as text. **Both controls are `Touchable`, so the whole check needed a finger** — adb could read it and could not drive it.",
           "goal": "conversation"
         },
         {
