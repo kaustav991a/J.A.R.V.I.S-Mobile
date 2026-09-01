@@ -421,6 +421,9 @@ function html() {
   const QSTATE = {
     proved: { word: 'Proved', hint: 'Seen working. Nothing owed.' },
     shipped: { word: 'Shipped · unproved', hint: 'Code landed and published. No human has seen it yet.' },
+    // a queue item can be half done: queue 23 shipped background sightings and still
+    // owes the alarm intent, and calling that either Open or Shipped is a lie
+    partial: { word: 'Half done', hint: 'Part of it shipped. The rest is still owed, and the detail says which.' },
     open: { word: 'Open', hint: 'Not started.' },
     blocked: { word: 'Blocked', hint: 'Cannot be finished from this repo.' },
   };
@@ -937,6 +940,7 @@ function html() {
   .q-tag { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dimmer); border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; white-space: nowrap; cursor: help; }
   .q-tag-proved { color: var(--proved); border-color: rgba(47,212,181,0.4); background: rgba(47,212,181,0.08); }
   .q-tag-shipped { color: var(--partial); border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.08); }
+  .q-tag-partial { color: var(--partial); border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.08); }
   .q-tag-blocked { color: #ff8fa0; border-color: rgba(255,143,160,0.4); background: rgba(255,143,160,0.07); }
 
   /* only proved earns the line through — see the comment at the generator */
@@ -945,6 +949,7 @@ function html() {
   .q-proved .q-n { color: var(--proved); }
 
   /* shipped-but-unproved is deliberately NOT struck through, and says so */
+  .q-partial { border-left: 3px solid var(--partial); }
   .q-shipped { border-left: 3px solid var(--partial); }
   .q-blocked { border-left: 3px solid rgba(255,143,160,0.5); }
   .q-blocked .q-t, .q-blocked .q-d { opacity: 0.82; }

@@ -16,6 +16,71 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## 🛑 STOP POINT — 2026-09-01, evening. **The runtime moved. Read this before publishing.**
+
+**The OTA runtime is no longer `31c64113d7d13a400eb1c56ef81c4d0d4be3fa17`. It is
+`1818e1b77eac5c530c6c15e2678b44bf2a2fb695`,** because `app.json` gained the
+`expo-location` plugin and `ACCESS_BACKGROUND_LOCATION`. Every publish from `c1d1ad4`
+onward reaches the new runtime, and **only a phone carrying the new APK can receive
+them.** The phone was built and installed in the same sitting, which is the whole
+reason the manifest change waited: the geofence library shipped over the air a commit
+earlier, on the old runtime, doing nothing until the permission arrived.
+
+### Build locally. An EAS build cannot update this phone without wiping it.
+
+Measured, not assumed. The installed APK was pulled off the device and its signer read:
+
+```
+Signer #1 certificate SHA-256 digest: fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
+```
+
+That is `android/app/debug.keystore`, byte for byte. So the app on the phone is a local
+`./gradlew assembleRelease` — the EAS build list ends on 12 Aug and the install stamp
+reads 21 Aug — **and an EAS build, signed with Expo's key, cannot update it.** The only
+way to install one is `adb uninstall` first, which destroys twelve weeks of sightings,
+the chat log and the journal. It was not done, and it is why **queue 18's real keystore
+is not the free ride the queue says it is**: rotating the signing key costs the same
+data unless it is done as signing-scheme v3 rotation, which is its own job.
+
+Two things follow, both now in `AGENTS.md`:
+
+- **`expo prebuild --clean` deletes `android/app/debug.keystore`.** `android/` is
+  gitignored, so the only key that can update the phone lives in a generated directory
+  a routine command wipes. Backed up before the prebuild and checked after.
+- **A local release build must have the fingerprint baked by hand.** `prebuild` writes
+  the literal `file:fingerprint` into `strings.xml`; `1818e1b7…` was written in before
+  building. Without it the APK asks the update server for `file:fingerprint`, gets
+  nothing, and runs its embedded bundle forever with no log line about it.
+
+### What the build is for: departures the app can actually see
+
+Three wrong figures in one day, all from one root, each caught by the person they were
+about. *"Usually at Home by 10:49 AM"* to a man who had slept there. *"When you are
+usually gone — 3:40 PM"* about an office he leaves at seven. And the repair, *"by
+8:04 PM"*, which is where he is next SEEN and still not a departure.
+
+Every sighting this app has ever written was written because somebody opened it. So the
+store held *when he used his phone at a place*, and every habit derived from it
+inherited that bias. **A geofence exit is the real event** — Android reports the
+boundary crossing with the app closed, two to five minutes late rather than hours.
+
+Asked for directly: *"the app should learn it itself, Google Maps Timeline has all the
+data"*. It does, and there is no route to it — Timeline moved on-device, no API exposes
+it to another app, and a Takeout export is stale the moment it is made. Maps knows
+because it holds background location. This is the same permission doing the same job,
+for one app's own named places.
+
+Shipped with it: `src/lib/geofence.ts` (regions, the task defined at module scope, an
+event handler that may not throw because nothing above it can catch), `via: enter | exit`
+on every sighting, `leftBy` preferring a measured exit and reporting `measured: false`
+when it falls back, and a **WATCH** control on Places that says which of the two missing
+things is missing — a permission is a dialog, a registration is the button, an old build
+is an install.
+
+**`background-sightings` is `untested` and only leaving can change that.** The first
+real proof is a departure whose recorded time matches the clock. Nothing on a laptop can
+make that happen.
+
 ## 🛑 STOP POINT — 2026-08-31, 18:55. Start here. **The freeze below was lifted today.**
 
 **Kaustav lifted it in the session, verbally: "work on app".** The banner under this entry

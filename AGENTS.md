@@ -193,6 +193,30 @@ of rediscovering them is high.
   hand (`npx expo-updates fingerprint:generate --platform android`) before building —
   remembering that `android/` is gitignored and generated, so a later `prebuild` puts
   the placeholder back without saying so.
+- **Only a build signed with `android/app/debug.keystore` can update the phone.** The
+  installed app was built locally and carries that key — signer SHA-256
+  `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`, checked on
+  2026-09-01 against the APK pulled off the device. **An EAS build carries a different
+  key**, so `adb install -r` refuses it, and the only way to install one is
+  `adb uninstall` first — which destroys twelve weeks of sightings, the chat log and
+  the journal. That is also why queue 18's real keystore is not free: rotating the key
+  costs the data unless it is done as signing-scheme v3 rotation.
+
+  Check before any install, and dry-run the install itself:
+
+  ```bash
+  adb pull "$(adb shell pm path com.mypersonalintelligence.jarvis | sed 's/package://' | tr -d '\r')" installed.apk
+  apksigner verify --print-certs installed.apk           # must match the keystore
+  keytool -list -v -keystore android/app/debug.keystore -storepass android | grep SHA256
+  adb install -r --dry-run app-release.apk               # fails safely if it would not take
+  ```
+
+  A refused install is safe: Android rejects the update and leaves the app alone. The
+  unsafe move is reaching for `adb uninstall` when one fails.
+- **`expo prebuild --clean` deletes `android/app/debug.keystore`.** `android/` is
+  gitignored, so the only copy of the key that can update the phone lives in a
+  generated directory that a routine command wipes. Copy it out first, put it back
+  after, and check the SHA-256 still matches before building.
 - **`Touchable` cannot be driven by `adb shell input`; `SettingsRow` can.** Measured on
   2026-08-26 across three methods — `input tap`, a held `input swipe`, and an explicit
   `input motionevent DOWN/UP` — against RESET and PREVIEW on Places. None fired: the row
