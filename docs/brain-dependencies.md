@@ -7,7 +7,7 @@
 >
 > Head: 462fa4c on `feat/cloud-gateway`, which is what Render watches.
 >
-> **21 ledger rows and 7 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
+> **20 ledger rows and 7 queue items** are blocked here. This file is their long form and **not** a status — the status is `docs/status/ledger.json`, and both lists below are counted from it.
 
 ## Read these before touching anything that looks broken
 
@@ -58,7 +58,7 @@ The phone knows *sent*. Only the gateway can say *delivered* and *read*, and it 
 
 **WRITTEN on the home machine 2026-08-29 (`02604c6`) and NOT LIVE.** Ported from this repo's `src/lib/briefingVoice.ts` line for line rather than reinvented, because two senders with two voices is worse than the repetition: a pool per slot, one cursor object shared across departures, the figures never varied, and the actionable word (`umbrella`, `jacket`, `Water`, `hair`, `wait it out`) kept in every variant, since Android truncates a body in the shade. The cursor is spent only on a briefing that actually went out — `_push_all` returns whether anything left, and a push that reached nobody now leaves the day OPEN rather than marking it done, which is the rule the failed-forecast path already had. It persists through `_persist("briefing_voice")` and is restored on boot, the half that waited on durable state: a cursor a deploy resets restarts the rotation at the same line every time. `_briefing_text` without a cursor still draws the first line of every pool, so the prose the harness asserts is unchanged; `test_commute_briefing.py` 15 -> 26, negative-tested by committing the cursor before the push instead of after. **Owed: a deploy, then two mornings of looking at the notification.**
 
-## The ledger rows — 21
+## The ledger rows — 20
 
 Every row whose blocker is `brain`, in the order §0b renders them.
 
@@ -87,7 +87,6 @@ Every row whose blocker is `brain`, in the order §0b renders them.
 
 | | Status | Why it is here |
 | --- | --- | --- |
-| Rotating wording in the gateway-sent briefing | untested | The phone rotates its own wording; the gateway does not. When `cloudArmed` is true the phone stays silent by design and the gateway posts `_briefing_text`, which is a fixed template — so on a cloud-linked phone the repetition the rotation was built to fix is still what arrives. Same shape as `briefingVoice.ts`: a pool per slot and a cursor that survives a deploy, which is why it wants `fix/durable-state` merged first rather than a second store that a redeploy wipes. **Seen rather than reasoned about, 2026-08-27.** The Office briefing at 17:59 on the 26th and the Home briefing at 07:00 on the 27th carry the identical remark — *"An umbrella, unless you’ve grown fond of arriving wet."* — and differ only in their figures, 51% against 65% with a storm line added. Two mornings, one sentence. It also cost a diagnosis: the changed figures read as rotated wording from the phone, and the gateway was briefly suspected of having gone silent. **2026-08-31: the rotation is written and deployed.** `02604c6` on `feat/cloud-gateway` ports this repo's `briefingVoice.ts` line for line rather than inventing a second voice, and `fix/durable-state` is merged, so the cursor survives a redeploy — which was the reason it had to wait. **Owed: two gateway briefings on different days, compared.** The pair that proved the defect were word-for-word identical, so word-for-word difference is the check. |
 | He speaks first, once a day | untested | Fired for the first time and was wrong: a bare substring match let a Mon–Fri pattern assert a Saturday shift, and the prompt then asserted it as true today. Fixed in the brain as c86d176, not deployed. The same body also capitalised `Sir`, which the voice rule forbids. **2026-08-31: the fix is deployed.** `c86d176` is contained in `origin/feat/cloud-gateway`, which is the branch Render watches — verified from this repo with `git branch -r --contains`, which is as much as this laptop can check. So the substring bug and the capitalised `Sir` are both live. **What is owed is a morning:** he speaks once a day at most, so this is proved by looking rather than by triggering. |
 
 ### Memory and the journal
