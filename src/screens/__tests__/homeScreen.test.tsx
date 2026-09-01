@@ -66,6 +66,22 @@ jest.mock('../../lib/journal/rollup', () => ({
   usageForAsk: jest.fn().mockResolvedValue({ today: 42, pickups: 7, top: [], usual: 60, days: 9 }),
 }));
 
+/**
+ * Home reads a location fix now, for the map panel that shows the match circles.
+ *
+ * Unmocked, `currentFix` reaches `expo-location` and never settles under jest, and
+ * every test in this file times out at five seconds with nothing to say about why.
+ * Mocked to null: the panel's own behaviour is covered in `components/__tests__`,
+ * and what these tests care about is that Home still renders around it.
+ */
+jest.mock('../../lib/place', () => ({
+  FIX_TTL_MS: 180_000,
+  currentFix: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../../lib/knownPlaces', () => ({
+  loadKnown: jest.fn().mockResolvedValue([]),
+}));
+
 beforeEach(() => {
   mockJarvis = {};
 });

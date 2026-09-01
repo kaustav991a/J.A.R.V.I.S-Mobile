@@ -17,6 +17,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type Fix = {
   lat: number;
   lon: number;
+  /**
+   * How wide the reading is, in metres, as the platform reports it.
+   *
+   * Carried because naming a place is a comparison, not a measurement: with two named
+   * places 150 m apart and a reading good to 100 m, choosing either is a coin toss.
+   * The place matcher refuses rather than guessing, and this is what it refuses on.
+   */
+  accuracy?: number;
   /** e.g. "Salt Lake, West Bengal" — empty when the geocoder had nothing */
   place: string;
 };
@@ -95,7 +103,17 @@ export async function currentFix(maxAgeMs = 0): Promise<Fix | null> {
   if (maxAgeMs > 0 && fixCache && Date.now() - fixCache.at <= maxAgeMs) return fixCache.fix;
   try {
     const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
+      /**
+       * , not , and the reason changed under this call.
+       *
+       * The balanced setting is around a hundred metres and is derived from wifi and cell rather
+       * than GPS. That was right while a fix only answered "what is the weather here";
+       * it is wrong now that the same fix decides WHICH NAMED PLACE you are standing
+       * in. Wifi positioning anchors to routers it knows — his own — so from 150 m
+       * down the road it kept handing back the coordinates of his living room, and the
+       * app kept saying Home. Reported from the phone on 2026-09-01.
+       */
+      accuracy: Location.Accuracy.High,
     });
     const { latitude, longitude } = position.coords;
     let place = '';
@@ -120,7 +138,7 @@ export async function currentFix(maxAgeMs = 0): Promise<Fix | null> {
     } catch {
       // an unnamed fix is still worth sending; the gateway prints coordinates
     }
-    const fix = { lat: latitude, lon: longitude, place };
+    const fix = { lat: latitude, lon: longitude, place, accuracy: position.coords.accuracy ?? undefined };
     fixCache = { fix, at: Date.now() };
     return fix;
   } catch {

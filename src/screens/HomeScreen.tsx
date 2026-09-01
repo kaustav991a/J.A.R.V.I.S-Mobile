@@ -10,6 +10,7 @@ import { GovernancePanel } from '../components/GovernancePanel';
 import { TypeLine } from '../components/TypeLine';
 import { QuickMenu } from '../components/QuickMenu';
 import { StatusPanel } from '../components/StatusPanel';
+import { PlaceMap } from '../components/PlaceMap';
 import { WatchingPanel } from '../components/WatchingPanel';
 import { Screen, SectionLabel } from '../components/ui/Atoms';
 import { Touchable } from '../components/ui/Touchable';
@@ -24,6 +25,10 @@ import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
 import { daysSeenAt, loadSeen, usuallyGoneBy } from '../lib/timeline';
 import { loadSpoken } from '../lib/spokenStore';
+import { loadKnown } from '../lib/knownPlaces';
+import type { KnownPlace } from '../lib/knownPlaces';
+import { FIX_TTL_MS, currentFix } from '../lib/place';
+import type { Fix } from '../lib/place';
 import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
 import { SCRIPTS } from '../data/fixtures';
@@ -108,6 +113,15 @@ export function HomeScreen() {
   const [scheduleAtGateway, setScheduleAtGateway] = useState<CloudArmedState>('never');
   const [usageAccess, setUsageAccess] = useState<'granted' | 'denied' | 'unknown'>('unknown');
   const [watch, setWatch] = useState<WatchFacts | null>(null);
+  /**
+   * The named places and the current reading, for the map panel below.
+   *
+   * A cached fix is accepted rather than taking a fresh one: this panel is about
+   * how the circles sit relative to each other, and paying a GPS spin every time
+   * Home comes into focus would be spending seconds to redraw the same picture.
+   */
+  const [known, setKnown] = useState<KnownPlace[]>([]);
+  const [fix, setFix] = useState<Fix | null>(null);
   useFocusEffect(
     useCallback(() => {
       let alive = true;
@@ -141,12 +155,18 @@ export function HomeScreen() {
       void (async () => {
         try {
           const now = new Date();
-          const [seen, spoken, usage] = await Promise.all([
+          const [seen, spoken, usage, places, here] = await Promise.all([
             loadSeen(),
             loadSpoken(),
             usageForAsk(await openJournal(), now.getTime()).catch(() => null),
+            loadKnown().catch(() => [] as KnownPlace[]),
+            // a cached reading: the panel is about how the circles sit relative to
+            // each other, and a GPS spin on every focus would redraw the same picture
+            shareLocation ? currentFix(FIX_TTL_MS).catch(() => null) : Promise.resolve(null),
           ]);
           if (!alive) return;
+          setKnown(places);
+          setFix(here);
           const next: WatchFacts = {
             baselineDays: usage?.days ?? 0,
             placeDays: place ? daysSeenAt(seen, place, now) : 0,
@@ -475,6 +495,23 @@ export function HomeScreen() {
         <>
           <SectionLabel>What he is watching</SectionLabel>
           <WatchingPanel facts={watch} />
+        </>
+      ) : null}
+
+      {/*
+        Where he thinks you are, and how big the circles are that decide it.
+
+        Asked for on 2026-09-01 after two named places 150 metres apart turned out to
+        sit inside each other's match circles, so walking between them never changed
+        what the app said. It is a diagnostic rather than a map, and it belongs on Home
+        for the same reason the status panel does: the question it answers — why does
+        it think I am at Home — is asked before anybody would think to go looking for a
+        screen about it.
+      */}
+      {shareLocation ? (
+        <>
+          <SectionLabel>Where he thinks you are</SectionLabel>
+          <PlaceMap places={known} fix={fix} />
         </>
       ) : null}
 

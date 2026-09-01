@@ -1,0 +1,53 @@
+import { render } from '@testing-library/react-native';
+
+import { PlaceMap } from '../PlaceMap';
+import { AppearanceProvider } from '../../theme/appearance';
+
+/**
+ * The drawing that answers "can I see the radius and the overlapped area".
+ *
+ * The arithmetic is pinned in `lib/__tests__/placeMap.test.ts`; these are about the
+ * two things the picture has to say out loud, because a diagram nobody can interpret
+ * is decoration: that the circles overlap, and that having nothing to draw is a state
+ * with words rather than an empty box.
+ */
+
+const place = (label: string, lat: number, lon: number) => ({
+  id: label.toLowerCase(),
+  label,
+  lat,
+  lon,
+  area: '',
+});
+
+const HOME = place('Home', 22.75, 88.37);
+/** about 150 m away, which is the reported case */
+const AREA = place('My area', 22.75135, 88.37);
+const OFFICE = place('Office', 22.58, 88.43);
+
+const mount = (ui: React.ReactElement) => render(<AppearanceProvider>{ui}</AppearanceProvider>);
+
+describe('the place map', () => {
+  it('says so when two circles overlap, rather than leaving it to be measured by eye', async () => {
+    const { findByTestId } = await mount(<PlaceMap places={[HOME, AREA]} fix={null} />);
+    expect((await findByTestId('place-map-caption')).props.children).toContain('overlap');
+  });
+
+  it('explains the circles when nothing overlaps', async () => {
+    const { findByTestId } = await mount(<PlaceMap places={[HOME, OFFICE]} fix={null} />);
+    expect((await findByTestId('place-map-caption')).props.children).toContain('how close');
+  });
+
+  it('draws the reading and its error when there is one', async () => {
+    const { findByTestId } = await mount(
+      <PlaceMap places={[HOME]} fix={{ lat: 22.75, lon: 88.37, accuracy: 30 }} />
+    );
+    expect(await findByTestId('place-map-accuracy')).toBeTruthy();
+  });
+
+  it('says what to do when there is nothing to draw', async () => {
+    // an empty box reads as a broken panel, which is the confusion this app keeps closing
+    const { findByTestId } = await mount(<PlaceMap places={[]} fix={null} />);
+    expect(await findByTestId('place-map-empty')).toBeTruthy();
+  });
+});

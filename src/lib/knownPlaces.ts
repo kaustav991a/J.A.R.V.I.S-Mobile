@@ -100,14 +100,49 @@ export function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lo
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 }
 
-/** within this many km of a named place counts as being there */
-export const AT_PLACE_KM = 0.25;
+/**
+ * Within this many km of a named place counts as being there.
+ *
+ * Was 250 m, and reported from the phone on 2026-09-01: Home and a named area about
+ * 150 metres apart, each sitting inside the other's circle, so walking between them
+ * never changed what the app said. 120 m is tight enough to separate two places on
+ * one street and loose enough for a fix taken indoors.
+ */
+export const AT_PLACE_KM = 0.12;
 
-/** the name of wherever he is standing, if it is somewhere he has named */
-export function nameFor(fix: { lat: number; lon: number }, places: KnownPlace[]): string | null {
+/**
+ * The name of wherever he is standing, or null when it cannot honestly tell.
+ *
+ * **The second half is the fix for a real report.** A place has to win by more than
+ * the reading's own error: with a hundred metres of uncertainty and two places a
+ * hundred and fifty apart, naming either one is a coin toss reported as a fact, and
+ * that is what put him at Home while he stood down the road. Null costs a remark;
+ * the wrong name costs trust in every remark.
+ *
+ * The accuracy is in metres and optional — a fix without one is taken at its word,
+ * which is how every caller behaved before this existed.
+ */
+export function nameFor(
+  fix: { lat: number; lon: number; accuracy?: number },
+  places: KnownPlace[]
+): string | null {
+  const errorKm = (fix.accuracy ?? 0) / 1000;
+  // anywhere the reading cannot rule out, which is wider than the match radius when
+  // the fix is poor — a neighbour just outside the circle is still a candidate for
+  // having been the real position
   const near = places
     .map((p) => ({ p, km: distanceKm(fix, p) }))
-    .filter((x) => x.km <= AT_PLACE_KM)
-    .sort((a, b) => a.km - b.km)[0];
-  return near ? near.p.label : null;
+    .filter((x) => x.km - errorKm <= AT_PLACE_KM)
+    .sort((a, b) => a.km - b.km);
+
+  const best = near[0];
+  if (!best) return null;
+  // inside the circle only because the error is wide is not being there
+  if (best.km > AT_PLACE_KM) return null;
+
+  const runnerUp = near[1];
+  // a neighbour this close cannot be ruled out by a reading this loose
+  if (runnerUp && runnerUp.km - best.km <= errorKm) return null;
+
+  return best.p.label;
 }
