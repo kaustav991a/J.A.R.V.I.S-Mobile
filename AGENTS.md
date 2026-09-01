@@ -245,6 +245,12 @@ of rediscovering them is high.
   that reaches the journal drags it in. It fails **after** a full minute of bundling with
   `Web Bundling failed`, `✖ Export failed`, and nothing about Android, which reads like a
   broken publish rather than a platform this app does not ship.
+- **`eas update --non-interactive` also needs `--environment`.** Without it the publish
+  dies on `The --environment flag must be set when running in --non-interactive mode`,
+  and the only other line is `Error: update command failed.` — which reads like a broken
+  project rather than a missing flag. The full command is
+  `npx eas update --channel production --platform android --environment production
+  --message "…" --non-interactive`.
 - **Never pipe `npm test` into `tail` inside a `&&` chain.** The pipeline exits with `tail`'s status, not jest's, so a failing suite reads as success and the commit and publish after it go ahead anyway. It happened on 2026-09-01: one red test shipped to the phone because the chain never stopped. Run the suite as its own command, or append `; echo EXIT=0`.
 - **Edit the ledger from a script file, never from `node -e "…"`.** The notes in
   `docs/status/ledger.json` are full of backticked code spans, and inside a double-quoted
