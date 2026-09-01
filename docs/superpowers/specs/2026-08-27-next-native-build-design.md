@@ -74,6 +74,42 @@ Android's own two-step grant. **This one should be argued for separately rather 
 through with the other three** — it is the only item here that changes what the app knows
 about you when it is closed.
 
+#### What 2026-09-01 added to this argument
+
+**Three wrong figures in one day, all from the same root, all seen by the person they
+were about.**
+
+- *"At Home early, sir — usually you are there by 10:49 AM"*, said to somebody who had
+  been home all night. 10:49 was the median first app-open at home, called an arrival.
+- *"When you are usually gone — 3:40 PM"* about an office he leaves at seven. That was
+  the median last app-open there. It also armed a "still here late" remark for 4:25 PM,
+  every working day, about a man at his desk in the afternoon.
+- *"By now you are usually gone — 8:04 PM"*, the repair, which is the hour he is next
+  SEEN at Home. Sound as an upper bound and still not a departure: he leaves at 7:10 and
+  the app cannot see it.
+
+Each was fixed by narrowing the claim, and the third fix is the end of that road — what
+is left to narrow is the sentence, not the data. **The app is being asked to learn when
+somebody leaves while being denied the only signal that shows a leaving.**
+
+**Asked directly on the day: "the app should learn it itself, Google Maps Timeline has
+all the data — when we leave, when we arrive."** It does, and there is no route to it:
+Timeline moved on-device, there is no API for another app to read it, and a Takeout
+export is a manual download that is stale the moment it is made. Maps knows because it
+holds background location and gets geofence transitions while closed. That is the same
+permission, doing the same job.
+
+**What it buys, concretely:** enter and exit events at named places with real
+timestamps, so `usuallyGoneBy` becomes a departure rather than a floor, `usuallyHereBy`
+becomes an arrival, `anticipate-habit` gets a baseline that is not app-open bias, and
+the commute time between two named places becomes measurable — the one anticipation on
+the buildable list that nothing else can support.
+
+**What it costs:** the permission Android asks about most pointedly, in two steps, and a
+genuine obligation to say on screen what is being recorded and to keep it derived. The
+sighting store is already 12 weeks of named places and nothing else; background events
+must not widen that into a track.
+
 ### 4. A real release keystore — queue 18
 
 Release is signed with Expo's generated debug keystore, which is why a local APK and an
