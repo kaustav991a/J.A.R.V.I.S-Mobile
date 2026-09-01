@@ -97,6 +97,44 @@ The publish itself needed one flag that is easy to lose an evening to:
 `eas update --non-interactive` also demands `--environment production`, and without it
 the only visible line is `Error: update command failed.`
 
+### The platform fired ten false departures, and he caught it in a minute — 18:31
+
+TEST was pressed on the new WATCH row and the phone posted **ten** notifications, not
+one: *"Left Office"*, *"Left Home"*, *"Left Musalman Para"*, *"Left Sector V Metro
+Station"*, *"Left Barrackpore Railway Station"* and five more, all stamped 6:31 PM,
+with a sighting written for each. **Play Services re-evaluates every region when the
+app process restarts and reports an exit for each region the phone is OUTSIDE of.**
+Standing at the office therefore produces a departure from every other place he owns.
+Every event is real; not one is a departure.
+
+*"but i'm in office now .. then why home ?"* — which is the entire diagnosis in one
+line, and arrived before the fix did.
+
+Three rules, each named after the thing that went wrong:
+
+1. **A person leaves one place at a time.** Two places reporting a departure inside
+   ninety seconds is the platform. The burst is dropped — and since the first exit of a
+   burst is indistinguishable from a real one when it lands, the repair reaches
+   backwards and removes what was already written.
+2. **Wait before speaking.** Retraction was tried first: post, then dismiss when the
+   second event exposes the burst. It left *"Left Home — 6:40 PM"* standing in the
+   shade about a house he was nowhere near, because `dismissNotificationAsync` is
+   best-effort and the shade is not. The word now waits ten seconds and goes out only
+   if the sighting is still there. **The sighting is never delayed** — a process killed
+   inside that window still recorded the departure and lost only the word about it.
+3. **You can only leave where you were.** A single false exit has no burst to give it
+   away, so it is judged by what came immediately before: a departure from somewhere
+   the app was not just seeing you is geometry, not a person. An exit with nothing
+   before it stands, because silence is not evidence.
+
+`pruneSweepExits` runs at every launch and applies all three to what is already stored.
+
+**The lesson is not "geofences are noisy".** It is that the first evening of any new
+sensor writes data, and this app derives habits from data. Ten sweep exits left alone
+would have taught a departure time for every named place within a week, and they would
+have looked exactly like the 3:40 PM figure that started this whole thread — a
+confident wrong number with a plausible provenance.
+
 ### What the build is for: departures the app can actually see
 
 Three wrong figures in one day, all from one root, each caught by the person they were
