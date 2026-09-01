@@ -36,9 +36,25 @@ export type Plot = {
   overlapping: boolean;
   /** so a scale bar can be drawn, and the picture read as a measurement */
   metresPerPixel: number;
+  /**
+   * Named places left out for being nowhere near.
+   *
+   * Counted rather than silently dropped: a panel that shows two of your ten
+   * places without saying so is lying by omission about what it has drawn.
+   */
+  hidden: number;
 };
 
 const M_PER_DEG_LAT = 111_320;
+
+/**
+ * How far away a named place can be and still belong in the picture.
+ *
+ * Wide enough to hold a house, the street it is on and the next named corner —
+ * which is the scale the overlap question lives at — and tight enough that a place
+ * across the city cannot flatten the drawing into dots.
+ */
+export const NEAR_M = 800;
 
 /** metres east and north of a reference point — flat, which is fine at this size */
 const project = (
@@ -54,17 +70,42 @@ export function mapPlot(input: {
   fix: { lat: number; lon: number; accuracy?: number } | null;
   /** the match radius in metres; defaults to the one the matcher actually uses */
   radiusM?: number;
+  /** how far from the centre a place can be and still be worth drawing, in metres */
+  nearM?: number;
   /** canvas edge, in pixels */
   size: number;
 }): Plot {
   const radiusM = input.radiusM ?? AT_PLACE_KM * 1000;
+  const nearM = input.nearM ?? NEAR_M;
+
+  /**
+   * Only the places near the middle of the question get drawn.
+   *
+   * Reported from the office: no circles, just dots. Ten named places across forty
+   * kilometres, and a plot scaled to hold all of them puts a hundred and fifty
+   * metres in a pixel — so a 120 m circle draws at less than one, and the panel
+   * shows nothing it exists to show. The question is about a few hundred metres
+   * either way; everything past that belongs on a map, and this is not one.
+   */
+  const centre = input.fix ?? input.places[0] ?? null;
+  if (!centre) {
+    return { places: [], you: null, overlapping: false, metresPerPixel: 1, hidden: 0 };
+  }
+
+  const withDistance = input.places.map((place) => {
+    const m = project(place, centre);
+    return { place, away: Math.hypot(m.east, m.north) };
+  });
+  const shown = withDistance.filter((x) => x.away <= nearM).map((x) => x.place);
+  const hidden = withDistance.length - shown.length;
+
   const points = [
-    ...input.places.map((p) => ({ lat: p.lat, lon: p.lon })),
+    ...shown.map((p) => ({ lat: p.lat, lon: p.lon })),
     ...(input.fix ? [{ lat: input.fix.lat, lon: input.fix.lon }] : []),
   ];
 
   if (!points.length) {
-    return { places: [], you: null, overlapping: false, metresPerPixel: 1 };
+    return { places: [], you: null, overlapping: false, metresPerPixel: 1, hidden };
   }
 
   const origin = {
@@ -92,7 +133,7 @@ export function mapPlot(input: {
     y: input.size / 2 - m.north / metresPerPixel,
   });
 
-  const places = input.places.map((p) => ({
+  const places = shown.map((p) => ({
     label: p.label,
     ...toCanvas(project(p, origin)),
     r: radiusM / metresPerPixel,
@@ -117,5 +158,5 @@ export function mapPlot(input: {
     }
   }
 
-  return { places, you, overlapping, metresPerPixel };
+  return { places, you, overlapping, metresPerPixel, hidden };
 }

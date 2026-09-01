@@ -90,3 +90,67 @@ describe('when there is little to draw', () => {
     expect(plot.overlapping).toBe(false);
   });
 });
+
+/**
+ * Only what is near, because the far ones make the near ones invisible.
+ *
+ * Reported from the office: no circles, no gap, just dots. Ten named places spread
+ * across forty kilometres of one city, and a plot scaled to hold all of them puts
+ * about a hundred and fifty metres in every pixel — so a 120 m match circle draws at
+ * under one pixel and the whole point of the panel disappears.
+ *
+ * The panel answers "how do the circles around me sit relative to each other", which
+ * is a question about a few hundred metres. Everything past that belongs on a map,
+ * and this was never a map.
+ */
+describe('keeping the drawing to the scale of the question', () => {
+  const HOME_P = { id: 'home', label: 'Home', lat: 22.75, lon: 88.37, area: '' };
+  const AREA_P = { id: 'area', label: 'My area', lat: 22.75135, lon: 88.37, area: '' };
+  /** about 20 km south, which is what flattens the scale */
+  const OFFICE_P = { id: 'office', label: 'Office', lat: 22.58, lon: 88.43, area: '' };
+
+  it('leaves out places that are nowhere near you', () => {
+    const plot = mapPlot({
+      places: [HOME_P, AREA_P, OFFICE_P],
+      fix: { lat: 22.75, lon: 88.37, accuracy: 15 },
+      size: 300,
+    });
+    expect(plot.places.map((p) => p.label).sort()).toEqual(['Home', 'My area']);
+  });
+
+  it('says how many it left out, rather than quietly dropping them', () => {
+    const plot = mapPlot({
+      places: [HOME_P, AREA_P, OFFICE_P],
+      fix: { lat: 22.75, lon: 88.37, accuracy: 15 },
+      size: 300,
+    });
+    expect(plot.hidden).toBe(1);
+  });
+
+  it('keeps the circles big enough to be looked at', () => {
+    // the report in one assertion: a radius under a pixel is not a drawing
+    const plot = mapPlot({
+      places: [HOME_P, AREA_P, OFFICE_P],
+      fix: { lat: 22.75, lon: 88.37, accuracy: 15 },
+      size: 300,
+    });
+    for (const p of plot.places) expect(p.r).toBeGreaterThan(10);
+  });
+
+  it('centres on you when you are at a place with no named neighbours', () => {
+    const plot = mapPlot({
+      places: [HOME_P, AREA_P, OFFICE_P],
+      fix: { lat: 22.58, lon: 88.43, accuracy: 15 },
+      size: 300,
+    });
+    expect(plot.places.map((p) => p.label)).toEqual(['Office']);
+    expect(plot.hidden).toBe(2);
+    expect(plot.places[0].r).toBeGreaterThan(10);
+  });
+
+  it('falls back to the places themselves when there is no reading', () => {
+    const plot = mapPlot({ places: [HOME_P, AREA_P, OFFICE_P], fix: null, size: 300 });
+    // no fix to centre on, so it shows the cluster around the first named place
+    expect(plot.places.map((p) => p.label).sort()).toEqual(['Home', 'My area']);
+  });
+});

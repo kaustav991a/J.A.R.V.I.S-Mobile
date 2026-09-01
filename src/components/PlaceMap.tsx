@@ -114,6 +114,9 @@ export function PlaceMap({
         {plot.overlapping
           ? 'Two of these circles overlap. Standing in the overlap, the app cannot tell which place you are at — and says nothing rather than guessing.'
           : 'Each circle is how close you must be for the app to call it that place. The dashed ring is how sure this reading is.'}
+        {plot.hidden > 0
+          ? ` ${plot.hidden} other named ${plot.hidden === 1 ? 'place is' : 'places are'} too far away to draw at this scale.`
+          : ''}
       </Text>
     </View>
   );

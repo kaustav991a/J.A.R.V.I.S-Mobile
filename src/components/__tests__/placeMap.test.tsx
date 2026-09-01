@@ -27,15 +27,19 @@ const OFFICE = place('Office', 22.58, 88.43);
 
 const mount = (ui: React.ReactElement) => render(<AppearanceProvider>{ui}</AppearanceProvider>);
 
+/** the caption is assembled from parts, so read it as the sentence it renders as */
+const captionOf = (node: { props: Record<string, unknown> }): string =>
+  ([] as unknown[]).concat(node.props.children as unknown).join('');
+
 describe('the place map', () => {
   it('says so when two circles overlap, rather than leaving it to be measured by eye', async () => {
     const { findByTestId } = await mount(<PlaceMap places={[HOME, AREA]} fix={null} />);
-    expect((await findByTestId('place-map-caption')).props.children).toContain('overlap');
+    expect(captionOf(await findByTestId('place-map-caption'))).toContain('overlap');
   });
 
   it('explains the circles when nothing overlaps', async () => {
     const { findByTestId } = await mount(<PlaceMap places={[HOME, OFFICE]} fix={null} />);
-    expect((await findByTestId('place-map-caption')).props.children).toContain('how close');
+    expect(captionOf(await findByTestId('place-map-caption'))).toContain('how close');
   });
 
   it('draws the reading and its error when there is one', async () => {
@@ -43,6 +47,12 @@ describe('the place map', () => {
       <PlaceMap places={[HOME]} fix={{ lat: 22.75, lon: 88.37, accuracy: 30 }} />
     );
     expect(await findByTestId('place-map-accuracy')).toBeTruthy();
+  });
+
+  it('says how many places were too far to draw, rather than dropping them quietly', async () => {
+    // reported from the office: ten places across forty kilometres drew as dots
+    const { findByTestId } = await mount(<PlaceMap places={[HOME, AREA, OFFICE]} fix={null} />);
+    expect(captionOf(await findByTestId('place-map-caption'))).toContain('too far away');
   });
 
   it('says what to do when there is nothing to draw', async () => {
