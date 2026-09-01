@@ -29,8 +29,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 const KEY = 'jarvis_place_seen';
 
-/** four weeks. Long enough for a habit, short enough that a changed job fades out */
-export const SEEN_TTL_MS = 28 * 24 * 60 * 60 * 1000;
+/**
+ * Twelve weeks.
+ *
+ * Was four, which segmented weekends correctly and could never learn one: 28 days is
+ * at most four Saturdays, and the rules wanted four, so a weekend routine needed a
+ * flawless month and never formed. A changed job still fades, because the routine
+ * reads only the most recent handful of matching days rather than the whole store.
+ */
+export const SEEN_TTL_MS = 84 * 24 * 60 * 60 * 1000;
 
 /**
  * How many sightings survive.
@@ -39,7 +46,7 @@ export const SEEN_TTL_MS = 28 * 24 * 60 * 60 * 1000;
  * minds, and the whole point of a cap is that this file can never become the reason
  * the app is slow to start.
  */
-export const SEEN_KEEP = 400;
+export const SEEN_KEEP = 1200;
 
 /**
  * Two sightings of the same place inside this window count as one.
@@ -321,6 +328,20 @@ export function placesSeen(seen: Seen[]): string[] {
  * that mistake would be repeated.
  */
 
+export type DayKind = 'weekend' | 'weekday';
+
+export type Routine = {
+  place: string;
+  /** how many matching days are behind the claim */
+  days: number;
+  /** whether those days are this exact weekday, or merely the same kind of day */
+  basis: 'weekday' | 'kind';
+  kind: DayKind;
+};
+
+/** how many of the most recent matching days a routine is read from, so it can change */
+export const ROUTINE_RECENT_DAYS = 6;
+
 /** how many of the same weekday before a routine is a routine rather than a coincidence */
 export const ROUTINE_DAYS = 3;
 
@@ -383,24 +404,65 @@ export function usualPlaceAt(
   seen: Seen[],
   now: Date,
   windowMin: number = ROUTINE_WINDOW_MIN
-): { place: string; days: number } | null {
-  const minute = minuteOfDay(now.getTime());
-  const daysPerPlace = new Map<string, Set<string>>();
+): Routine | null {
+  const exact = routineFrom(seen, now, windowMin, false);
+  if (exact) return exact;
+  // a Saturday is more like a Sunday than like a Tuesday: where the weekday itself is
+  // still thin, the KIND of day is the next most honest grouping, and saying that
+  // beats saying nothing for three months while Saturdays accumulate one a week
+  return routineFrom(seen, now, windowMin, true);
+}
 
-  for (const [key, rows] of sameWeekdayDays(seen, now)) {
-    for (const s of rows) {
-      if (Math.abs(minuteOfDay(s.at) - minute) > windowMin) continue;
-      const held = daysPerPlace.get(s.place) ?? new Set<string>();
-      held.add(key);
-      daysPerPlace.set(s.place, held);
-    }
+/** whether a date is a weekend one, which is the coarser grouping a routine falls back to */
+export const dayKind = (d: Date): DayKind => (d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : 'weekday');
+
+function routineFrom(seen: Seen[], now: Date, windowMin: number, byKind: boolean): Routine | null {
+  const minute = minuteOfDay(now.getTime());
+  const today = dayKey(now.getTime());
+  const weekday = now.getDay();
+  const kind = dayKind(now);
+  const daysPerPlace = new Map<string, Map<string, number>>();
+
+  for (const s of seen) {
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    const when = new Date(s.at);
+    if (byKind ? dayKind(when) !== kind : when.getDay() !== weekday) continue;
+    if (Math.abs(minuteOfDay(s.at) - minute) > windowMin) continue;
+    const held = daysPerPlace.get(s.place) ?? new Map<string, number>();
+    // the newest sighting of that day, so recency can be judged per day
+    held.set(key, Math.max(held.get(key) ?? 0, s.at));
+    daysPerPlace.set(s.place, held);
+  }
+
+  /**
+   * Only the newest days count, and that is what lets a routine change.
+   *
+   * History is kept for twelve weeks so a weekend can accumulate at all, and a median
+   * over twelve weeks would let a job somebody left in July argue with where they are
+   * in September. Taking the most recent handful keeps both: enough samples for a
+   * Saturday, and a pattern that follows a life rather than outliving it.
+   */
+  const recent = new Map<string, number>();
+  const seenDays = [...new Set([...daysPerPlace.values()].flatMap((m) => [...m.keys()]))];
+  const newest = seenDays
+    .map((key) => ({ key, at: Math.max(...[...daysPerPlace.values()].map((m) => m.get(key) ?? 0)) }))
+    .sort((a, b) => b.at - a.at)
+    .slice(0, ROUTINE_RECENT_DAYS)
+    .map((d) => d.key);
+
+  for (const [place, days] of daysPerPlace) {
+    const count = [...days.keys()].filter((key) => newest.includes(key)).length;
+    if (count) recent.set(place, count);
   }
 
   let best: { place: string; days: number } | null = null;
-  for (const [place, days] of daysPerPlace) {
-    if (!best || days.size > best.days) best = { place, days: days.size };
+  for (const [place, days] of recent) {
+    if (!best || days > best.days) best = { place, days };
   }
-  return best && best.days >= ROUTINE_DAYS ? best : null;
+  return best && best.days >= ROUTINE_DAYS
+    ? { ...best, basis: byKind ? 'kind' : 'weekday', kind }
+    : null;
 }
 
 /**
@@ -414,11 +476,11 @@ export function elsewhereNow(
   seen: Seen[],
   place: string | null,
   now: Date
-): { usual: string; days: number } | null {
+): { usual: string; days: number; basis: Routine['basis']; kind: DayKind } | null {
   if (!place) return null;
   const usual = usualPlaceAt(seen, now);
   if (!usual || usual.place === place) return null;
-  return { usual: usual.place, days: usual.days };
+  return { usual: usual.place, days: usual.days, basis: usual.basis, kind: usual.kind };
 }
 
 /**

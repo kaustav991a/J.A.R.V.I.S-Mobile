@@ -174,3 +174,88 @@ describe('the visit you are in the middle of', () => {
     expect(visitNow([], new Date(2026, 8, 1, 9, 35))).toBeNull();
   });
 });
+
+/**
+ * Weekends, which the first cut segmented correctly and could never actually learn.
+ *
+ * `sameWeekdayDays` compares Saturdays with Saturdays, which is right. But sightings
+ * were kept for 28 days, so a Saturday had **at most four** samples and the rules
+ * wanted four — a weekend routine therefore needed a flawless month and in practice
+ * never formed at all.
+ *
+ * Two changes. History is kept long enough for a weekday to accumulate, and where the
+ * exact weekday is still thin the routine falls back to the KIND of day — weekend or
+ * weekday — which is the next most honest grouping. A Saturday is more like a Sunday
+ * than like a Tuesday, and saying so beats saying nothing.
+ */
+const sat = (d: number, h: number, m: number, place: string): Seen => ({
+  place,
+  at: new Date(2026, 7, d, h, m).getTime(),
+});
+
+describe('learning a weekend', () => {
+  /** Aug 2026: 1, 8, 15, 22 are Saturdays; 2, 9, 16 are Sundays */
+  const saturdays = [
+    sat(1, 10, 30, 'Home'),
+    sat(8, 10, 45, 'Home'),
+    sat(15, 10, 20, 'Home'),
+  ];
+
+  const nextSaturday = new Date(2026, 7, 29, 10, 30);
+
+  it('learns Saturdays from Saturdays once it has enough of them', () => {
+    const out = usualPlaceAt(saturdays, nextSaturday);
+    expect(out?.place).toBe('Home');
+    expect(out?.basis).toBe('weekday');
+  });
+
+  it('falls back to the kind of day when the weekday itself is thin', () => {
+    // two Saturdays and two Sundays: not enough of either alone, and plenty of
+    // weekend. A Saturday is more like a Sunday than like a Tuesday
+    const weekend = [
+      sat(1, 10, 30, 'Home'),
+      sat(2, 10, 40, 'Home'),
+      sat(8, 10, 20, 'Home'),
+      sat(9, 10, 50, 'Home'),
+    ];
+    const out = usualPlaceAt(weekend, nextSaturday);
+    expect(out?.place).toBe('Home');
+    expect(out?.basis).toBe('kind');
+    expect(out?.kind).toBe('weekend');
+  });
+
+  it('never lets a weekday routine stand in for a weekend one', () => {
+    // the mistake the gateway made, in its other direction: four Tuesdays say
+    // nothing whatever about a Saturday morning
+    const weekdaysOnly = [
+      sat(4, 10, 30, 'Office'),
+      sat(5, 10, 30, 'Office'),
+      sat(6, 10, 30, 'Office'),
+      sat(7, 10, 30, 'Office'),
+    ];
+    expect(usualPlaceAt(weekdaysOnly, nextSaturday)).toBeNull();
+  });
+
+  it('does not let a weekend stand in for a weekday either', () => {
+    const weekendOnly = [
+      sat(1, 10, 30, 'Home'),
+      sat(2, 10, 40, 'Home'),
+      sat(8, 10, 20, 'Home'),
+      sat(9, 10, 50, 'Home'),
+    ];
+    const tuesdayMorning = new Date(2026, 7, 25, 10, 30);
+    expect(usualPlaceAt(weekendOnly, tuesdayMorning)).toBeNull();
+  });
+});
+
+describe('a routine that has changed', () => {
+  it('follows the newest days rather than being outvoted by old ones', () => {
+    // a job left in July must not argue with where somebody is in September. Twelve
+    // weeks of history is kept so a weekend can accumulate; only the recent days are
+    // read, so the pattern follows a life rather than outliving it
+    const oldSaturdays = [1, 8, 15].map((d) => sat(d, 10, 30, 'Office'));
+    const newSaturdays = [22, 29, 36, 43, 50, 57].map((d) => sat(d, 10, 30, 'Cafe'));
+    const out = usualPlaceAt([...oldSaturdays, ...newSaturdays], new Date(2026, 9, 3, 10, 30));
+    expect(out?.place).toBe('Cafe');
+  });
+});
