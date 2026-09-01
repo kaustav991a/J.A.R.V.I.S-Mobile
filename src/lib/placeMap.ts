@@ -160,3 +160,20 @@ export function mapPlot(input: {
 
   return { places, you, overlapping, metresPerPixel, hidden };
 }
+
+/** how much of the canvas edge a label must keep clear of */
+const LABEL_EDGE_PX = 60;
+
+/**
+ * Where to put a place's label, and which way to hang it.
+ *
+ * Seen on the phone: a circle near the left edge rendered as *"or V Metro Station"* —
+ * an SVG label centred on its circle runs off the canvas, and the platform clips it
+ * rather than wrapping. So a label close to an edge hangs from that edge instead of
+ * from its own middle.
+ */
+export function labelAt(x: number, size: number): { x: number; anchor: 'start' | 'middle' | 'end' } {
+  if (x < LABEL_EDGE_PX) return { x: 4, anchor: 'start' };
+  if (x > size - LABEL_EDGE_PX) return { x: size - 4, anchor: 'end' };
+  return { x, anchor: 'middle' };
+}

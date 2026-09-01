@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 
-import { mapPlot } from '../lib/placeMap';
+import { labelAt, mapPlot } from '../lib/placeMap';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { COLOR, RADIUS, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
@@ -83,18 +83,23 @@ export function PlaceMap({
         {plot.places.map((p) => (
           <Circle key={`dot-${p.label}`} cx={p.x} cy={p.y} r={3.5} fill={accent} />
         ))}
-        {plot.places.map((p) => (
-          <SvgText
-            key={`label-${p.label}`}
-            x={p.x}
-            y={p.y - 9}
-            fill={COLOR.white}
-            fontSize={10}
-            textAnchor="middle"
-          >
-            {p.label}
-          </SvgText>
-        ))}
+        {plot.places.map((p) => {
+          // a label centred on a circle at the edge is clipped, not wrapped: the phone
+          // rendered "Sector V Metro Station" as "or V Metro Station"
+          const label = labelAt(p.x, size);
+          return (
+            <SvgText
+              key={`label-${p.label}`}
+              x={label.x}
+              y={p.y - 9}
+              fill={COLOR.white}
+              fontSize={10}
+              textAnchor={label.anchor}
+            >
+              {p.label}
+            </SvgText>
+          );
+        })}
         {plot.you ? <Circle cx={plot.you.x} cy={plot.you.y} r={4.5} fill={COLOR.green} /> : null}
         {/* the scale bar, bottom left, so the circles are a measurement */}
         <Line

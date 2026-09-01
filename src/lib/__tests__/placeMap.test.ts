@@ -1,4 +1,4 @@
-import { mapPlot } from '../placeMap';
+import { labelAt, mapPlot } from '../placeMap';
 
 /**
  * The picture that makes an overlap arguable instead of theoretical.
@@ -152,5 +152,20 @@ describe('keeping the drawing to the scale of the question', () => {
     const plot = mapPlot({ places: [HOME_P, AREA_P, OFFICE_P], fix: null, size: 300 });
     // no fix to centre on, so it shows the cluster around the first named place
     expect(plot.places.map((p) => p.label).sort()).toEqual(['Home', 'My area']);
+  });
+});
+
+describe('keeping a label on the canvas', () => {
+  it('centres a label with room on both sides', () => {
+    expect(labelAt(150, 300)).toEqual({ x: 150, anchor: 'middle' });
+  });
+
+  it('anchors a label at the left edge to its start, so it cannot be cut in half', () => {
+    // seen on the phone: "or V Metro Station", because the circle sat at the edge
+    expect(labelAt(20, 300)).toEqual({ x: 4, anchor: 'start' });
+  });
+
+  it('anchors a label at the right edge to its end', () => {
+    expect(labelAt(285, 300)).toEqual({ x: 296, anchor: 'end' });
   });
 });
