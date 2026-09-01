@@ -211,14 +211,26 @@ export function nextSeenElsewhere(
   if (firstAfter.size < ENOUGH_PLACE_DAYS) return null;
 
   const rows = [...firstAfter.values()];
-  const times = rows.map((r) => minuteOfDay(r.at)).sort((a, b) => a - b);
-  const mid = Math.floor(times.length / 2);
-  const minute = times.length % 2 ? times[mid] : times[mid - 1];
 
+  /**
+   * The place first, then the hour of THAT place's evenings.
+   *
+   * Taken separately they describe a day that never happened: on the phone this read
+   * "8:04 PM — usually at Home", where 8:04 was the train at Sealdah and Home is an
+   * hour later. The median hour came from every evening and the name from whichever
+   * appeared most often, so the pair straddled two different sets of days.
+   */
   const tally = new Map<string, number>();
   for (const r of rows) tally.set(r.place, (tally.get(r.place) ?? 0) + 1);
   let best = rows[0].place;
   for (const [name, n] of tally) if (n > (tally.get(best) ?? 0)) best = name;
+
+  const times = rows
+    .filter((r) => r.place === best)
+    .map((r) => minuteOfDay(r.at))
+    .sort((a, b) => a - b);
+  const mid = Math.floor(times.length / 2);
+  const minute = times.length % 2 ? times[mid] : times[mid - 1];
 
   return { minute, place: best };
 }

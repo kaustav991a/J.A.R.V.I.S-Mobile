@@ -431,3 +431,55 @@ describe('where you are next seen, not only when', () => {
     expect(nextSeenElsewhere(noEvidence, 'Office', NOW)).toBeNull();
   });
 });
+
+/**
+ * The hour and the place have to describe the same days.
+ *
+ * Seen on the phone: *"By now you are usually gone — 8:04 PM. Usually at Home by
+ * then."* — while 8:04 is the train at Sealdah, and Home is an hour later. The median
+ * hour was taken across every day and the place was whichever appeared most often, so
+ * the two were computed from different sets and together described an evening that
+ * never happened.
+ */
+describe('the hour and the place agree with each other', () => {
+  /** Sealdah on two evenings, Home on three — Home is the usual, and it is later */
+  const mixed = seen(
+    [16, 18, 30, 'Office'],
+    [16, 20, 4, 'Sealdah Rail Station'],
+    [17, 18, 30, 'Office'],
+    [17, 20, 6, 'Sealdah Rail Station'],
+    [18, 18, 45, 'Office'],
+    [18, 21, 30, 'Home'],
+    [19, 18, 40, 'Office'],
+    [19, 21, 20, 'Home'],
+    [20, 18, 35, 'Office'],
+    [20, 21, 40, 'Home']
+  );
+
+  it('names the place seen most often', () => {
+    expect(nextSeenElsewhere(mixed, 'Office', NOW)?.place).toBe('Home');
+  });
+
+  it('times that place, not the middle of everything', () => {
+    // the Home evenings are 21:20, 21:30, 21:40 — the median of those, and nowhere
+    // near the 20:06 that mixing the station days in would have produced
+    expect(nextSeenElsewhere(mixed, 'Office', NOW)?.minute).toBe(21 * 60 + 30);
+  });
+
+  it('still answers when one place accounts for every evening', () => {
+    const only = seen(
+      [17, 18, 30, 'Office'],
+      [17, 20, 4, 'Sealdah Rail Station'],
+      [18, 18, 45, 'Office'],
+      [18, 20, 10, 'Sealdah Rail Station'],
+      [19, 18, 40, 'Office'],
+      [19, 19, 58, 'Sealdah Rail Station'],
+      [20, 18, 35, 'Office'],
+      [20, 20, 12, 'Sealdah Rail Station']
+    );
+    expect(nextSeenElsewhere(only, 'Office', NOW)).toEqual({
+      place: 'Sealdah Rail Station',
+      minute: 20 * 60 + 4,
+    });
+  });
+});
