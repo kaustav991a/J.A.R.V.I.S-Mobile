@@ -5,8 +5,8 @@ import * as TaskManager from 'expo-task-manager';
 import { clockLabel } from './commute';
 import { AT_PLACE_KM } from './knownPlaces';
 import type { KnownPlace } from './knownPlaces';
-import { postNow } from './notify';
-import { noteSeen } from './timeline';
+import { dismiss, postNow } from './notify';
+import { dropExitsAround, noteSeen } from './timeline';
 
 /**
  * Sightings that happen whether or not anybody is holding the phone.
@@ -49,6 +49,19 @@ export const GEOFENCE_TASK = 'jarvis-place-geofence';
  * would be worse than the app-open bias this replaces.
  */
 export const GEOFENCE_RADIUS_M = Math.max(120, AT_PLACE_KM * 1000);
+
+/**
+ * How close together two exits have to be before they are the platform, not you.
+ *
+ * Play Services re-evaluates every region when the app process restarts and reports an
+ * exit for each one the phone is outside of. On 2026-09-01 at 18:31 that was ten named
+ * places, ten notifications and ten false departures, from an office he had not left
+ * yet — every event real, not one of them a departure.
+ *
+ * Ninety seconds, because a person leaves one place at a time. The nearest genuine
+ * pair — out of the flat, out of the block — is minutes apart, not seconds.
+ */
+export const SWEEP_WINDOW_MS = 90_000;
 
 export type Region = {
   identifier: string;
@@ -99,6 +112,18 @@ export async function onGeofenceEvent(event: GeofenceEvent, at: number = Date.no
     if (!entering && !leaving) return;
 
     const when = Number.isFinite(at) ? at : Date.now();
+
+    /**
+     * A departure from somewhere else, seconds ago, means neither of them happened.
+     *
+     * The first exit of a sweep is indistinguishable from a real one — it is the
+     * second place in the same breath that gives it away — so this reaches backwards
+     * and takes the earlier ones out again. It cannot be done any earlier: at the
+     * moment the first arrives there is nothing to tell it apart from you walking out
+     * of your office.
+     */
+    if (leaving && ((await inSweep(when)) || (await sweepDetected(when, label)))) return;
+
     await noteSeen(label, when, entering ? 'enter' : 'exit');
 
     // the sighting is written first and separately: a notification that cannot be
@@ -167,6 +192,12 @@ export const LEAVE_COOLDOWN_MS = 45 * 60_000;
 
 const LEFT_SAID_KEY = 'jarvis_left_said';
 
+/** when a sweep was last recognised, so the rest of the burst goes quietly */
+const SWEEP_AT_KEY = 'jarvis_sweep_at';
+
+/** the last thing said, kept so a sweep can take its own notification back */
+const LEFT_LAST_KEY = 'jarvis_left_last';
+
 type LeftSaid = Record<string, number>;
 
 const loadLeftSaid = async (): Promise<LeftSaid> => {
@@ -178,6 +209,57 @@ const loadLeftSaid = async (): Promise<LeftSaid> => {
     return {};
   }
 };
+
+/**
+ * Whether this exit belongs to a burst rather than to you, and clean up if it does.
+ *
+ * Three separate jobs, because a sweep is only recognisable partway through it:
+ *
+ * 1. **Already known.** Once a burst has been spotted, every later exit in the same
+ *    ninety seconds is part of it and goes quietly.
+ * 2. **Recognise it.** Another place reporting a departure seconds ago is the
+ *    signature — a person leaves one place at a time.
+ * 3. **Take back what was already said.** The first exit of a burst was written and
+ *    announced before there was anything to tell it apart from a real departure, so
+ *    the sighting is removed, the notification is dismissed from the shade, and the
+ *    quiet period for that place is handed back.
+ */
+async function inSweep(when: number): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(SWEEP_AT_KEY);
+    const mark = raw ? Number(raw) : NaN;
+    if (Number.isFinite(mark) && Math.abs(when - mark) <= SWEEP_WINDOW_MS) return true;
+  } catch {
+    /* an unreadable mark is no mark */
+  }
+  return false;
+}
+
+/** the same question, asked with the label, plus the repair */
+async function sweepDetected(when: number, label: string): Promise<boolean> {
+  const dropped = await dropExitsAround(when, label, SWEEP_WINDOW_MS);
+  if (!dropped) return false;
+
+  try {
+    await AsyncStorage.setItem(SWEEP_AT_KEY, String(when));
+
+    // the first one was already said out loud: take it off the shade and give the
+    // place its quiet period back, so a real departure minutes later still speaks
+    const raw = await AsyncStorage.getItem(LEFT_LAST_KEY);
+    const last = raw ? (JSON.parse(raw) as { id?: string; place?: string; at?: number }) : null;
+    if (last && typeof last.at === 'number' && Math.abs(when - last.at) <= SWEEP_WINDOW_MS) {
+      if (typeof last.id === 'string') await dismiss(last.id);
+      if (typeof last.place === 'string') {
+        const said = await loadLeftSaid();
+        delete said[last.place];
+        await AsyncStorage.setItem(LEFT_SAID_KEY, JSON.stringify(said));
+      }
+    }
+  } catch {
+    // the sighting is already gone, which is the half that matters
+  }
+  return true;
+}
 
 /**
  * Say you left, once per place per cooldown.
@@ -199,11 +281,19 @@ export async function announceLeaving(place: string, at: number): Promise<void> 
   await AsyncStorage.setItem(LEFT_SAID_KEY, JSON.stringify({ ...said, [place]: at }));
 
   const when = new Date(at);
-  await postNow({
+  const id = await postNow({
     title: `Left ${place}`,
     body: `${clockLabel(when.getHours(), when.getMinutes())}. Noted, sir.`,
     data: { kind: 'left-place', place, at },
   });
+
+  // kept so that if this turns out to have been the first shot of a sweep, the
+  // notification can be taken back rather than left standing as a false departure
+  try {
+    await AsyncStorage.setItem(LEFT_LAST_KEY, JSON.stringify({ id, place, at }));
+  } catch {
+    /* it only costs the ability to undo */
+  }
 }
 
 /**

@@ -16,6 +16,7 @@ import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
 // can hand work back to a process it just woke, which is before any component
 // mounts. Registering it is the separate job the effect below does.
 import { syncCommuteTask } from './src/lib/commuteTask';
+import { pruneSweepExits } from './src/lib/timeline';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { crashBuild } from './src/lib/crashBuild';
@@ -142,6 +143,26 @@ export default function App() {
    * durable record is written by `setCommuteTask` for the Places screen to read;
    * this line is the same fact where `adb logcat` can see it during a launch.
    */
+  /**
+   * Take the platform's geofence sweeps back out of the history.
+   *
+   * Play Services re-evaluates every region when this process starts and reports an
+   * exit for each one the phone is outside of. On 2026-09-01 at 18:31 that wrote ten
+   * departures in one minute, from ten places, one of them an office he had not left
+   * yet. `onGeofenceEvent` now recognises a burst as it arrives; this is for the ones
+   * already stored, and for any that slip through a process that dies mid-sweep.
+   *
+   * Runs on every launch rather than once behind a flag, because the failure it
+   * repairs recurs by design and a silent wrong figure is what this whole area of the
+   * app has spent a week paying for.
+   */
+  useEffect(() => {
+    if (launching) return;
+    void pruneSweepExits().then((dropped) => {
+      if (dropped) console.log(`[jarvis] dropped ${dropped} swept exits`);
+    });
+  }, [launching]);
+
   useEffect(() => {
     if (launching) return;
     void syncCommuteTask().then(({ ok, reason }) => {

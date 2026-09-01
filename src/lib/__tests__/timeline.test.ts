@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {
   ENOUGH_PLACE_DAYS,
   LATE_BY_MIN,
@@ -5,8 +7,10 @@ import {
   daysSeenAt,
   hereEarly,
   leftBy,
+  loadSeen,
   nextSeenElsewhere,
   placesSeen,
+  pruneSweepExits,
   seenElsewhereBy,
   stillHereLate,
   usuallyGoneBy,
@@ -541,5 +545,52 @@ describe('departures from geofence exits', () => {
 
   it('has nothing to say about a place it has never seen', () => {
     expect(leftBy([], 'Office', NOW)).toBeNull();
+  });
+});
+
+describe('taking the sweeps back out of the history', () => {
+  const exit = (place: string, hour: number, minute: number) => ({
+    place,
+    at: new Date(new Date().setHours(hour, minute, 0, 0)).getTime(),
+    via: 'exit' as const,
+  });
+
+  const store = async (seen: unknown[]) => {
+    await AsyncStorage.setItem('jarvis_place_seen', JSON.stringify(seen));
+  };
+
+  it('removes the ten places that all left at 6:31, none of which happened', async () => {
+    await store([
+      exit('Office', 18, 31),
+      exit('Musalman Para', 18, 31),
+      exit('Sector V', 18, 31),
+      exit('Barrackpore', 18, 31),
+    ]);
+    expect(await pruneSweepExits()).toBe(4);
+    expect(await loadSeen()).toEqual([]);
+  });
+
+  it('leaves a lone departure alone, which is the thing worth keeping', async () => {
+    await store([exit('Office', 19, 5)]);
+    expect(await pruneSweepExits()).toBe(0);
+    expect(await loadSeen()).toHaveLength(1);
+  });
+
+  it('keeps two real departures hours apart', async () => {
+    await store([exit('Home', 9, 10), exit('Office', 19, 5)]);
+    expect(await pruneSweepExits()).toBe(0);
+  });
+
+  it('never touches an arrival or an app-open sighting', async () => {
+    const now = Date.now();
+    await store([
+      { place: 'Office', at: now - 60_000, via: 'enter' },
+      { place: 'Office', at: now - 30_000 },
+      exit('Home', 18, 31),
+      exit('Sector V', 18, 31),
+    ]);
+    await pruneSweepExits();
+    const kept = await loadSeen();
+    expect(kept.map((s) => s.via)).toEqual(['enter', undefined]);
   });
 });

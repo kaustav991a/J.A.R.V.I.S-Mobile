@@ -231,3 +231,64 @@ describe('seeing the notification without leaving', () => {
     expect(posted).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('the sweep Android fires at every restart', () => {
+  beforeEach(() => {
+    posted.mockClear();
+  });
+
+  it('ignores exits from several places at once, because a person leaves one place at a time', async () => {
+    // measured on the phone, 2026-09-01 18:31: ten named places, ten "you left"
+    // notifications in the same minute, from an office he had not left yet. Play
+    // Services re-evaluates every region when the app process restarts and reports an
+    // exit for each one the phone is outside of. Every event is real; not one is a
+    // departure
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Musalman Para' } }, at(18, 31));
+    await onGeofenceEvent(
+      { eventType: 'exit', region: { identifier: 'Barrackpore Railway Station' } },
+      at(18, 31)
+    );
+    expect(await loadSeen()).toEqual([]);
+  });
+
+  it('takes back the first one, which looked real until the second arrived', async () => {
+    // the first exit of a sweep is indistinguishable from a departure. It is only the
+    // second place in the same breath that gives it away, so the repair has to reach
+    // backwards
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    expect(await loadSeen()).toHaveLength(1);
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    expect(await loadSeen()).toEqual([]);
+  });
+
+  it('says nothing more once it knows, and one buzz is the cost of finding out', async () => {
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
+    expect(posted).toHaveBeenCalledTimes(1);
+  });
+
+  it('still believes a single departure, which is the whole feature', async () => {
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    const seen = await loadSeen();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ place: 'Office', via: 'exit' });
+    expect(posted).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets two real departures stand when they are far enough apart', async () => {
+    // leaving home in the morning and the office in the evening are both true
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    expect(await loadSeen()).toHaveLength(2);
+  });
+
+  it('never drops an arrival, which no sweep produces', async () => {
+    await onGeofenceEvent({ eventType: 'enter', region: { identifier: 'Office' } }, at(18, 31));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
+    await onGeofenceEvent({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    const seen = await loadSeen();
+    expect(seen).toEqual([expect.objectContaining({ place: 'Office', via: 'enter' })]);
+  });
+});

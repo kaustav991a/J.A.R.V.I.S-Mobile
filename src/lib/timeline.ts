@@ -136,6 +136,78 @@ export async function noteSeen(
   }
 }
 
+/**
+ * Take back the exits that turned out to be a platform sweep, and say whether to drop
+ * this one too.
+ *
+ * Answers true when another place reported leaving inside the window, which is the
+ * signature of Play Services re-evaluating every region rather than of a person
+ * walking out of somewhere. The earlier sightings from the same burst go with it: they
+ * were written before there was anything to tell them apart from a departure.
+ *
+ * Arrivals are never touched. No sweep produces one — a phone can only be inside the
+ * region it is inside — so an `enter` is always the real thing.
+ */
+export async function dropExitsAround(
+  at: number,
+  place: string,
+  windowMs: number
+): Promise<boolean> {
+  try {
+    const seen = await loadSeen();
+    const burst = seen.filter(
+      (s) => s.via === 'exit' && s.place !== place && Math.abs(at - s.at) <= windowMs
+    );
+    if (!burst.length) return false;
+
+    const kept = seen.filter(
+      (s) => !(s.via === 'exit' && Math.abs(at - s.at) <= windowMs)
+    );
+    await AsyncStorage.setItem(KEY, JSON.stringify(kept));
+    return true;
+  } catch {
+    // a store that cannot be read cannot be corrected, and a false departure is
+    // better than a lost real one
+    return false;
+  }
+}
+
+/**
+ * Take the platform's sweeps back out of the history, once, at launch.
+ *
+ * `dropExitsAround` catches a burst as it happens; this is for the ones already
+ * written. On 2026-09-01 at 18:31 ten places reported leaving in the same minute and
+ * all ten were stored before anything knew better, which would have taught him a
+ * departure time for every place he owns — from an office he had not left yet.
+ *
+ * The same signature: two or more places leaving inside the window. A lone exit is a
+ * departure and stays. Arrivals and app-open sightings are never touched.
+ */
+export async function pruneSweepExits(windowMs: number = 90_000): Promise<number> {
+  try {
+    const seen = await loadSeen();
+    const exits = seen.filter((s) => s.via === 'exit');
+    if (exits.length < 2) return 0;
+
+    const swept = new Set<number>();
+    for (const a of exits) {
+      const burst = exits.filter((b) => b.place !== a.place && Math.abs(a.at - b.at) <= windowMs);
+      if (burst.length) {
+        swept.add(a.at);
+        for (const b of burst) swept.add(b.at);
+      }
+    }
+    if (!swept.size) return 0;
+
+    const kept = seen.filter((s) => !(s.via === 'exit' && swept.has(s.at)));
+    await AsyncStorage.setItem(KEY, JSON.stringify(kept));
+    return seen.length - kept.length;
+  } catch {
+    // history that cannot be read cannot be repaired, and nothing depends on this
+    return 0;
+  }
+}
+
 /** forget the lot — paired with the location-sharing switch going off */
 export async function forgetSeen(): Promise<void> {
   try {
