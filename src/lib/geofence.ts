@@ -163,8 +163,22 @@ export async function onGeofenceEvent(
      * word about a departure that has been retracted is worse than silence: the
      * notification outlives the correction.
      */
+    /**
+     * Wait, then look again — at the burst, not only at this sighting.
+     *
+     * Two exits can be delivered in the same second, and each handler reads the store
+     * before the other has written to it: neither sees a burst, both write, both
+     * speak. That is exactly what reached the phone at 16:03 on 2026-09-02 —
+     * *"Left Mousumi's Home"* and *"Left Sealdah Rail Station"*, from an office forty
+     * kilometres from either.
+     *
+     * So the check after the wait is the whole check, run again against a store that
+     * has by then settled. The first pass stops most of it; this pass is the one that
+     * cannot be raced.
+     */
     if (speakAfterMs > 0) await new Promise((r) => setTimeout(r, speakAfterMs));
     if (await inSweep(when)) return;
+    if (await sweepDetected(when, label, farApart(places ?? (await loadKnown())))) return;
     const kept = (await loadSeen()).some(
       (s) => s.place === label && s.at === when && s.via === 'exit'
     );

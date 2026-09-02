@@ -382,3 +382,31 @@ describe('places that overlap each other', () => {
     expect(await loadSeen()).toEqual([]);
   });
 });
+
+describe('two exits that arrive in the same breath', () => {
+  beforeEach(() => {
+    posted.mockClear();
+  });
+
+  it('says nothing when both are written before either can look', async () => {
+    // measured on the phone, 2026-09-02 16:03: "Left Mousumi's Home" and "Left Sealdah
+    // Rail Station" a second apart, from an office forty kilometres from either. Each
+    // handler read the store before the other had written to it, found no burst, and
+    // spoke. The settle wait re-checked only its own sighting, never the burst
+    const first = fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(16, 3), 200, SPREAD);
+    const second = fire(
+      { eventType: 'exit', region: { identifier: 'Sector V' } },
+      at(16, 3),
+      200,
+      SPREAD
+    );
+    await Promise.all([first, second]);
+    expect(posted).not.toHaveBeenCalled();
+    expect(await loadSeen()).toEqual([]);
+  });
+
+  it('still speaks for the one departure nothing contradicts', async () => {
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5), 30, SPREAD);
+    expect(posted).toHaveBeenCalledTimes(1);
+  });
+});
