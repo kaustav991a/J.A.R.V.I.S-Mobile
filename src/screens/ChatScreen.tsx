@@ -196,7 +196,6 @@ export function ChatScreen() {
    * Marked spoken the moment it is shown rather than when it is read, because "at
    * most one a day" has to hold against a screen that is opened twenty times.
    */
-  const [remark, setRemark] = useState<string | null>(null);
 
   /**
    * The turn whose menu is open, or null.
@@ -303,7 +302,6 @@ export function ChatScreen() {
             spokenBefore,
           });
           if (!said) return;
-          setRemark(said.line);
           // and into the log, so tomorrow can still see what he noticed today
           noteUnprompted(said.line, now.getTime());
           await noteSpoken(said.about, dayKey(now));
@@ -707,19 +705,19 @@ export function ChatScreen() {
             })}
           />
           {/*
-            A line rather than a chat turn, deliberately.
+            It used to be drawn here as well, and that was one copy too many.
 
-            A turn would claim he said it in conversation, and would be persisted and
-            replayed like everything else in the log — so tomorrow the record would
-            show him volunteering something he was never asked. This is a readout of
-            now, which is what it actually is, and it disappears when it stops being
-            true. The same reasoning as the situation line directly above it.
+            The comment this replaces argued the opposite — a line rather than a turn,
+            because "a turn would claim he said it in conversation" and would be
+            replayed tomorrow as him volunteering something he was never asked.
+            **Volunteering something unasked is the entire feature.** What was actually
+            wrong was that it vanished: the WATCHING panel reported `Today: SPOKEN` over
+            a log whose last entry was from the previous afternoon, and ten days of this
+            working left nothing anybody could look at.
+
+            So it is a turn now, written where the conversation is kept. Drawn in both
+            places it collided with the newest bubble and said the same thing twice.
           */}
-          {remark ? (
-            <Text testID="chat-remark" style={styles.remark}>
-              {remark}
-            </Text>
-          ) : null}
         </View>
 
         {turns.length === 0 ? (
@@ -1143,7 +1141,6 @@ const styles = StyleSheet.create({
   time: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.dim, letterSpacing: 1 },
   // the accent, because it is the one line on this screen nobody asked for and it
   // has to be distinguishable from the situation line it sits under
-  remark: { ...TYPE.meta, fontSize: 12, color: COLOR.blue, marginTop: SPACE.sm, lineHeight: 17 },
   mark: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.dim, letterSpacing: 1 },
   markBad: { color: COLOR.red },
   retry: { ...TYPE.dataLabel, fontSize: 9, color: COLOR.blue, letterSpacing: 1 },
