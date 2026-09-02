@@ -11,6 +11,7 @@ import {
   leftBy,
   loadSeen,
   nextSeenElsewhere,
+  noteSeen,
   placesSeen,
   pruneSweepExits,
   seenElsewhereBy,
@@ -838,5 +839,36 @@ describe('a commute is a chain of exits, not a contradiction', () => {
       ])
     );
     expect(await pruneSweepExits(90_000, far)).toBe(1);
+  });
+});
+
+describe('the same crossing delivered twice', () => {
+  const t = (hour: number, minute: number) =>
+    new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('writes one sighting, not two', async () => {
+    // every row on the phone appeared in a pair on 2026-09-02: the platform delivers a
+    // crossing more than once, and a store that treats each delivery as an event turns
+    // one arrival into two
+    await noteSeen('Office', t(10, 3), 'enter');
+    await noteSeen('Office', t(10, 3), 'enter');
+    expect(await loadSeen()).toHaveLength(1);
+  });
+
+  it('still keeps a departure and a return at the same place', async () => {
+    await noteSeen('Office', t(13, 0), 'exit');
+    await noteSeen('Office', t(14, 0), 'enter');
+    expect(await loadSeen()).toHaveLength(2);
+  });
+
+  it('keeps two crossings the same way apart when they are minutes apart', async () => {
+    // out for lunch and out for the evening are two departures, not one delivered twice
+    await noteSeen('Office', t(13, 0), 'exit');
+    await noteSeen('Office', t(19, 8), 'exit');
+    expect(await loadSeen()).toHaveLength(2);
   });
 });

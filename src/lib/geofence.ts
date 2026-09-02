@@ -143,6 +143,8 @@ export async function onGeofenceEvent(
      * moment the first arrives there is nothing to tell it apart from you walking out
      * of your office.
      */
+    if (entering && (await alreadyInside(label))) return;
+
     if (leaving) {
       // the places are needed twice over: to tell a sweep from a walk, since two
       // departures are the platform only if a person could not have made both, and to
@@ -274,6 +276,29 @@ const loadLeftSaid = async (): Promise<LeftSaid> => {
  * is ignored and the crossing is believed.
  */
 export const FIX_TRUSTED_M = 150;
+
+/**
+ * Whether the app already believes you are inside this place.
+ *
+ * **Measured on 2026-09-02: six *"Reached Office"* between 12:33 and 1:23, from a desk
+ * he never left.** The drift check refuses the phantom exits that come with a
+ * wandering fix; the phantom re-entries that follow them walked straight in, because
+ * only departures were ever guarded. An arrival at a place you are already standing in
+ * is not an arrival.
+ *
+ * Judged on the last crossing for that place alone. A departure between two arrivals
+ * makes the second one a real return, which is a thing that happens — lunch, a
+ * meeting, the walk to the station and back.
+ */
+async function alreadyInside(label: string): Promise<boolean> {
+  try {
+    const seen = await loadSeen();
+    const last = seen.filter((s) => s.place === label && s.via).pop();
+    return last?.via === 'enter';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Whether the phone is still standing in the place it was just reported leaving.

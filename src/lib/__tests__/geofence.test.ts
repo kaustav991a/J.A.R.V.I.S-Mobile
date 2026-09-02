@@ -459,3 +459,43 @@ describe('an exit from a place the phone is still standing in', () => {
     expect(await loadSeen()).toHaveLength(1);
   });
 });
+
+describe('arriving somewhere you are already standing', () => {
+  beforeEach(() => {
+    posted.mockClear();
+    mockFix.mockReset();
+  });
+
+  it('ignores a second arrival with no departure between', async () => {
+    // measured on the phone, 2026-09-02: six "Reached Office" between 12:33 and 1:23
+    // from a desk he never left. The drift check refuses the phantom exits; the
+    // phantom re-entries walked straight in, because only departures were guarded
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(10, 3), 0, [OFFICE]);
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(12, 33), 0, [OFFICE]);
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(12, 54), 0, [OFFICE]);
+    expect(await loadSeen()).toHaveLength(1);
+  });
+
+  it('believes an arrival after a departure, which is a real return', async () => {
+    mockFix.mockResolvedValue({ lat: 22.9, lon: 88.9, place: '', accuracy: 20 });
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(10, 3), 0, [OFFICE]);
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(13, 0), 0, [OFFICE]);
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(14, 0), 0, [OFFICE]);
+    expect((await loadSeen()).filter((s) => s.via === 'enter')).toHaveLength(2);
+  });
+
+  it('keeps arrivals at different places apart', async () => {
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(10, 3), 0, [OFFICE, HOME]);
+    await fire({ eventType: 'enter', region: { identifier: 'Home' } }, at(20, 0), 0, [OFFICE, HOME]);
+    expect(await loadSeen()).toHaveLength(2);
+  });
+
+  it('writes one sighting when the same crossing is delivered twice', async () => {
+    // every row on the phone appeared in a pair: the platform delivers a crossing more
+    // than once, and a store that treats every delivery as an event counts one arrival
+    // as two
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(10, 3), 0, [OFFICE]);
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(10, 3), 0, [OFFICE]);
+    expect(await loadSeen()).toHaveLength(1);
+  });
+});

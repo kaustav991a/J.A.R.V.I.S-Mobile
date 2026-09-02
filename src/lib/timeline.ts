@@ -126,8 +126,13 @@ export async function noteSeen(
   try {
     const seen = await loadSeen();
     const last = seen[seen.length - 1];
-    // a crossing is never a duplicate: two of them 20 minutes apart are a real
-    // departure and a real return, which is exactly what the app-open store cannot see
+    // a crossing is not a duplicate of the one before it — a departure and a return
+    // twenty minutes apart are two real events — but the SAME crossing delivered twice
+    // is one event, and the platform does deliver twice. Every row on the phone
+    // appeared in a pair on 2026-09-02
+    if (via && seen.some((s) => s.place === place && s.via === via && Math.abs(s.at - at) < 60_000)) {
+      return;
+    }
     if (!via && last && last.place === place && at - last.at < SAME_VISIT_MIN * 60_000) return;
     const sighting = via ? { place, at, via } : { place, at };
     await AsyncStorage.setItem(KEY, JSON.stringify([...seen, sighting].slice(-SEEN_KEEP)));
