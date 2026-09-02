@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Hint, Screen, SectionLabel } from '../components/ui/Atoms';
@@ -218,26 +218,28 @@ export function MemoryScreen() {
               >
                 <Ionicons name="ellipse-outline" size={17} color={COLOR.dim} style={styles.bullet} />
                 <Text style={styles.fact}>{c.text}</Text>
-                <Touchable
+                <Pressable
                   testID={`candidate-keep-${c.id}`}
                   accessibilityRole="button"
                   accessibilityLabel={`Remember: ${c.text}`}
                   hitSlop={8}
                   disabled={busy}
                   onPress={() => void keep(c)}
+                  style={({ pressed }) => (pressed ? styles.pressed : undefined)}
                 >
                   <Text style={[styles.action, { color: accent }]}>KEEP</Text>
-                </Touchable>
-                <Touchable
+                </Pressable>
+                <Pressable
                   testID={`candidate-drop-${c.id}`}
                   accessibilityRole="button"
                   accessibilityLabel={`Do not remember: ${c.text}`}
                   hitSlop={8}
                   disabled={busy}
                   onPress={() => void ignore(c)}
+                  style={({ pressed }) => (pressed ? styles.pressed : undefined)}
                 >
                   <Ionicons name="close" size={18} color={COLOR.dim} />
-                </Touchable>
+                </Pressable>
               </View>
             ))}
           </View>
@@ -272,26 +274,28 @@ export function MemoryScreen() {
                   <Text style={styles.fact}>{s.fact}</Text>
                   <Text style={styles.why}>{s.why}</Text>
                 </View>
-                <Touchable
+                <Pressable
                   testID={`stale-forget-${i}`}
                   accessibilityRole="button"
                   accessibilityLabel={`Forget: ${s.fact}`}
                   hitSlop={8}
                   disabled={busy}
                   onPress={() => void dropStale(s)}
+                  style={({ pressed }) => (pressed ? styles.pressed : undefined)}
                 >
                   <Text style={[styles.action, { color: accent }]}>FORGET</Text>
-                </Touchable>
-                <Touchable
+                </Pressable>
+                <Pressable
                   testID={`stale-keep-${i}`}
                   accessibilityRole="button"
                   accessibilityLabel={`Keep: ${s.fact}`}
                   hitSlop={8}
                   disabled={busy}
                   onPress={() => void hold(s)}
+                  style={({ pressed }) => (pressed ? styles.pressed : undefined)}
                 >
                   <Ionicons name="close" size={18} color={COLOR.dim} />
-                </Touchable>
+                </Pressable>
               </View>
             ))}
           </View>
@@ -397,6 +401,15 @@ const styles = StyleSheet.create({
   // the fact and its reason stack, so the reason reads as a caption and not a second fact
   rowText: { flex: 1, gap: 2 },
   why: { ...TYPE.meta, fontSize: 11, color: COLOR.dim, lineHeight: 15 },
+  /**
+   * Pressed feedback, and the reason these are `Pressable` at all.
+   *
+   * `Touchable` is an animated `Pressable` and **synthetic input does not reach it** —
+   * measured again on 2026-09-02, when FORGET took three taps from a laptop and did
+   * nothing each time while the same tap on a plain control worked. Every offer here
+   * is meant to be checkable from a laptop, so none of them is animated.
+   */
+  pressed: { opacity: 0.55 },
   action: { ...TYPE.meta, fontSize: 11, letterSpacing: 1, marginRight: SPACE.md },
   add: { marginTop: SPACE.md },
 });
