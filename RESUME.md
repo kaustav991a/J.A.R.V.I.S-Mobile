@@ -16,6 +16,51 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ⚠️ 2026-09-02, evening. Three false departures, and two fixes that were worse than the bug.
+
+The morning proved background sightings. The evening spent itself on what they get
+wrong, and the lesson is not about geofences.
+
+**Three false *"Left X"* notifications, three different causes:**
+
+| What arrived | Why |
+|---|---|
+| *Left Mousumi's Home* + *Left Sealdah*, 16:03 | two sweep exits a second apart; each handler read the store before the other had written, so neither saw a burst |
+| *Left Office, 18:12* | a drifting fix crossed the 120 m boundary from a desk he had not left — one place, so no burst to compare it against |
+| — | and the six-hour contradiction rule silently deleted three real morning departures |
+
+Each was caught the same way: **he read the sentence and said "but I am at my desk"**.
+Not one was caught by 1,410 passing tests.
+
+### The two rules that ate real data
+
+Both were written the same afternoon, each tuned on the exact failure it had just seen,
+and neither was checked against what else has that shape.
+
+- **The burst rule** could not tell overlapping circles from a platform sweep, so
+  leaving home also-leaving-the-neighbourhood was thrown away. Fixed with distance.
+- **"You can only leave where you were"** looked back six hours, so every leg of a
+  commute was contradicted by the leg before it — which is what a journey *is*. Home
+  8:06, Barrackpore 8:41, Sealdah 9:31, Sector V 10:03: three of the four deleted at
+  the next launch. Fixed with ten minutes, and the distant case handed to the fresh-fix
+  check, which is a better witness than a timestamp.
+
+**The crossing store is empty tonight**, Monday's 7:08 PM included. Nothing else was
+touched — no rule here can reach a sighting without a `via`, so twelve weeks of
+app-open history, the chat log, the journal and the facts are all intact.
+
+**Not rebuilt from the notification log, deliberately.** The times are all there and it
+would have taken ten minutes. Writing invented rows into a timeline to make a counter
+read better is the exact failure this project keeps naming, and tomorrow's commute
+regenerates the same four crossings for nothing.
+
+### What the map turned out to be for
+
+It was built as a diagnostic panel and had never diagnosed anything. Tonight two
+screenshots a minute apart showed the dot drifting out of the Office circle while he sat
+still, the accuracy ring swelling around it. **The notification said what; the map said
+why.** That is the whole argument for drawing state rather than asserting it.
+
 ## ✅ 2026-09-02. Four bugs the phone found, and one of them had been hiding for ten days.
 
 **`anticipate-v1` was never broken. It was invisible.** The WATCHING panel read
