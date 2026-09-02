@@ -91,6 +91,13 @@ export type JarvisContextValue = {
   disconnect: () => void;
   /** send a text command; falls back to REST when the socket is not open */
   sendCommand: (text: string) => Promise<void>;
+  /**
+   * Keep something he said without being asked.
+   *
+   * The remark is decided on the chat screen and belongs in the log, not in that
+   * screen's state — which is where it lived for ten days, drawn once and lost.
+   */
+  noteUnprompted: (text: string, at: number) => void;
   /** send a recorded clip; the far end transcribes it and answers */
   sendVoice: (clip: { base64: string; format: string }) => Promise<boolean>;
   /** send a photo for the far end to look at; the caption may be empty */
@@ -1326,6 +1333,11 @@ export function JarvisProvider({ children }: PropsWithChildren) {
    */
   const dropTurn = useCallback((at: number) => dispatch({ type: 'turn_drop', at }), []);
 
+  const noteUnprompted = useCallback(
+    (text: string, at: number) => dispatch({ type: 'unprompted', text, at }),
+    []
+  );
+
   /** take one of your own turns out of the log, in any state. His cannot be removed */
   const removeTurn = useCallback((at: number) => dispatch({ type: 'turn_remove', at }), []);
 
@@ -1467,6 +1479,7 @@ export function JarvisProvider({ children }: PropsWithChildren) {
       connect,
       disconnect,
       sendCommand,
+      noteUnprompted,
       sendVoice,
       sendPhoto,
       resendPhoto,

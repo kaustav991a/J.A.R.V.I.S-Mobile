@@ -100,7 +100,7 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useContext(HeaderHeightContext);
   const { accent, animations } = useAppearance();
-  const { hud, sendCommand, sendVoice, sendPhoto, resendPhoto, connected, markChatRead, setChatFocused, mode, place, dropTurn, removeTurn } =
+  const { hud, sendCommand, sendVoice, sendPhoto, resendPhoto, connected, markChatRead, setChatFocused, mode, place, dropTurn, removeTurn, noteUnprompted } =
     useJarvis();
 
   /**
@@ -304,6 +304,8 @@ export function ChatScreen() {
           });
           if (!said) return;
           setRemark(said.line);
+          // and into the log, so tomorrow can still see what he noticed today
+          noteUnprompted(said.line, now.getTime());
           await noteSpoken(said.about, dayKey(now));
         } catch {
           // a remark is the most optional thing in this app; nothing it needs may
@@ -313,7 +315,7 @@ export function ChatScreen() {
       return () => {
         alive = false;
       };
-    }, [place, minute])
+    }, [place, minute, noteUnprompted])
   );
 
   /** a photo taken and not yet sent. Null is the ordinary state of this screen. */

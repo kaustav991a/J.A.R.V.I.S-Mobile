@@ -84,6 +84,16 @@ export type HudState = {
 export type HudAction =
   | { type: 'frame'; frame: JarvisFrame; at: number }
   | { type: 'local_command'; text: string; at: number; image?: string }
+  /**
+   * Something he noticed and said without being asked.
+   *
+   * Decided in `lib/anticipate.ts` and kept here rather than in the screen that
+   * shows it. It was React state for ten days: drawn once at the top of the chat,
+   * written nowhere, gone the moment the tab changed. The WATCHING panel would
+   * report `Today: SPOKEN` over a log whose last entry was from yesterday — one
+   * remark a day, spent on nobody.
+   */
+  | { type: 'unprompted'; text: string; at: number }
   /** something carried the turn stamped `at`; the wait for an answer starts */
   | { type: 'turn_sent'; at: number }
   /** nothing could carry it, so there is nothing to wait for */
@@ -449,6 +459,18 @@ export function hudReducer(state: HudState, action: HudAction): HudState {
   switch (action.type) {
     case 'frame':
       return { ...applyFrame(state, action.frame, action.at), lastFrameAt: action.at };
+    case 'unprompted': {
+      // the focus effect runs on every return to the tab and the day marker is
+      // written after the remark, so the log must refuse the second copy itself
+      if (holdsTurn(state.chat, { from: 'jarvis', text: action.text, at: action.at })) return state;
+      return {
+        ...state,
+        chat: cap(
+          place(state.chat, { from: 'jarvis' as const, text: action.text, at: action.at }),
+          CHAT_CAP
+        ),
+      };
+    }
     case 'local_command':
       return {
         ...state,

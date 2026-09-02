@@ -1,4 +1,5 @@
 import { hudReducer, initialHudState, HudState } from '../hudReducer';
+import type { ChatEntry } from '../hudReducer';
 import { JarvisFrame } from '../../ws/frames';
 
 const feed = (frames: JarvisFrame[], start: HudState = initialHudState): HudState =>
@@ -782,5 +783,46 @@ describe('a pushed reply that was also carried over the socket', () => {
     s = hudReducer(s, { type: 'frame', frame: greeting, at: 1220 });
 
     expect(s.chat).toHaveLength(1);
+  });
+});
+
+describe('an unprompted remark is part of the record', () => {
+  /**
+   * It used to be a label that vanished.
+   *
+   * `anticipate-v1` sat untested for ten days while working perfectly: the remark was
+   * React state, drawn once at the top of the chat and never written anywhere. On
+   * 2026-09-02 the WATCHING panel read `Today: SPOKEN` while the chat log's last entry
+   * was from the previous afternoon — the day's one remark had been spent, shown to
+   * nobody, and lost. A remark worth making is worth keeping.
+   */
+  const base = () => ({ ...initialHudState, chat: [] as ChatEntry[] });
+
+  it('lands in the log as his turn', () => {
+    const next = hudReducer(base(), {
+      type: 'unprompted',
+      text: 'Still at Office, sir — by 7:08 PM you are usually at Home.',
+      at: 1000,
+    });
+    expect(next.chat).toEqual([
+      { from: 'jarvis', text: 'Still at Office, sir — by 7:08 PM you are usually at Home.', at: 1000 },
+    ]);
+  });
+
+  it('is written once, however many times the screen mounts', () => {
+    // useFocusEffect runs on every return to the tab, and the day marker is written
+    // after the remark - a race the log must not turn into a stutter
+    const said = { type: 'unprompted' as const, text: 'Not at Office, sir.', at: 2000 };
+    const next = hudReducer(hudReducer(base(), said), said);
+    expect(next.chat).toHaveLength(1);
+  });
+
+  it('keeps the conversation it arrives into', () => {
+    const held: ChatEntry[] = [{ from: 'user', text: 'how far is home', at: 500 }];
+    const next = hudReducer(
+      { ...initialHudState, chat: held },
+      { type: 'unprompted', text: 'Not at Office, sir.', at: 900 }
+    );
+    expect(next.chat.map((c) => c.from)).toEqual(['user', 'jarvis']);
   });
 });
