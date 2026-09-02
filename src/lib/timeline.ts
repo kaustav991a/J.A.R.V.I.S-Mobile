@@ -214,11 +214,24 @@ export async function pruneSweepExits(
      * evidence, and a real first departure has to be allowed to be the first thing in
      * the history.
      */
+    /**
+     * You can only leave where you were — judged in minutes, not hours.
+     *
+     * A sweep reports every region the phone is outside of, so at the office it says
+     * you left Home, and with one place named there is no burst to recognise it by.
+     * The tell is a sighting somewhere else **at almost the same moment**.
+     *
+     * The window was six hours to begin with, and that deleted a commute: Home 8:06,
+     * Barrackpore 8:41, Sealdah 9:31, Sector V 10:03 — four true departures, each
+     * preceded by an exit from the place before it, which is what a journey IS. Three
+     * were thrown away and the row read *"Nothing yet"* over a morning of them.
+     */
+    const CONTRADICTION_MS = 10 * 60_000;
     for (const a of exits) {
-      const before = seen.filter((b) => b.at < a.at && b.at > a.at - 6 * 3600_000).pop();
-      // "somewhere else" has to mean somewhere else: leaving home is also leaving the
-      // neighbourhood it overlaps, and the sighting before it is the neighbour
-      if (before && before.place !== a.place && far(before.place, a.place)) swept.add(a.at);
+      const near = seen.filter(
+        (b) => b.place !== a.place && Math.abs(b.at - a.at) <= CONTRADICTION_MS && far(b.place, a.place)
+      );
+      if (near.length) swept.add(a.at);
     }
 
     for (const a of exits) {

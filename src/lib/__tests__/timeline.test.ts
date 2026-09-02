@@ -608,13 +608,15 @@ describe('you can only leave where you were', () => {
   const t = (hour: number, minute: number) =>
     new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
 
-  it('drops an exit from a place you were not at, alone though it is', async () => {
+  it('drops an exit contradicted by a sighting minutes away', async () => {
     // 2026-09-01 18:40, at the office: Android reported leaving Home, because a sweep
     // reports every region the phone is OUTSIDE of. One event, so no burst to catch it
     await AsyncStorage.setItem(
       'jarvis_place_seen',
       JSON.stringify([
-        { place: 'Office', at: t(17, 50) },
+        // minutes apart, not an hour: a sighting an hour earlier does not contradict
+        // anything, and treating it as though it did deleted whole commutes
+        { place: 'Office', at: t(18, 34) },
         { place: 'Home', at: t(18, 40), via: 'exit' },
       ])
     );
@@ -799,5 +801,42 @@ describe('being early is a claim about a habit', () => {
       ...arriveToday(8, 40),
     ];
     expect(hereEarly(seen, 'Office', new Date())?.usualBy).toBe(10 * 60 + 3);
+  });
+});
+
+describe('a commute is a chain of exits, not a contradiction', () => {
+  const t = (hour: number, minute: number) =>
+    new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
+
+  const far = () => true;
+
+  it('keeps every leg of a journey through four places', async () => {
+    // measured on the phone, 2026-09-02: Home 8:06, Barrackpore 8:41, Sealdah 9:31,
+    // Sector V 10:03 - four real departures, and the launch repair deleted three of
+    // them because each was preceded by an exit from somewhere else. That IS a
+    // commute. "Crossings recorded" then read "Nothing yet" over a morning of them
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([
+        { place: 'Home', at: t(8, 6), via: 'exit' },
+        { place: 'Barrackpore', at: t(8, 41), via: 'exit' },
+        { place: 'Sealdah', at: t(9, 31), via: 'exit' },
+        { place: 'Sector V', at: t(10, 3), via: 'exit' },
+      ])
+    );
+    expect(await pruneSweepExits(90_000, far)).toBe(0);
+    expect(await loadSeen()).toHaveLength(4);
+  });
+
+  it('still drops an exit contradicted by a sighting minutes away', async () => {
+    // the case the rule was written for: at the office, told he left Home
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([
+        { place: 'Office', at: t(18, 10) },
+        { place: 'Home', at: t(18, 12), via: 'exit' },
+      ])
+    );
+    expect(await pruneSweepExits(90_000, far)).toBe(1);
   });
 });
