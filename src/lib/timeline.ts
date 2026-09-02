@@ -151,17 +151,24 @@ export async function noteSeen(
 export async function dropExitsAround(
   at: number,
   place: string,
-  windowMs: number
+  windowMs: number,
+  far: (a: string, b: string) => boolean = () => true
 ): Promise<boolean> {
   try {
     const seen = await loadSeen();
+    // only a departure a person could not also have made counts as the platform:
+    // overlapping circles are left together on one walk, and both are real
     const burst = seen.filter(
-      (s) => s.via === 'exit' && s.place !== place && Math.abs(at - s.at) <= windowMs
+      (s) =>
+        s.via === 'exit' &&
+        s.place !== place &&
+        far(place, s.place) &&
+        Math.abs(at - s.at) <= windowMs
     );
     if (!burst.length) return false;
 
     const kept = seen.filter(
-      (s) => !(s.via === 'exit' && Math.abs(at - s.at) <= windowMs)
+      (s) => !(s.via === 'exit' && Math.abs(at - s.at) <= windowMs && far(place, s.place))
     );
     await AsyncStorage.setItem(KEY, JSON.stringify(kept));
     return true;
@@ -183,7 +190,10 @@ export async function dropExitsAround(
  * The same signature: two or more places leaving inside the window. A lone exit is a
  * departure and stays. Arrivals and app-open sightings are never touched.
  */
-export async function pruneSweepExits(windowMs: number = 90_000): Promise<number> {
+export async function pruneSweepExits(
+  windowMs: number = 90_000,
+  far: (a: string, b: string) => boolean = () => true
+): Promise<number> {
   try {
     const seen = await loadSeen();
     const exits = seen.filter((s) => s.via === 'exit');
@@ -206,11 +216,15 @@ export async function pruneSweepExits(windowMs: number = 90_000): Promise<number
      */
     for (const a of exits) {
       const before = seen.filter((b) => b.at < a.at && b.at > a.at - 6 * 3600_000).pop();
-      if (before && before.place !== a.place) swept.add(a.at);
+      // "somewhere else" has to mean somewhere else: leaving home is also leaving the
+      // neighbourhood it overlaps, and the sighting before it is the neighbour
+      if (before && before.place !== a.place && far(before.place, a.place)) swept.add(a.at);
     }
 
     for (const a of exits) {
-      const burst = exits.filter((b) => b.place !== a.place && Math.abs(a.at - b.at) <= windowMs);
+      const burst = exits.filter(
+        (b) => b.place !== a.place && far(a.place, b.place) && Math.abs(a.at - b.at) <= windowMs
+      );
       if (burst.length) {
         swept.add(a.at);
         for (const b of burst) swept.add(b.at);

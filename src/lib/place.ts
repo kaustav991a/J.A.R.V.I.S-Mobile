@@ -167,6 +167,52 @@ export async function currentFix(maxAgeMs = 0): Promise<Fix | null> {
   }
 }
 
+/**
+ * How far you have to move before the dot moves.
+ *
+ * Metres rather than seconds: a phone on a desk costs nothing, and a phone in a
+ * pocket updates as fast as it travels. Five metres is under the accuracy of a good
+ * fix, so the dot keeps up with a walk without jittering in place.
+ */
+export const WATCH_METRES = 5;
+
+/**
+ * Follow the fix while somebody is looking at it.
+ *
+ * The map panel took a single cached fix when Home came into focus, which is right
+ * for *where am I* and wrong for watching yourself move: the dot sat still while the
+ * person did not. Reported from the phone on 2026-09-02 — *"im not getting realtime
+ * GPS dot as seen on map"*.
+ *
+ * Returns the stopper rather than taking a cleanup callback, so a screen can hand it
+ * straight to an effect. **Nothing here reverse-geocodes.** The name of the place is
+ * a network round trip and this fires every few metres; the panel needs coordinates
+ * and an accuracy, and the naming stays on the slower path that already does it.
+ */
+export async function watchFix(onFix: (fix: Fix) => void): Promise<() => void> {
+  try {
+    const subscription = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.High, distanceInterval: WATCH_METRES },
+      (position) => {
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy } = position.coords;
+        onFix({
+          lat: latitude,
+          lon: longitude,
+          place: '',
+          accuracy: accuracy ?? undefined,
+          altitude: altitude ?? undefined,
+          altitudeAccuracy: altitudeAccuracy ?? undefined,
+        });
+      }
+    );
+    return () => subscription.remove();
+  } catch {
+    // a refused or unavailable watch leaves the cached fix on screen, which is the
+    // behaviour this replaces rather than a failure
+    return () => {};
+  }
+}
+
 /** the remembered trail, oldest first, with anything stale dropped */
 export async function loadTrail(): Promise<TrailStep[]> {
   try {

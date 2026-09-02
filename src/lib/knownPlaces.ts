@@ -111,6 +111,34 @@ export function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lo
 export const AT_PLACE_KM = 0.12;
 
 /**
+ * How close two places have to be before one walk can leave both.
+ *
+ * His home and Laxminath Nagar are about 150 m apart and their circles overlap, so
+ * stepping out of the door crosses both boundaries inside a minute. That is a real
+ * pair of departures and it looks exactly like the platform's restart sweep, which
+ * also reports several places at once — the difference is distance. Nobody leaves
+ * two places half a kilometre apart in the same breath.
+ */
+export const NEIGHBOUR_KM = 0.5;
+
+/**
+ * A test for "could one walk have left both of these?", by label.
+ *
+ * Unknown labels answer false — not far apart — because the cost of being wrong runs
+ * one way: treating a real departure as a sweep deletes a sighting that cannot be
+ * recovered, while keeping a false one costs a wrong figure that later data outvotes.
+ */
+export function farApart(places: KnownPlace[]): (a: string, b: string) => boolean {
+  const at = new Map(places.map((p) => [p.label, p]));
+  return (a, b) => {
+    const one = at.get(a);
+    const two = at.get(b);
+    if (!one || !two) return false;
+    return distanceKm(one, two) > NEIGHBOUR_KM;
+  };
+}
+
+/**
  * The name of wherever he is standing, or null when it cannot honestly tell.
  *
  * **The second half is the fix for a real report.** A place has to win by more than

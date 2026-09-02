@@ -17,6 +17,7 @@ import { alertFromLaunch, installHandler, probeNotify } from './src/lib/notify';
 // mounts. Registering it is the separate job the effect below does.
 import { syncCommuteTask } from './src/lib/commuteTask';
 import { pruneSweepExits } from './src/lib/timeline';
+import { farApart, loadKnown } from './src/lib/knownPlaces';
 import { ToastProvider } from './src/components/ui/Toast';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { crashBuild } from './src/lib/crashBuild';
@@ -158,9 +159,11 @@ export default function App() {
    */
   useEffect(() => {
     if (launching) return;
-    void pruneSweepExits().then((dropped) => {
-      if (dropped) console.log(`[jarvis] dropped ${dropped} swept exits`);
-    });
+    void loadKnown()
+      .then((places) => pruneSweepExits(undefined, farApart(places)))
+      .then((dropped) => {
+        if (dropped) console.log(`[jarvis] dropped ${dropped} swept exits`);
+      });
   }, [launching]);
 
   useEffect(() => {

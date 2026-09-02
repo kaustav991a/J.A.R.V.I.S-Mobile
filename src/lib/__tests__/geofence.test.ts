@@ -50,6 +50,20 @@ const place = (label: string, lat: number, lon: number): KnownPlace => ({
 const HOME = place('Home', 22.81556, 88.37106);
 const OFFICE = place('Office', 22.5769, 88.4344);
 
+/**
+ * Kilometres apart on purpose.
+ *
+ * A sweep is recognised by distance — nobody leaves two of these in one minute — so
+ * the rule cannot be exercised without telling the app where the places are.
+ */
+const SPREAD = [
+  OFFICE,
+  HOME,
+  place('Musalman Para', 22.7, 88.4),
+  place('Sector V', 22.5726, 88.4325),
+  place('Barrackpore Railway Station', 22.76, 88.37),
+];
+
 /** a time today, so the notification body can be checked against a clock */
 const at = (hour: number, minute: number): number =>
   new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
@@ -58,8 +72,12 @@ const at = (hour: number, minute: number): number =>
 const recent = Date.now() - 60_000;
 
 /** the ten-second pause before speaking is real time, and no test wants to spend it */
-const fire = (event: Parameters<typeof onGeofenceEvent>[0], at?: number, ms = 0) =>
-  onGeofenceEvent(event, at, ms);
+const fire = (
+  event: Parameters<typeof onGeofenceEvent>[0],
+  at?: number,
+  ms = 0,
+  places?: KnownPlace[]
+) => onGeofenceEvent(event, at, ms, places);
 
 beforeEach(async () => {
   await AsyncStorage.clear();
@@ -247,8 +265,8 @@ describe('the sweep Android fires at every restart', () => {
     // Services re-evaluates every region when the app process restarts and reports an
     // exit for each one the phone is outside of. Every event is real; not one is a
     // departure
-    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
-    await fire({ eventType: 'exit', region: { identifier: 'Musalman Para' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Musalman Para' } }, at(18, 31), 0, SPREAD);
     await fire(
       { eventType: 'exit', region: { identifier: 'Barrackpore Railway Station' } },
       at(18, 31)
@@ -260,21 +278,21 @@ describe('the sweep Android fires at every restart', () => {
     // the first exit of a sweep is indistinguishable from a departure. It is only the
     // second place in the same breath that gives it away, so the repair has to reach
     // backwards
-    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31), 0, SPREAD);
     expect(await loadSeen()).toHaveLength(1);
-    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31), 0, SPREAD);
     expect(await loadSeen()).toEqual([]);
   });
 
   it('says nothing more once it knows, and one buzz is the cost of finding out', async () => {
-    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31));
-    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
-    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(18, 31), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31), 0, SPREAD);
     expect(posted).toHaveBeenCalledTimes(1);
   });
 
   it('still believes a single departure, which is the whole feature', async () => {
-    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5), 0, SPREAD);
     const seen = await loadSeen();
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ place: 'Office', via: 'exit' });
@@ -283,15 +301,15 @@ describe('the sweep Android fires at every restart', () => {
 
   it('lets two real departures stand when they are far enough apart', async () => {
     // leaving home in the morning and the office in the evening are both true
-    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10));
-    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5));
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(9, 10), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5), 0, SPREAD);
     expect(await loadSeen()).toHaveLength(2);
   });
 
   it('never drops an arrival, which no sweep produces', async () => {
-    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(18, 31));
-    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31));
-    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31));
+    await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(18, 31), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31), 0, SPREAD);
     const seen = await loadSeen();
     expect(seen).toEqual([expect.objectContaining({ place: 'Office', via: 'enter' })]);
   });
@@ -311,12 +329,13 @@ describe('waiting a moment before speaking', () => {
     const settle = fire(
       { eventType: 'exit', region: { identifier: 'Home' } },
       at(18, 40),
-      200
+      200,
+      SPREAD
     );
     // the sighting has to be written before the second event can recognise the burst,
     // which on a phone is seconds and here is a tick
     await new Promise((r) => setTimeout(r, 20));
-    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 40), 0);
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 40), 0, SPREAD);
     await settle;
     expect(posted).not.toHaveBeenCalled();
     expect(await loadSeen()).toEqual([]);
@@ -325,5 +344,41 @@ describe('waiting a moment before speaking', () => {
   it('still speaks for a departure that nothing contradicts', async () => {
     await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5), 0);
     expect(posted).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('places that overlap each other', () => {
+  const NEAR = place('Laxminath Nagar', 22.81622, 88.37179); // ~110 m from HOME
+  const FAR = place('Sector V', 22.5769, 88.4344); // 40 km away
+
+  beforeEach(() => {
+    posted.mockClear();
+  });
+
+  it('reports both when leaving two circles that sit on top of each other', async () => {
+    // his home and Laxminath Nagar are about 150 m apart and their 120 m circles
+    // overlap, so one walk out of the door crosses both boundaries within a minute.
+    // Reported as missing on 2026-09-02: "didn't get notification on leaving
+    // laxminath nagar" - the sweep rule had eaten a real departure
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(8, 6), 0, [HOME, NEAR]);
+    await fire(
+      { eventType: 'exit', region: { identifier: 'Laxminath Nagar' } },
+      at(8, 7),
+      0,
+      [HOME, NEAR]
+    );
+    expect((await loadSeen()).map((s) => s.place)).toEqual(['Home', 'Laxminath Nagar']);
+    expect(posted).toHaveBeenCalledTimes(2);
+  });
+
+  it('still throws away two departures forty kilometres apart', async () => {
+    // nobody leaves the office and Barrackpore in the same minute, and that is the
+    // signature of the platform re-evaluating every region at process start
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31), 0, [HOME, FAR]);
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31), 0, [
+      HOME,
+      FAR,
+    ]);
+    expect(await loadSeen()).toEqual([]);
   });
 });

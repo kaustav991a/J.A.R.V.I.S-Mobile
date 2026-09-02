@@ -27,7 +27,7 @@ import { daysSeenAt, loadSeen, nextSeenElsewhere } from '../lib/timeline';
 import { forgetSpoken, loadSpoken } from '../lib/spokenStore';
 import { loadKnown } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
-import { FIX_TTL_MS, currentFix } from '../lib/place';
+import { FIX_TTL_MS, currentFix, watchFix } from '../lib/place';
 import type { Fix } from '../lib/place';
 import { usageForAsk } from '../lib/journal/rollup';
 import { openJournal } from '../lib/journal/store';
@@ -279,6 +279,39 @@ export function HomeScreen() {
     useCallback(() => {
       void refreshPlace();
     }, [refreshPlace])
+  );
+
+  /**
+   * The dot follows you while the panel is on screen.
+   *
+   * The cached fix is right for the sentence at the top — *where am I* — and wrong for
+   * the map, where a dot that does not move while you do reads as a broken map. Asked
+   * for on 2026-09-02: *"im not getting realtime GPS dot as seen on map"*.
+   *
+   * Bound to focus, not to the app being alive. A watch that outlives its screen is a
+   * background tracker nobody asked for, and this one holds GPS open, so it stops on
+   * the way out of the tab. Off entirely when location sharing is off: the switch has
+   * to mean the thing it says.
+   *
+   * The place NAME still comes from the slower cached path — naming is a network round
+   * trip and this fires every five metres.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (!shareLocation) return;
+      let stop: (() => void) | null = null;
+      let gone = false;
+      void watchFix((next) => {
+        setFix((held) => ({ ...next, place: held?.place ?? next.place }));
+      }).then((off) => {
+        if (gone) off();
+        else stop = off;
+      });
+      return () => {
+        gone = true;
+        stop?.();
+      };
+    }, [shareLocation])
   );
 
   const [menu, setMenu] = useState(false);

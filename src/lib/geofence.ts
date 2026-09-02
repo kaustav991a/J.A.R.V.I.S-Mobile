@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
 import { clockLabel } from './commute';
-import { AT_PLACE_KM } from './knownPlaces';
+import { AT_PLACE_KM, farApart, loadKnown } from './knownPlaces';
 import type { KnownPlace } from './knownPlaces';
 import { dismiss, postNow } from './notify';
 import { dropExitsAround, loadSeen, noteSeen } from './timeline';
@@ -117,7 +117,8 @@ type GeofenceEvent = {
 export async function onGeofenceEvent(
   event: GeofenceEvent,
   at: number = Date.now(),
-  speakAfterMs: number = SPEAK_AFTER_MS
+  speakAfterMs: number = SPEAK_AFTER_MS,
+  places?: KnownPlace[]
 ): Promise<void> {
   try {
     const kind = event?.eventType;
@@ -141,7 +142,12 @@ export async function onGeofenceEvent(
      * moment the first arrives there is nothing to tell it apart from you walking out
      * of your office.
      */
-    if (leaving && ((await inSweep(when)) || (await sweepDetected(when, label)))) return;
+    if (leaving) {
+      // the places are needed to tell a sweep from a walk: two departures are the
+      // platform only if a person could not have made both
+      const known = places ?? (await loadKnown());
+      if ((await inSweep(when)) || (await sweepDetected(when, label, farApart(known)))) return;
+    }
 
     await noteSeen(label, when, entering ? 'enter' : 'exit');
 
@@ -269,8 +275,12 @@ async function inSweep(when: number): Promise<boolean> {
 }
 
 /** the same question, asked with the label, plus the repair */
-async function sweepDetected(when: number, label: string): Promise<boolean> {
-  const dropped = await dropExitsAround(when, label, SWEEP_WINDOW_MS);
+async function sweepDetected(
+  when: number,
+  label: string,
+  far: (a: string, b: string) => boolean
+): Promise<boolean> {
+  const dropped = await dropExitsAround(when, label, SWEEP_WINDOW_MS, far);
   if (!dropped) return false;
 
   try {

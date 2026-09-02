@@ -634,3 +634,39 @@ describe('you can only leave where you were', () => {
     expect(await loadSeen()).toHaveLength(1);
   });
 });
+
+describe('pruning knows which places touch each other', () => {
+  const t = (hour: number, minute: number) =>
+    new Date(new Date().setHours(hour, minute, 0, 0)).getTime();
+
+  /** Home and Laxminath Nagar overlap; Sector V is forty kilometres off */
+  const far = (a: string, b: string) => {
+    const near = new Set(['Home', 'Laxminath Nagar']);
+    return !(near.has(a) && near.has(b));
+  };
+
+  it('keeps both departures from circles that sit on top of each other', async () => {
+    // one walk out of the door crosses both boundaries, and both are true
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([
+        { place: 'Home', at: t(8, 0) },
+        { place: 'Home', at: t(8, 6), via: 'exit' },
+        { place: 'Laxminath Nagar', at: t(8, 7), via: 'exit' },
+      ])
+    );
+    expect(await pruneSweepExits(90_000, far)).toBe(0);
+    expect(await loadSeen()).toHaveLength(3);
+  });
+
+  it('still throws out a burst from places nobody could have left together', async () => {
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([
+        { place: 'Home', at: t(18, 31), via: 'exit' },
+        { place: 'Sector V', at: t(18, 31), via: 'exit' },
+      ])
+    );
+    expect(await pruneSweepExits(90_000, far)).toBe(2);
+  });
+});
