@@ -499,6 +499,50 @@ export function usuallyHereBy(seen: Seen[], place: string, now: Date): number | 
   return times.length % 2 ? times[mid] : times[mid - 1];
 }
 
+/**
+ * The hour he arrives at a place, and whether anything watched him do it.
+ *
+ * Two sources and they disagree by an hour and a half. A geofence `enter` is the
+ * boundary being crossed with the phone in a pocket; everything else is the first
+ * moment somebody happened to pick the phone up at that place, which is always later
+ * than arriving. On 2026-09-02 the app told a man at his desk since 10:03 that he was
+ * *"at Office early, sir — usually you are there by 11:51 AM"*: right about its data,
+ * and its data had only ever seen him late.
+ *
+ * **This is the arrival twin of `leftBy`**, and the same rule holds — the measured
+ * source wins as soon as it has enough days, and the fallback is reported as a
+ * fallback rather than dressed as a figure. What a caller does with `measured: false`
+ * is its own decision; `earlyRemark` refuses to speak on one, because "you are early"
+ * is a claim about a habit and that is exactly what an app-open median is not.
+ */
+export function arrivalHour(
+  seen: Seen[],
+  place: string,
+  now: Date
+): { minute: number; measured: boolean } | null {
+  const today = dayKey(now.getTime());
+  const crossings = new Map<string, number>();
+
+  for (const s of seen) {
+    if (s.place !== place || s.via !== 'enter') continue;
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    // the FIRST crossing of a day: coming back from lunch is not arriving
+    const held = crossings.get(key);
+    const minute = minuteOfDay(s.at);
+    if (held === undefined || minute < held) crossings.set(key, minute);
+  }
+
+  if (crossings.size >= ENOUGH_PLACE_DAYS) {
+    const times = [...crossings.values()].sort((a, b) => a - b);
+    const mid = Math.floor(times.length / 2);
+    return { minute: times.length % 2 ? times[mid] : times[mid - 1], measured: true };
+  }
+
+  const guess = usuallyHereBy(seen, place, now);
+  return guess === null ? null : { minute: guess, measured: false };
+}
+
 /** how far before the usual arrival before being early is worth a remark */
 export const EARLY_BY_MIN = 45;
 
@@ -515,8 +559,22 @@ export function hereEarly(
   place: string,
   now: Date
 ): { usualBy: number; at: number } | null {
-  const usualBy = usuallyHereBy(seen, place, now);
-  if (usualBy === null) return null;
+  /**
+   * The hour has to have been watched, not inferred.
+   *
+   * "You are early" is a claim about a habit, and an app-open median is not one: it
+   * is the hour somebody tends to pick up their phone at a place, which is always
+   * after arriving. On 2026-09-02 that produced *"at Office early, sir — usually you
+   * are there by 11:51 AM"* to a man at that desk by ten. Nothing was early; the
+   * baseline was late.
+   *
+   * So this stays silent until the crossings have enough days, the same way the
+   * departure figure waited. Silence for a few days is the cost of not making the
+   * 3:40 PM mistake in the other direction.
+   */
+  const arrival = arrivalHour(seen, place, now);
+  if (!arrival || !arrival.measured) return null;
+  const usualBy = arrival.minute;
 
   /**
    * You have to have arrived, and it is the ARRIVAL that is early — not the clock.

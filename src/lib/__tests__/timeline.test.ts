@@ -4,6 +4,7 @@ import {
   ENOUGH_PLACE_DAYS,
   LATE_BY_MIN,
   absentFrom,
+  arrivalHour,
   daysSeenAt,
   exitDaysAt,
   hereEarly,
@@ -197,7 +198,14 @@ describe('when you are usually there', () => {
 });
 
 describe('arriving somewhere earlier than usual', () => {
-  /** four days of leaving Home and reaching the Office around nine */
+  /**
+   * Four days of leaving Home and reaching the Office around nine.
+   *
+   * The Office sightings are crossings, because since 2026-09-02 that is what an
+   * arrival hour has to be built from: an app-open median is the hour somebody picks
+   * their phone up at a place, which is always after arriving, and `hereEarly` refuses
+   * to call anybody early against one.
+   */
   const arrivals = seen(
     [17, 7, 30, 'Home'],
     [17, 9, 0, 'Office'],
@@ -207,7 +215,7 @@ describe('arriving somewhere earlier than usual', () => {
     [19, 8, 50, 'Office'],
     [20, 7, 35, 'Home'],
     [20, 9, 5, 'Office']
-  );
+  ).map((x) => (x.place === 'Office' ? { ...x, via: 'enter' as const } : x));
 
   /** today: left Home at 7:10 and reached the Office at 7:55 */
   const today = [...arrivals, ...seen([21, 7, 10, 'Home'], [21, 7, 55, 'Office'])];
@@ -706,5 +714,90 @@ describe('how many days it has actually watched you go', () => {
     expect(
       exitDaysAt([{ place: 'Office', at: day(0, 13, 0), via: 'exit' }], 'Office', new Date())
     ).toBe(0);
+  });
+});
+
+describe('an arrival hour it has actually watched', () => {
+  const at = (back: number, hour: number, minute: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - back);
+    d.setHours(hour, minute, 0, 0);
+    return d.getTime();
+  };
+
+  /** four earlier days, each an app-open at Office long after he got there */
+  const appOpens = () =>
+    [1, 2, 3, 4].flatMap((back) => [
+      { place: 'Home', at: at(back, 7, 30) },
+      { place: 'Office', at: at(back, 11, 51) },
+    ]);
+
+  /** the same four days, with the boundary crossing recorded */
+  const measured = () =>
+    [1, 2, 3, 4].flatMap((back) => [
+      { place: 'Home', at: at(back, 7, 30) },
+      { place: 'Office', at: at(back, 10, 3), via: 'enter' as const },
+      { place: 'Office', at: at(back, 11, 51) },
+    ]);
+
+  it('says so when the hour came from app-opens rather than from arriving', () => {
+    // "usually you are there by 11:51 AM" to a man who had been at his desk since
+    // 10:03. The figure is right about the data and the data only ever saw him late,
+    // which is the same shape as "usually gone by 3:40 PM" from an office he leaves
+    // at seven. Reported 2026-09-02
+    expect(arrivalHour(appOpens(), 'Office', new Date())).toEqual({
+      minute: 11 * 60 + 51,
+      measured: false,
+    });
+  });
+
+  it('prefers the crossing once there are enough days of them', () => {
+    expect(arrivalHour(measured(), 'Office', new Date())).toEqual({
+      minute: 10 * 60 + 3,
+      measured: true,
+    });
+  });
+
+  it('has nothing to say before either kind has enough days', () => {
+    expect(arrivalHour([{ place: 'Office', at: at(1, 10, 3), via: 'enter' }], 'Office', new Date())).toBeNull();
+  });
+});
+
+describe('being early is a claim about a habit', () => {
+  const at = (back: number, hour: number, minute: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - back);
+    d.setHours(hour, minute, 0, 0);
+    return d.getTime();
+  };
+
+  const arriveToday = (hour: number, minute: number) => [
+    { place: 'Home', at: at(0, 7, 30) },
+    { place: 'Office', at: at(0, hour, minute) },
+  ];
+
+  it('says nothing when the usual hour is only where the app was opened', () => {
+    // this is the remark that fired on 2026-09-02: "at Office early, sir - usually you
+    // are there by 11:51 AM", to a man who is at that desk by ten every day. Nothing
+    // was early. The baseline was late
+    const seen = [
+      ...[1, 2, 3, 4].flatMap((back) => [
+        { place: 'Home', at: at(back, 7, 30) },
+        { place: 'Office', at: at(back, 11, 51) },
+      ]),
+      ...arriveToday(10, 3),
+    ];
+    expect(hereEarly(seen, 'Office', new Date())).toBeNull();
+  });
+
+  it('speaks once the crossings say so, because then it is a habit', () => {
+    const seen = [
+      ...[1, 2, 3, 4].flatMap((back) => [
+        { place: 'Home', at: at(back, 7, 30) },
+        { place: 'Office', at: at(back, 10, 3), via: 'enter' as const },
+      ]),
+      ...arriveToday(8, 40),
+    ];
+    expect(hereEarly(seen, 'Office', new Date())?.usualBy).toBe(10 * 60 + 3);
   });
 });
