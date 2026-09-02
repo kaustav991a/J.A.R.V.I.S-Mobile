@@ -16,6 +16,48 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ 2026-09-02. Four bugs the phone found, and one of them had been hiding for ten days.
+
+**`anticipate-v1` was never broken. It was invisible.** The WATCHING panel read
+`Today: SPOKEN` — *one remark a day, nothing more until tomorrow* — over a chat log
+whose last entry was from the previous afternoon. The remark was React state: drawn
+once at the top of the chat, written nowhere, gone the moment the tab changed. Ten
+days of a feature working perfectly and leaving no evidence behind. It now lands in
+the log as his turn, deduplicated in the reducer, which is what makes the row testable
+at all — press CLEAR, open Chat, and what he noticed is still there tomorrow.
+
+**The anti-sweep rules ate two real departures.** *"Didn't get notification on leaving
+laxminath nagar"*, and the same for Ichhapur Railway Station. Both overlap Home, so one
+walk out of the door crosses two boundaries inside a minute — **the same shape as the
+platform sweep**, and yesterday's rules threw the second away. Distance is the only
+thing that separates them: a person can leave two circles 150 m apart on one walk and
+cannot leave two places 40 km apart in the same breath. Half a kilometre is the line,
+and unknown labels count as near rather than far, because deleting a real sighting
+cannot be undone while keeping a false one costs a figure that later data outvotes.
+
+**The row was still claiming it cannot see him leave.** True while a sighting needed
+the app open; false since 19:08 on 09-01. It now prefers the measured exit and names
+what watched it. Then it turned out to be wrong in the other direction too — it said
+*nothing has watched you leave yet* while Monday's exit sat in the store, because
+`leftBy` wants four days before calling a time usual. Those are two different claims
+and only the second was true, so the row counts up: *"it has watched you leave once,
+and wants 4 before calling that your usual time."* The note also printed literal
+`**asterisks**`, the panel being plain text.
+
+**The dot follows him now.** A cached fix is right for *where am I* and wrong for a
+map. `watchFix` updates every five metres while Home is focused and stops when it is
+not; the breathing dashed ring that came with it is the fix's own error drawn live, not
+a fault — and it is the same figure that stops the app naming a place when the ring is
+wide enough to touch two of them.
+
+### The pattern in all four
+
+None of these was found by a test, and all four were found in a day. Three of them are
+the same failure: **a feature that cannot be observed cannot be trusted, and looks
+identical to a broken one.** The remark that vanished, the row that denied its own
+evidence, the departure silently deleted — each was working code that told the person
+using it something false about itself. The tests stayed green throughout.
+
 ## ✅ CLOSED — 2026-09-01, 19:09. **"Left Office — 7:08 PM. Noted, sir."**
 
 The screenshot is the whole entry. Lock screen, Tue Sep 1, 7:09 PM, one notification
