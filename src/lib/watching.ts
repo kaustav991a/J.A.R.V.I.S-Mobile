@@ -49,6 +49,15 @@ export type WatchFacts = {
   goneBy: number | null;
   /** where he is usually seen at that hour, when the sightings name one */
   goneTo?: string | null;
+  /**
+   * When he was actually seen to leave, and whether anything watched him do it.
+   *
+   * `measured` is the difference between a figure and a bound. A geofence exit is the
+   * boundary being crossed with the app closed; everything else is the last moment
+   * somebody happened to open the phone, which is always earlier than leaving and was
+   * once reported as 3:40 PM about an office he leaves at seven.
+   */
+  leftAt?: { minute: number; measured: boolean } | null;
   /** whether the one remark a day has already been spent */
   spokenToday: boolean;
 };
@@ -109,18 +118,30 @@ export function watching(f: WatchFacts): WatchRow[] {
        * old figure, so the row said "last seen there" above a number that meant the
        * opposite. Both now say the same thing.
        */
-      label: 'Where you turn up next',
+      label: f.leftAt?.measured ? 'When you leave' : 'Where you turn up next',
       // the place he is at now, because that is the one he could be remarked on for.
       // Naming it matters: "4 more days" with no subject reads as a countdown to
       // nothing at all
-      ...(f.placeDays >= ENOUGH_PLACE_DAYS
+      ...(f.leftAt?.measured
+        ? {
+            ready: true,
+            word: clockLabel(Math.floor(f.leftAt.minute / 60), f.leftAt.minute % 60),
+            // what watched it, because the row spent a week describing a figure it
+            // could not actually observe
+            note: f.place
+              ? `Measured at ${f.place}: the phone crossed the boundary with the app closed.`
+              : 'Measured when the phone crossed the boundary, with the app closed.',
+          }
+        : f.placeDays >= ENOUGH_PLACE_DAYS
         ? f.goneBy !== null
           ? {
               ready: true,
               // the figure itself, because that is the whole point of having learned it
               word: clockLabel(Math.floor(f.goneBy / 60), f.goneBy % 60),
               note: f.place
-                ? `${f.goneTo ? `${f.goneTo}, ` : ''}from ${f.placeDays} days after ${f.place}. **It cannot see you leave** — only where you turn up next, so your leaving time is somewhere before this.`
+                ? // no asterisks: this is rendered as plain text, and markdown
+                  // emphasis arrives on screen as the characters themselves
+                  `${f.goneTo ? `${f.goneTo}, ` : ''}from ${f.placeDays} days after ${f.place}. Nothing has watched you leave yet — this is only where you turn up next, so you left some time before it.`
                 : `The hour you are next seen somewhere else, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`,
             }
           : // enough days, and still no median — every sighting landed on one of them.
