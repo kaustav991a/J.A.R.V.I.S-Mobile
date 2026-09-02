@@ -10,6 +10,10 @@ import { useToast } from '../components/ui/Toast';
 import { COLOR, SPACE, TYPE } from '../theme/tokens';
 import { useAppearance } from '../theme/appearance';
 import { useJarvis } from '../state/JarvisProvider';
+import { factCandidates } from '../lib/journal/candidates';
+import type { Candidate } from '../lib/journal/candidates';
+import { decidedIds } from '../lib/journal/candidateStore';
+import { dismissFact, keepFact } from '../lib/journal/decide';
 import { haptic } from '../lib/haptics';
 
 /**
@@ -27,7 +31,7 @@ import { haptic } from '../lib/haptics';
  */
 export function MemoryScreen() {
   const { accent } = useAppearance();
-  const { api, pairing } = useJarvis();
+  const { api, pairing, hud } = useJarvis();
   const toast = useToast();
 
   const [facts, setFacts] = useState<string[]>([]);
@@ -36,6 +40,56 @@ export function MemoryScreen() {
   const [problem, setProblem] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+
+  /**
+   * Sentences he would remember if you let him.
+   *
+   * Read from the chat log this screen can already see, filtered by `factCandidates`,
+   * and never stored by the reading. The harvest happens here rather than in the chat
+   * screen for a reason worth keeping: a turn becomes a candidate while it is still in
+   * the log, so `CHAT_CAP` drops a sentence that has already been offered instead of
+   * one nobody ever saw.
+   */
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+
+  const readCandidates = useCallback(async () => {
+    const decided = await decidedIds();
+    setCandidates(factCandidates(hud.chat, Date.now(), decided));
+  }, [hud.chat]);
+
+  /**
+   * Send one, or refuse one. The deciding itself lives in `journal/decide`.
+   *
+   * Both answers are a line here on purpose: the promise this feature makes — nothing
+   * reaches the gateway until it is ticked — is testable there and, on this screen,
+   * not testable at all. The harness cannot render this component without tripping an
+   * invalid hook call in the navigation mock, so logic that matters does not live in
+   * it.
+   */
+  const keep = async (c: Candidate) => {
+    setBusy(true);
+    const out = await keepFact(c, { remember: api.remember });
+    setBusy(false);
+    if (!out.ok) {
+      haptic.bad();
+      toast.show(out.why, 'bad');
+      return;
+    }
+    setFacts(out.facts);
+    setPersistent(out.stored);
+    setCandidates((held) => held.filter((x) => x.id !== c.id));
+    haptic.good();
+    toast.show(
+      out.stored ? 'Remembered' : 'Held for now — the brain has no database',
+      out.stored ? 'good' : 'bad'
+    );
+  };
+
+  const ignore = async (c: Candidate) => {
+    await dismissFact(c);
+    setCandidates((held) => held.filter((x) => x.id !== c.id));
+    haptic.tap();
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,7 +111,8 @@ export function MemoryScreen() {
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load])
+      void readCandidates();
+    }, [load, readCandidates])
   );
 
   const add = async () => {
@@ -103,6 +158,58 @@ export function MemoryScreen() {
           The brain refuses these without a pairing token, since anything written here is
           treated as true about you on every turn. Set one on the Connection screen.
         </Hint>
+      ) : null}
+
+      {/**
+       * What he noticed you say, offered rather than kept.
+       *
+       * **Nothing here has been stored.** The decision behind this section, taken on
+       * 2026-09-02, was not *he decides quietly* — which needs a model reading every
+       * sentence and a great deal of trust — but *he proposes, you approve*. So a
+       * candidate is a sentence with a tick next to it, and the only thing that ever
+       * reaches the gateway is one you ticked.
+       *
+       * Dismissing is as permanent as keeping. Both are answers, and an offer that
+       * comes back after a no is nagging.
+       */}
+      {candidates.length ? (
+        <>
+          <SectionLabel>He noticed you said</SectionLabel>
+          <View style={styles.group}>
+            {candidates.map((c, i) => (
+              <View
+                key={c.id}
+                style={[styles.row, i === candidates.length - 1 ? styles.lastRow : null]}
+              >
+                <Ionicons name="ellipse-outline" size={17} color={COLOR.dim} style={styles.bullet} />
+                <Text style={styles.fact}>{c.text}</Text>
+                <Touchable
+                  testID={`candidate-keep-${c.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remember: ${c.text}`}
+                  hitSlop={8}
+                  disabled={busy}
+                  onPress={() => void keep(c)}
+                >
+                  <Text style={[styles.action, { color: accent }]}>KEEP</Text>
+                </Touchable>
+                <Touchable
+                  testID={`candidate-drop-${c.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Do not remember: ${c.text}`}
+                  hitSlop={8}
+                  disabled={busy}
+                  onPress={() => void ignore(c)}
+                >
+                  <Ionicons name="close" size={18} color={COLOR.dim} />
+                </Touchable>
+              </View>
+            ))}
+          </View>
+          <Hint testID="candidates-hint">
+            He has not kept any of these. Nothing leaves the phone until you say so.
+          </Hint>
+        </>
       ) : null}
 
       <SectionLabel>What he knows about you</SectionLabel>
@@ -200,5 +307,7 @@ const styles = StyleSheet.create({
     minHeight: 76,
     textAlignVertical: 'top',
   },
+  // KEEP sits beside the dismiss cross, so it reads as the pair of answers it is
+  action: { ...TYPE.meta, fontSize: 11, letterSpacing: 1, marginRight: SPACE.md },
   add: { marginTop: SPACE.md },
 });
