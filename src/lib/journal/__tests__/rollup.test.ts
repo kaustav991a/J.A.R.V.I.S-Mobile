@@ -216,3 +216,45 @@ describe('an app against its own usual', () => {
     expect(await appDeltas(j, NOW)).toEqual([]);
   });
 });
+
+describe('the home screen is not an app you chose to use', () => {
+  const load = async (j: Journal, app: string, perDay: number[]) => {
+    await j.putDaily(perDay.map((ms, back) => ({ day: dayOf(back), app, ms })));
+  };
+
+  /**
+   * *"53m in System launcher today against a usual 2m, sir."*
+   *
+   * True, and worth nobody's day. The launcher is what is on screen between the
+   * things you actually opened — it accumulates while a phone sits unlocked, which on
+   * 2026-09-02 was a laptop driving it over adb with stay-awake pinned on. Foreground
+   * time there is not a decision about an app, so it cannot be the finding.
+   */
+  it('never remarks on the launcher, however far past its usual it goes', async () => {
+    const j = await fresh();
+    await load(j, 'com.miui.home', [53 * 60_000, 2 * 60_000, 2 * 60_000, 2 * 60_000]);
+    expect(await appDeltas(j, NOW)).toEqual([]);
+  });
+
+  it('ignores the system shell for the same reason', async () => {
+    const j = await fresh();
+    await load(j, 'com.android.systemui', [40 * 60_000, 1 * 60_000, 1 * 60_000, 1 * 60_000]);
+    expect(await appDeltas(j, NOW)).toEqual([]);
+  });
+
+  it('recognises the other launchers by name, since the package differs per phone', async () => {
+    const j = await fresh();
+    await load(j, 'com.google.android.apps.nexuslauncher', [40 * 60_000, 60_000, 60_000, 60_000]);
+    await load(j, 'com.sec.android.app.launcher', [40 * 60_000, 60_000, 60_000, 60_000]);
+    expect(await appDeltas(j, NOW)).toEqual([]);
+  });
+
+  it('still finds the app underneath it', async () => {
+    const j = await fresh();
+    await load(j, 'com.miui.home', [53 * 60_000, 2 * 60_000, 2 * 60_000, 2 * 60_000]);
+    await load(j, 'com.instagram.android', [90 * 60_000, 20 * 60_000, 20 * 60_000, 20 * 60_000]);
+    const found = await appDeltas(j, NOW);
+    expect(found).toHaveLength(1);
+    expect(found[0].today).toBe(90);
+  });
+});

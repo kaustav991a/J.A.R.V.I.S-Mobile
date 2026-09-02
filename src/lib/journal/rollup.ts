@@ -152,6 +152,24 @@ export type AppDelta = {
  * true statement about a day, where a zero baseline invites "far more than usual"
  * about somebody nobody has watched yet.
  */
+/**
+ * The home screen and the system shell, which are not apps anybody chose to open.
+ *
+ * *"53m in System launcher today against a usual 2m, sir."* — true, and worth nobody's
+ * day. The launcher is what is on screen between the things you actually opened, so it
+ * accumulates whenever a phone sits unlocked; on 2026-09-02 that was a laptop driving
+ * it over adb with stay-awake pinned on. Foreground time there is not a decision about
+ * an app, and the day's one remark cannot be spent on it.
+ *
+ * Matched by shape as well as by name, because the launcher package differs on every
+ * phone — `com.miui.home` here, `nexuslauncher` on a Pixel, `sec.android.app.launcher`
+ * on a Samsung — and a list of exact strings would quietly stop working on the next
+ * device this app is installed on.
+ */
+const SHELL = /(^|.)(launcherd*|home|systemui|nexuslauncher|trebuchet)$|launcher3?$|systemui/i;
+
+export const isShell = (pkg: string): boolean => SHELL.test(pkg);
+
 export async function appDeltas(j: Journal, now: number): Promise<AppDelta[]> {
   const day = dayKey(now);
   const from = dayKey(now - (WINDOW_DAYS - 1) * DAY_MS);
@@ -169,6 +187,7 @@ export async function appDeltas(j: Journal, now: number): Promise<AppDelta[]> {
   const out: AppDelta[] = [];
 
   for (const row of await j.dailyFor(day)) {
+    if (isShell(row.app)) continue;
     const todayMin = minutes(row.ms);
     const usualMin = minutes(usualByApp.get(row.app) ?? 0);
     if (todayMin < APP_FLOOR_MIN) continue;
