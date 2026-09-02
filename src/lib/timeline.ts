@@ -241,6 +241,29 @@ export async function pruneSweepExits(
   }
 }
 
+/** how many crossings the diagnostic row shows: a check, not a history */
+export const CROSSINGS_SHOWN = 6;
+
+/**
+ * The crossings the app has actually recorded, newest first.
+ *
+ * There was no window into this store at all, which was fine while every crossing
+ * announced itself and stopped being fine the moment the false ones were silenced:
+ * *"if sweep is silent then it will add different timings and we can't show it"*. A
+ * suppressed sweep writes nothing — and nobody could check that, which is the same
+ * shape as every other bug this app has shipped.
+ *
+ * App-open sightings are left out deliberately. Mixing them in would put the old kind
+ * of guess next to a measured crossing with nothing to tell them apart, which is the
+ * confusion this row exists to end.
+ */
+export function crossings(seen: Seen[], now: Date, limit: number = CROSSINGS_SHOWN): Seen[] {
+  return seen
+    .filter((s) => s.via && s.at <= now.getTime())
+    .sort((a, b) => b.at - a.at)
+    .slice(0, limit);
+}
+
 /** forget the lot — paired with the location-sharing switch going off */
 export async function forgetSeen(): Promise<void> {
   try {

@@ -299,6 +299,7 @@ async function sweepDetected(
 
   try {
     await AsyncStorage.setItem(SWEEP_AT_KEY, String(when));
+    await noteSweep(when);
 
     // the first one was already said out loud: take it off the shade and give the
     // place its quiet period back, so a real departure minutes later still speaks
@@ -376,6 +377,46 @@ export async function forgetLeaving(): Promise<void> {
     await AsyncStorage.removeItem(LEFT_SAID_KEY);
   } catch {
     /* nothing stored */
+  }
+}
+
+/** how many bursts were recognised today, kept per day so the figure is about today */
+const SWEEP_COUNT_KEY = 'jarvis_sweep_count';
+
+const dayOf = (at: number): string => {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+
+/**
+ * Record that a burst was thrown away.
+ *
+ * Kept so the Places row can say how much was refused, which is the half of *"nothing
+ * happened"* that nobody could otherwise see. A day with three sweeps and no
+ * notifications is the rule working; a day with none and a missing departure is the
+ * rule failing, and until this counter existed those looked identical.
+ */
+export async function noteSweep(at: number): Promise<void> {
+  try {
+    const day = dayOf(at);
+    const raw = await AsyncStorage.getItem(SWEEP_COUNT_KEY);
+    const held = raw ? (JSON.parse(raw) as { day?: string; count?: number }) : null;
+    const count = held && held.day === day && typeof held.count === 'number' ? held.count : 0;
+    await AsyncStorage.setItem(SWEEP_COUNT_KEY, JSON.stringify({ day, count: count + 1 }));
+  } catch {
+    /* a lost count costs a diagnostic, not a sighting */
+  }
+}
+
+/** how many bursts were refused on the day `now` falls in */
+export async function sweepsToday(now: number = Date.now()): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(SWEEP_COUNT_KEY);
+    const held = raw ? (JSON.parse(raw) as { day?: string; count?: number }) : null;
+    if (!held || held.day !== dayOf(now) || typeof held.count !== 'number') return 0;
+    return held.count;
+  } catch {
+    return 0;
   }
 }
 

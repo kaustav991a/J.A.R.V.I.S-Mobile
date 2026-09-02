@@ -13,8 +13,11 @@ import { useJarvis } from '../state/JarvisProvider';
 import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
+import { crossings, loadSeen } from '../lib/timeline';
+import type { Seen } from '../lib/timeline';
 import {
   askForBackgroundLocation,
+  sweepsToday,
   backgroundLocationState,
   previewLeaving,
   startWatchingPlaces,
@@ -79,6 +82,15 @@ export function PlacesScreen() {
   const [watching, setWatching] = useState(false);
 
   /**
+   * The crossings the store holds, and the bursts it refused today.
+   *
+   * Read on focus rather than kept live: this is a diagnostic somebody opens to check
+   * an answer, not a feed. A crossing arrives every few hours at most.
+   */
+  const [crossed, setCrossed] = useState<Seen[]>([]);
+  const [sweeps, setSweeps] = useState(0);
+
+  /**
    * The one repair this screen can make, and it makes it once.
    *
    * `unarmed` is the state the device was found in on 2026-08-26: two departures
@@ -112,6 +124,8 @@ export function PlacesScreen() {
       void cloudArmedState().then(l.only(setCloudState));
       void backgroundLocationState().then(l.only(setBgLocation));
       void watchingPlaces().then(l.only(setWatching));
+      void loadSeen().then((seen) => l.only(setCrossed)(crossings(seen, new Date())));
+      void sweepsToday().then(l.only(setSweeps));
       void readHealth(l);
       return l.end;
     }, [readHealth])
@@ -723,6 +737,49 @@ export function PlacesScreen() {
             {watching ? 'STOP' : 'WATCH'}
           </Text>
         </Pressable>
+      </View>
+
+      {/**
+       * What the app actually recorded, as data rather than as a claim.
+       *
+       * *"but if sweep is silent then it will add different timings and we can't show
+       * it"* — asked an hour after the false departures were silenced, and the honest
+       * answer was that a suppressed sweep writes nothing AND nobody could check that.
+       * The only window into the sighting store was a notification, and those had just
+       * been switched off for the wrong ones.
+       *
+       * Both halves are here: the crossings that were kept, and how many bursts were
+       * refused today. A day with sweeps refused and no notifications is the rule
+       * working; a quiet day with a departure missing is the rule failing. Until this
+       * row existed those two looked identical.
+       */}
+      <View style={styles.row}>
+        <Ionicons name="git-commit-outline" size={19} color={COLOR.dim} />
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>Crossings recorded</Text>
+          {crossed.length ? (
+            crossed.map((c) => (
+              <Text key={`${c.place}-${c.at}`} style={styles.rowSub} testID={`crossing-${c.at}`}>
+                {`${c.via === 'exit' ? 'Left' : 'Reached'} ${c.place} · ${clockLabel(
+                  new Date(c.at).getHours(),
+                  new Date(c.at).getMinutes()
+                )}`}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.rowSub} testID="crossings-none">
+              Nothing yet. A crossing is recorded when you leave or reach a named place with
+              the app closed.
+            </Text>
+          )}
+          <Text style={styles.rowSub} testID="crossings-swept">
+            {sweeps === 0
+              ? 'No bursts refused today.'
+              : sweeps === 1
+                ? 'One burst refused today — several places at once, which is the platform and not you. Nothing was recorded from it.'
+                : `${sweeps} bursts refused today — several places at once, which is the platform and not you. Nothing was recorded from them.`}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.row}>
