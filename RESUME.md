@@ -16,6 +16,64 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## 🛑 STOP POINT — 2026-09-02, 19:00. Start here.
+
+**`feat/mobile-hud` at `4130e85`. 1410 tests, 97 suites, `tsc` clean,
+`build-status --check` up to date. 89 rows, 56 proved (63%).**
+
+**The OTA runtime is `1818e1b77eac5c530c6c15e2678b44bf2a2fb695`, not `31c64113`.** It
+moved yesterday when `app.json` gained `ACCESS_BACKGROUND_LOCATION`, and the APK that
+carries it was built **locally** — signed with `android/app/debug.keystore`, cert
+`fac61745dc09`. **An EAS build cannot update this phone**; installing one means
+uninstalling first, which costs the chat log, the journal and twelve weeks of
+sightings. Build with `./gradlew assembleRelease`, back the keystore up before any
+`prebuild --clean`, and bake the fingerprint into `strings.xml` by hand.
+
+### The brain is still frozen, and it now owes two things
+
+He said *"no work on brain until I say"*, and that still stands. Two items are queued
+against it, in order:
+
+1. **Stop the gateway distilling chat into facts by itself.** It writes a fact the
+   moment a message arrives — *"I've updated my records, Sir"* is literal. That is the
+   *he decides quietly* option that was explicitly refused on 09-02, running
+   server-side the whole time. The phone now has the consent-based half plus a tidy
+   pass that mops up after it.
+2. `situation-block`, the last app-side-ready piece of *He knows where and when he is*.
+
+**The stated rhythm is brain Mon–Fri, desktop at weekends**, which is the opposite of
+what has actually been worked all week. Unresolved on purpose; ask before assuming
+either.
+
+### What shipped today, and what is still unproved
+
+Eleven OTA publishes. Anticipation proved on the phone. Memory learned to take from
+conversation and to give things back. Background sightings survived a day of false
+positives and three fixes.
+
+**One thing to check tomorrow, and it proves four fixes at once.** Around 10:30, open
+Settings → Places → **Crossings recorded**. If Home ~8:06, Barrackpore ~8:41, Sealdah
+~9:31 and Sector V ~10:03 are all listed, then the distance rule, the ten-minute
+contradiction window, the fresh-fix second opinion and the burst race fix are all
+proved together — and `leftBy` starts rebuilding an honest departure median.
+
+**The crossing store is empty tonight.** Monday's 7:08 PM went with it. Deliberately not
+rebuilt from the notification log; tomorrow regenerates it.
+
+### Left in the app, in the order I would take them
+
+- `places` — `partial` on one question: two circles 150 m apart, does it name the right
+  one. Needs the walk between Home and Laxminath Nagar, and the enter/exit pair is a
+  better instrument than a screenshot of the header.
+- `anticipate-habit` — not blocked, waiting on arithmetic. Four days of measured exits
+  and the habit rows start quoting real times.
+- Queue 23 still owes the alarm intent and `expo-battery`; both need the next APK.
+
+**A rule this week keeps proving:** every bug that mattered was found by the person
+reading a sentence the app wrote, and none by the suite. When adding a rule that
+deletes or suppresses data, write down what else has that shape before shipping it —
+twice today a rule tuned on one failure ate the legitimate case that resembled it.
+
 ## ⚠️ 2026-09-02, evening. Three false departures, and two fixes that were worse than the bug.
 
 The morning proved background sightings. The evening spent itself on what they get
