@@ -5,6 +5,7 @@ import {
   LATE_BY_MIN,
   absentFrom,
   daysSeenAt,
+  exitDaysAt,
   hereEarly,
   leftBy,
   loadSeen,
@@ -668,5 +669,42 @@ describe('pruning knows which places touch each other', () => {
       ])
     );
     expect(await pruneSweepExits(90_000, far)).toBe(2);
+  });
+});
+
+describe('how many days it has actually watched you go', () => {
+  const day = (back: number, hour: number, minute: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - back);
+    d.setHours(hour, minute, 0, 0);
+    return d.getTime();
+  };
+
+  it('counts the days a departure was measured, not the sightings', () => {
+    // two exits on one evening - a step outside and the real one - is one day of
+    // evidence, and a median wants days
+    expect(
+      exitDaysAt(
+        [
+          { place: 'Office', at: day(1, 13, 0), via: 'exit' },
+          { place: 'Office', at: day(1, 19, 8), via: 'exit' },
+          { place: 'Office', at: day(2, 19, 2), via: 'exit' },
+        ],
+        'Office',
+        new Date()
+      )
+    ).toBe(2);
+  });
+
+  it('ignores app-open sightings, which never watched anything', () => {
+    expect(
+      exitDaysAt([{ place: 'Office', at: day(1, 15, 40) }], 'Office', new Date())
+    ).toBe(0);
+  });
+
+  it('leaves today out, the way every other baseline here does', () => {
+    expect(
+      exitDaysAt([{ place: 'Office', at: day(0, 13, 0), via: 'exit' }], 'Office', new Date())
+    ).toBe(0);
   });
 });

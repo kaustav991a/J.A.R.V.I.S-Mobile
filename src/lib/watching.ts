@@ -58,6 +58,14 @@ export type WatchFacts = {
    * once reported as 3:40 PM about an office he leaves at seven.
    */
   leftAt?: { minute: number; measured: boolean } | null;
+  /**
+   * How many earlier days a departure was actually watched.
+   *
+   * The row has to tell two silences apart: nothing has ever seen him leave, and it
+   * has seen him leave once and wants a few more days before calling that usual.
+   * Saying the first over a store that holds Monday's 7:08 PM exit reads as broken.
+   */
+  leftDays?: number;
   /** whether the one remark a day has already been spent */
   spokenToday: boolean;
 };
@@ -141,7 +149,15 @@ export function watching(f: WatchFacts): WatchRow[] {
               note: f.place
                 ? // no asterisks: this is rendered as plain text, and markdown
                   // emphasis arrives on screen as the characters themselves
-                  `${f.goneTo ? `${f.goneTo}, ` : ''}from ${f.placeDays} days after ${f.place}. Nothing has watched you leave yet — this is only where you turn up next, so you left some time before it.`
+                  `${f.goneTo ? `${f.goneTo}, ` : ''}from ${f.placeDays} days after ${f.place}. ${
+                    f.leftDays
+                      ? `${
+                          f.leftDays === 1
+                            ? 'It has watched you leave once'
+                            : `It has watched you leave on ${f.leftDays} days`
+                        }, and wants ${ENOUGH_PLACE_DAYS} before calling that your usual time`
+                      : 'Nothing has watched you leave yet'
+                  } — this is only where you turn up next, so you left some time before it.`
                 : `The hour you are next seen somewhere else, from ${f.placeDays} days. It is when you are next SEEN, so you left some time before it.`,
             }
           : // enough days, and still no median — every sighting landed on one of them.

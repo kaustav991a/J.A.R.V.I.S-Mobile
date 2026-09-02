@@ -173,3 +173,29 @@ describe('the departure row prefers a measured one', () => {
     }
   });
 });
+
+describe('counting up to a measured departure', () => {
+  const facts = (over: Partial<WatchFacts> = {}): WatchFacts => ({
+    baselineDays: 9,
+    placeDays: 7,
+    place: 'Office',
+    goneBy: 21 * 60 + 4,
+    goneTo: 'Home',
+    spokenToday: false,
+    leftAt: { minute: 21 * 60 + 4, measured: false },
+    ...over,
+  });
+
+  it('says it has watched, once, rather than that it never has', () => {
+    // the store held Monday's 7:08 PM exit while the row said nothing had watched
+    // him leave, which reads as broken rather than as honest arithmetic
+    const row = watching(facts({ leftDays: 1 })).find((r) => /turn up next/i.test(r.label));
+    expect(row?.note).toMatch(/1 day|once/i);
+    expect(row?.note).not.toMatch(/nothing has watched/i);
+  });
+
+  it('still says nothing has watched when nothing has', () => {
+    const row = watching(facts({ leftDays: 0 })).find((r) => /turn up next/i.test(r.label));
+    expect(row?.note).toMatch(/nothing has watched/i);
+  });
+});

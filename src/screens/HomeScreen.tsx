@@ -23,7 +23,7 @@ import { cloudArmedState, dayKey } from '../lib/commute';
 import type { CloudArmedState } from '../lib/commute';
 import { usageAccessState } from '../lib/status';
 import type { WatchFacts } from '../lib/watching';
-import { daysSeenAt, leftBy, loadSeen, nextSeenElsewhere } from '../lib/timeline';
+import { daysSeenAt, exitDaysAt, leftBy, loadSeen, nextSeenElsewhere } from '../lib/timeline';
 import { forgetSpoken, loadSpoken } from '../lib/spokenStore';
 import { loadKnown } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
@@ -184,6 +184,8 @@ export function HomeScreen() {
             // what actually watched him go, when anything did. A geofence exit is the
             // boundary being crossed with the app closed; the rest of this row is a bound
             leftAt: place ? leftBy(seen, place, now) : null,
+            // so the row counts up instead of claiming nothing has ever watched
+            leftDays: place ? exitDaysAt(seen, place, now) : 0,
             goneBy: place ? nextSeenElsewhere(seen, place, now)?.minute ?? null : null,
             goneTo: place ? nextSeenElsewhere(seen, place, now)?.place ?? null : null,
             spokenToday: spoken?.day === dayKey(now),
@@ -206,6 +208,7 @@ export function HomeScreen() {
             prev.goneBy === next.goneBy &&
             prev.leftAt?.minute === next.leftAt?.minute &&
             prev.leftAt?.measured === next.leftAt?.measured &&
+            prev.leftDays === next.leftDays &&
             prev.spokenToday === next.spokenToday
               ? prev
               : next

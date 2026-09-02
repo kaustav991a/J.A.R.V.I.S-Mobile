@@ -323,6 +323,27 @@ export function leftBy(
   return floor === null ? null : { minute: floor, measured: false };
 }
 /**
+ * How many earlier days a departure from a place was actually watched.
+ *
+ * The panel needs this to tell two silences apart: *nothing has ever seen you leave*
+ * and *it has seen you leave once and wants a few more before calling it usual*. On
+ * 2026-09-02 the row said the first while the store held Monday's 7:08 PM exit, which
+ * reads as a broken feature rather than an honest one counting up.
+ *
+ * Days, not sightings, and never today — the same rule every baseline here follows.
+ */
+export function exitDaysAt(seen: Seen[], place: string, now: Date): number {
+  const today = dayKey(now.getTime());
+  const days = new Set<string>();
+  for (const s of seen) {
+    if (s.place !== place || s.via !== 'exit') continue;
+    const key = dayKey(s.at);
+    if (key !== today) days.add(key);
+  }
+  return days.size;
+}
+
+/**
  * How many distinct EARLIER days he has been seen at a place.
  *
  * For the Home panel to count down honestly — "3 more days" is progress, where a
