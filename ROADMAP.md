@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**55 of 89 rows are proved on the phone** (62%). 73 have code (82%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
+**56 of 89 rows are proved on the phone** (63%). 74 have code (83%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
 
 ### Transport, pairing, security
 
@@ -299,7 +299,7 @@ It took two fixes today and the first was incomplete. `place()` orders what arri
 
 ### Memory and the journal
 
-*5 proved of 13.*
+*6 proved of 13.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -308,8 +308,20 @@ It took two fixes today and the first was incomplete. `place()` orders what arri
 **One row on that screen is a bug, and it caused today's worst answer.** `Kaustav is **currently** in Ichapur, West Bengal, India` — a time-sensitive claim in a permanent store. When `_FAR_RE` extracted `dest="here"` and injected no route fact, the model reached for that, and with `Kaustav lives in Ichapur` beside it produced *"since you're currently in Ichapur, sir, you've already arrived at home"* while the phone's own header read `Office`. **So that answer was not invented from weights — it was a stale fact filling a hole the regex left**, which is worse, because it will happen again wherever a live lookup fails quietly. Every other fact on the screen is durable; this one is a snapshot wearing a fact's clothes, and the `where` block already carries live location on every single turn, so it is redundant as well as harmful.
 
 Also visible: `Kaustav asked about Marco Polo`, which is not a fact about him at all. Extraction is storing conversation trivia beside load-bearing records. |
-| Anything he learns from what you actually say | — | App | **The largest gap in the memory story, and it was not in this ledger until 2026-08-24.** `shareFacts` derives from the journal rollup and named places only — four keys, all about the handset: `phone:screen-time`, `phone:pickups`, `phone:top-apps`, plus the places. **Nothing reads the conversation.** How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past `CHAT_CAP` (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in `chat_turns`, so this is not data loss — it is that no turn is ever promoted to a fact. |
-| A chat log that is not a one-day window | partial | App | `CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets. |
+| Anything he learns from what you actually say | proved |  | **The largest gap in the memory story, and it was not in this ledger until 2026-08-24.** `shareFacts` derives from the journal rollup and named places only — four keys, all about the handset: `phone:screen-time`, `phone:pickups`, `phone:top-apps`, plus the places. **Nothing reads the conversation.** How he works, who matters to him, what he cares about: durable only if typed by hand into the Memory screen. So a chat scrolls past `CHAT_CAP` (100 entries, roughly a day at real pace) and nothing was taken from it. The raw turns survive brain-side in `chat_turns`, so this is not data loss — it is that no turn is ever promoted to a fact.
+
+**Built and proved on the phone, 2026-09-02.** *He proposes, you approve* — the shape was chosen over quiet distillation deliberately, because distilling everything somebody says needs a model reading every sentence and a great deal of trust.
+
+**Keeping:** *"my manager is called Rahul"* typed into chat at 15:28 appeared on the Memory screen under **HE NOTICED YOU SAID** with the hint *"He has not kept any of these. Nothing leaves the phone until you say so."* KEEP took it to the gateway by the same path a typed fact takes: `18 KNOWN` to `19 KNOWN`, the offer gone, the sentence stored in the words it was said in.
+
+**And the test immediately found the thing nobody had noticed: the gateway already distils chat by itself.** *"I've updated my records, Sir"* was not a figure of speech — it had written *"Kaustav's manager at Fortmindz is called Rahul"* the moment the message arrived. So the system as a whole has been doing **exactly the option that was explicitly not chosen**, quietly, server-side. This row is the phone's consent-based half; stopping the silent half is one change on the gateway and is [[owed to the brain]].
+
+**Forgetting, proved the same evening.** *"all that i tell him will go to the memory ?? thats not feasable"* — nineteen facts, several of them a question asked once or a place he stood in an hour ago, each riding along on every reply. The tidy pass offered three: Marco Polo (*a question asked once*), *is currently in Ichapur* (*wrong while he sat in the office*), and a duplicate Kitty. All three forgotten by hand: **18 KNOWN to 15 KNOWN**, and the section emptied itself because nothing was left worth flagging.
+
+**One control bug found by the test and fixed:** FORGET was a `Touchable` and took three taps from a laptop without firing. Animated controls do not receive synthetic input — the trap this repo recorded on 2026-08-26 and walked into again. Every control on both offer sections is a plain `Pressable` now. |
+| A chat log that is not a one-day window | partial | App | `CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets.
+
+**2026-09-02: the silent half is no longer silent.** Candidates are harvested while a turn is still in the log, so `CHAT_CAP` now drops sentences that have already been offered rather than ones nobody ever saw. The cap itself is unchanged and still deliberate — a phone should not carry an unbounded log — so this row stays `partial`: what leaves is still not announced, it is merely no longer unread. |
 | One assistant across desk, phone and chat | partial | Brain | App and chat share one history. A desk answering with its own brain bypasses it, so those turns never join the shared history. |
 | Rolling memory durable across restarts | partial | Brain | In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified. |
 | Deploy-durable gateway state | untested | Brain | Committed on `fix/durable-state`, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing. |
