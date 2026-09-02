@@ -252,6 +252,23 @@ of rediscovering them is high.
   `npx eas update --channel production --platform android --environment production
   --message "…" --non-interactive`.
 - **Never pipe `npm test` into `tail` inside a `&&` chain.** The pipeline exits with `tail`'s status, not jest's, so a failing suite reads as success and the commit and publish after it go ahead anyway. It happened on 2026-09-01: one red test shipped to the phone because the chain never stopped. Run the suite as its own command, or append `; echo EXIT=0`.
+- **Never write a regex through a JS template literal in a patch script.** A backslash
+  is eaten by the template, so `\s` arrives as `s` and `\b` vanishes — the code still
+  compiles, the character class still looks plausible (`[^A-Za-zs']`), and the only
+  symptom is a matcher that quietly matches nothing. It cost an afternoon on
+  2026-09-02: `names()` in `journal/stale.ts` returned an empty set on every call while
+  the identical literal, typed into a test file, matched correctly.
+
+  Write the code block into a `.txt` file with a quoted heredoc and splice it in:
+
+  ```bash
+  cat > "$TEMP/block.txt" << 'ENDOFBLOCK'
+  const words = (t: string) => t.split(/\s+/);
+  ENDOFBLOCK
+  ```
+
+  The same rule that already applies to backticks applies to every backslash: **if it
+  has to survive, it does not go through a template literal.**
 - **Edit the ledger from a script file, never from `node -e "…"`.** The notes in
   `docs/status/ledger.json` are full of backticked code spans, and inside a double-quoted
   shell string a backtick is command substitution — a note quoting `` `adb logcat` `` ran

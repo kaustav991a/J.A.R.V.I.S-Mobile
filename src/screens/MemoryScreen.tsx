@@ -14,6 +14,10 @@ import { factCandidates } from '../lib/journal/candidates';
 import type { Candidate } from '../lib/journal/candidates';
 import { decidedIds } from '../lib/journal/candidateStore';
 import { dismissFact, keepFact } from '../lib/journal/decide';
+import { factId } from '../lib/journal/candidates';
+import { staleFacts } from '../lib/journal/stale';
+import type { Stale } from '../lib/journal/stale';
+import { forgetOne, keepAnyway } from '../lib/journal/tidy';
 import { haptic } from '../lib/haptics';
 
 /**
@@ -88,6 +92,37 @@ export function MemoryScreen() {
   const ignore = async (c: Candidate) => {
     await dismissFact(c);
     setCandidates((held) => held.filter((x) => x.id !== c.id));
+    haptic.tap();
+  };
+
+  /**
+   * Facts he would offer to forget, with the reason beside each.
+   *
+   * Recomputed whenever the fact list changes rather than stored: the offer is a view
+   * of what is held, and a stored copy would go stale the moment anything else edited
+   * memory.
+   */
+  const [held, setHeld] = useState<string[]>([]);
+  const stale = staleFacts(facts).filter((s) => !held.includes(`keep:${factId(s.fact)}`));
+
+  const dropStale = async (s: Stale) => {
+    setBusy(true);
+    const out = await forgetOne(s, { forget: api.forget });
+    setBusy(false);
+    if (!out.ok) {
+      haptic.bad();
+      toast.show(out.why, 'bad');
+      return;
+    }
+    setFacts(out.facts);
+    haptic.good();
+    toast.show('Forgotten');
+  };
+
+  /** keep it, and stop offering it: the answer was no */
+  const hold = async (s: Stale) => {
+    await keepAnyway(s);
+    setHeld((was) => [...was, `keep:${factId(s.fact)}`]);
     haptic.tap();
   };
 
@@ -212,6 +247,57 @@ export function MemoryScreen() {
         </>
       ) : null}
 
+      {/**
+       * Facts he would rather not be carrying, offered up.
+       *
+       * *"all that i tell him will go to the memory ?? thats not feasable"* — nineteen
+       * facts by 2026-09-02, several of them a question asked once or a place he was
+       * standing an hour ago, and the hint at the bottom of this screen says the cost:
+       * every one of them rides along on every reply.
+       *
+       * **Nothing is deleted until it is ticked**, and KEEP is a permanent answer the
+       * same way ✕ is on the other section.
+       */}
+      {stale.length ? (
+        <>
+          <SectionLabel>Worth forgetting</SectionLabel>
+          <View style={styles.group}>
+            {stale.map((s, i) => (
+              <View
+                key={s.fact}
+                style={[styles.row, i === stale.length - 1 ? styles.lastRow : null]}
+              >
+                <Ionicons name="trash-outline" size={17} color={COLOR.dim} style={styles.bullet} />
+                <View style={styles.rowText}>
+                  <Text style={styles.fact}>{s.fact}</Text>
+                  <Text style={styles.why}>{s.why}</Text>
+                </View>
+                <Touchable
+                  testID={`stale-forget-${i}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Forget: ${s.fact}`}
+                  hitSlop={8}
+                  disabled={busy}
+                  onPress={() => void dropStale(s)}
+                >
+                  <Text style={[styles.action, { color: accent }]}>FORGET</Text>
+                </Touchable>
+                <Touchable
+                  testID={`stale-keep-${i}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Keep: ${s.fact}`}
+                  hitSlop={8}
+                  disabled={busy}
+                  onPress={() => void hold(s)}
+                >
+                  <Ionicons name="close" size={18} color={COLOR.dim} />
+                </Touchable>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
+
       <SectionLabel>What he knows about you</SectionLabel>
 
       {loading ? (
@@ -308,6 +394,9 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   // KEEP sits beside the dismiss cross, so it reads as the pair of answers it is
+  // the fact and its reason stack, so the reason reads as a caption and not a second fact
+  rowText: { flex: 1, gap: 2 },
+  why: { ...TYPE.meta, fontSize: 11, color: COLOR.dim, lineHeight: 15 },
   action: { ...TYPE.meta, fontSize: 11, letterSpacing: 1, marginRight: SPACE.md },
   add: { marginTop: SPACE.md },
 });
