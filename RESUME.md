@@ -50,6 +50,33 @@ not; the breathing dashed ring that came with it is the fix's own error drawn li
 a fault — and it is the same figure that stops the app naming a place when the ring is
 wide enough to touch two of them.
 
+### Four wrong figures, one shape — 2026-09-02, end of day
+
+Worth naming, because the app has now been caught making the same mistake four times
+in eight days and each one looked completely different on screen:
+
+| It said | It had measured |
+|---|---|
+| *"usually gone by 3:40 PM"* | when he last **opened the app** at the office |
+| *"usually you are there by 11:51 AM"* | when he first **opened the app** after arriving |
+| ten departures in one minute | the platform's **geometry** at process start |
+| *"53m in System launcher"* | a screen **sitting unlocked** while a laptop drove it |
+
+Every one was a correct calculation. Every one was over data that measured something
+other than what the sentence claimed. And **none of them was caught by a test** — the
+suite went from 1179 to 1346 passing across the same week, green the whole way, because
+a test can only assert that the arithmetic matches the fixture, and in all four cases
+it did.
+
+What caught them was the person the sentence was about reading it and saying *"but I
+leave at seven"*, *"but I'm in office now"*, *"but 11:51 is wrong"*, *"whats this??"*.
+
+The defence that generalises is not more tests. It is **making every figure name its
+own source in the sentence** — `measured: true | false`, *"the phone crossed the
+boundary with the app closed"*, *"it has watched you leave once and wants 4"*. A figure
+that has to say where it came from cannot quietly be about something else, and a person
+reading it can tell in a second what took a day to find.
+
 ### The pattern in all four
 
 None of these was found by a test, and all four were found in a day. Three of them are

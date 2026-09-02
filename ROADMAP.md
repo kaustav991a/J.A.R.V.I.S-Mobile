@@ -314,7 +314,11 @@ Also visible: `Kaustav asked about Marco Polo`, which is not a fact about him at
 | Rolling memory durable across restarts | partial | Brain | In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified. |
 | Deploy-durable gateway state | untested | Brain | Committed on `fix/durable-state`, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing. |
 | Chat history sent with the ask | — | Brain | The envelope carries one turn. |
-| Journal: usage source, rollup, fact sharing | proved |  | Derived facts only, never rows — the pattern every later sense copies. |
+| Journal: usage source, rollup, fact sharing | proved |  | Derived facts only, never rows — the pattern every later sense copies.
+
+**2026-09-02: the home screen was competing with real apps, and won.** *"53m in System launcher today against a usual 2m, sir."* — a true figure that was worth nobody's day. The launcher is what is on screen between the things you actually open, so it accumulates whenever a phone sits unlocked; that afternoon it was a laptop driving the phone over adb with stay-awake pinned on. Foreground time there is not a decision about an app, and it had taken the day's single remark.
+
+Launchers and the system shell are excluded from `appDeltas` now, **matched by shape rather than by an exact list** — `com.miui.home` here, `nexuslauncher` on a Pixel, `sec.android.app.launcher` on a Samsung. A list of strings would have kept working on this phone and quietly stopped on the next one. |
 | The journal’s denial path | proved |  | Reads “I cannot see your usage, sir — the permission is off.” Collected history stays visible under HELD ON THIS DEVICE, which is the honest distinction. |
 | Any background work running unattended | proved |  | **Proved on `84f40716`, 2026-08-26 at 18:07.** The task ran with the app backgrounded and the phone disconnected from adb — nobody started it, and the count on Places moved from 1 to 2 with the stamp reading `Nothing was due`. Getting there needed the throttling lifted first: standby bucket **40 (RARE)** to **5 (EXEMPTED)** and the app added to the device-idle whitelist, after which `WITHIN_QUOTA` went from unsatisfied to satisfied and only the 15-minute timer remained. That is what the Battery restrictions row asks a person to do in Settings. Before that, measured the same day: roughly one job window a day and `Network: blocked=REASON_APP_STANDBY`. |
 | The commute task body exercised by a test | proved |  | 10 tests, with the task callback captured at import and invoked against the real module. The gate cases were confirmed by removing the gate. |
@@ -412,7 +416,9 @@ CLEAR pressed again on the new build, and the log shows both outcomes an hour ap
 > At Office early, sir — usually you are there by 11:51 AM.  ·  12:58  
 > 53m in System launcher today against a usual 2m, sir.  ·  13:25
 
-The early trigger went quiet and **the day was not wasted on silence** — the ranking fell through to the next candidate holding a real figure, which is exactly what the per-subject cooldown was built for. Both are in the log, so both can be read tomorrow. |
+The early trigger went quiet and **the day was not wasted on silence** — the ranking fell through to the next candidate holding a real figure, which is exactly what the per-subject cooldown was built for. Both are in the log, so both can be read tomorrow.
+
+**The fall-through immediately found the next weakness, which is the point of having one.** With the early remark refused, the day went to `appRemark` — and it named the launcher. Two triggers examined in an afternoon because each one's output was finally readable in the log. |
 | Anticipation that finds you in your pocket | — | Brain | Needs the gateway push or a foreground service — the phone measurably cannot do it alone. |
 | Anticipation from learned habit rather than a written rule | — |  | **Blocked by time, not by work, and the spec says so outright:** *"Two to four weeks of baseline before 'unusual' means anything, and the senses in §3.2 to notice with. No amount of code shortens the first."* (`docs/superpowers/specs/2026-08-21-anticipation-design.md`.)
 
