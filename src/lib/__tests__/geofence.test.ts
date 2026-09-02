@@ -15,6 +15,8 @@ import { loadSeen } from '../timeline';
 import type { KnownPlace } from '../knownPlaces';
 
 const mockPosted = jest.fn().mockResolvedValue('id');
+const mockFix = jest.fn().mockResolvedValue(null);
+jest.mock('../place', () => ({ currentFix: () => mockFix() }));
 jest.mock('../notify', () => ({
   postNow: (...a: unknown[]) => mockPosted(...a),
   GENERAL_CHANNEL: 'general-v8',
@@ -408,5 +410,52 @@ describe('two exits that arrive in the same breath', () => {
   it('still speaks for the one departure nothing contradicts', async () => {
     await fire({ eventType: 'exit', region: { identifier: 'Office' } }, at(19, 5), 30, SPREAD);
     expect(posted).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('an exit from a place the phone is still standing in', () => {
+  beforeEach(() => {
+    posted.mockClear();
+    mockFix.mockReset();
+  });
+
+  it('refuses a departure the fix contradicts', async () => {
+    // measured on the phone, 2026-09-02 18:12: "Left Office" while he sat at his desk.
+    // The dot on the map had wandered outside the circle with the accuracy ring
+    // ballooning - a drifting fix crossed the boundary, and with one place involved
+    // there was no burst to recognise it by
+    mockFix.mockResolvedValue({ lat: HOME.lat, lon: HOME.lon, place: '', accuracy: 20 });
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 12), 0, [HOME]);
+    expect(await loadSeen()).toEqual([]);
+    expect(posted).not.toHaveBeenCalled();
+  });
+
+  it('believes a departure the fix agrees with', async () => {
+    // a kilometre away is a departure whatever the geofence thought
+    mockFix.mockResolvedValue({ lat: 22.8256, lon: 88.3711, place: '', accuracy: 20 });
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(19, 5), 0, [HOME]);
+    expect((await loadSeen())[0]).toMatchObject({ place: 'Home', via: 'exit' });
+  });
+
+  it('believes the crossing when no fix can be had, rather than losing it', async () => {
+    // a refused or slow reading must not silently delete a real departure: the
+    // geofence is the measurement, and this check is only a second opinion
+    mockFix.mockResolvedValue(null);
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(19, 5), 0, [HOME]);
+    expect(await loadSeen()).toHaveLength(1);
+  });
+
+  it('believes it when the reading is too vague to argue with', async () => {
+    // a fix good to 300 m cannot tell inside from outside a 120 m circle, and a
+    // check that cannot decide must not be the thing that decides
+    mockFix.mockResolvedValue({ lat: HOME.lat, lon: HOME.lon, place: '', accuracy: 300 });
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(19, 5), 0, [HOME]);
+    expect(await loadSeen()).toHaveLength(1);
+  });
+
+  it('never second-guesses an arrival, which drift cannot invent', async () => {
+    mockFix.mockResolvedValue({ lat: HOME.lat, lon: HOME.lon, place: '', accuracy: 20 });
+    await fire({ eventType: 'enter', region: { identifier: 'Home' } }, at(9, 0), 0, [HOME]);
+    expect(await loadSeen()).toHaveLength(1);
   });
 });

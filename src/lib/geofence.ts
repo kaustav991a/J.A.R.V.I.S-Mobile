@@ -3,7 +3,8 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
 import { clockLabel } from './commute';
-import { AT_PLACE_KM, farApart, loadKnown } from './knownPlaces';
+import { AT_PLACE_KM, distanceKm, farApart, loadKnown } from './knownPlaces';
+import { currentFix } from './place';
 import type { KnownPlace } from './knownPlaces';
 import { dismiss, postNow } from './notify';
 import { dropExitsAround, loadSeen, noteSeen } from './timeline';
@@ -143,10 +144,12 @@ export async function onGeofenceEvent(
      * of your office.
      */
     if (leaving) {
-      // the places are needed to tell a sweep from a walk: two departures are the
-      // platform only if a person could not have made both
+      // the places are needed twice over: to tell a sweep from a walk, since two
+      // departures are the platform only if a person could not have made both, and to
+      // ask whether the phone is still standing in the place it just reported leaving
       const known = places ?? (await loadKnown());
       if ((await inSweep(when)) || (await sweepDetected(when, label, farApart(known)))) return;
+      if (await stillThere(label, known)) return;
     }
 
     await noteSeen(label, when, entering ? 'enter' : 'exit');
@@ -262,6 +265,49 @@ const loadLeftSaid = async (): Promise<LeftSaid> => {
     return {};
   }
 };
+
+/**
+ * How sure a reading has to be before it may overrule a crossing.
+ *
+ * A fix good to 300 m cannot tell inside from outside a 120 m circle, and a check
+ * that cannot decide must never be the thing that decides. Anything vaguer than this
+ * is ignored and the crossing is believed.
+ */
+export const FIX_TRUSTED_M = 150;
+
+/**
+ * Whether the phone is still standing in the place it was just reported leaving.
+ *
+ * **Measured on 2026-09-02 at 18:12: *"Left Office"* while he sat at his desk.** The
+ * dot on the map had wandered outside the circle with the accuracy ring ballooning —
+ * a drifting fix crossed the boundary, Play Services reported it honestly, and with a
+ * single place involved there was no burst for the sweep rules to recognise.
+ *
+ * So an exit gets a second opinion: one fresh reading, compared against the place it
+ * claims you left. **Every doubt resolves in favour of the crossing** — no fix, a
+ * vague fix, a place with no coordinates, all mean the geofence stands. The geofence
+ * is the measurement; this is only a witness that can say *no, he is still here*.
+ */
+async function stillThere(label: string, places: KnownPlace[]): Promise<boolean> {
+  try {
+    const place = places.find((p) => p.label === label);
+    if (!place) return false;
+
+    const fix = await currentFix();
+    if (!fix) return false;
+
+    const accuracy = typeof fix.accuracy === 'number' ? fix.accuracy : 0;
+    if (accuracy > FIX_TRUSTED_M) return false;
+
+    // the accuracy is spent in the crossing's favour: only a reading that puts him
+    // inside the circle even at its own worst case may overrule it
+    const metres = distanceKm(fix, { lat: place.lat, lon: place.lon }) * 1000;
+    return metres + accuracy <= GEOFENCE_RADIUS_M;
+  } catch {
+    // a check that throws has not decided anything
+    return false;
+  }
+}
 
 /**
  * Whether this exit belongs to a burst rather than to you, and clean up if it does.
