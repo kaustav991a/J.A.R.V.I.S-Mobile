@@ -264,6 +264,28 @@ export function crossings(seen: Seen[], now: Date, limit: number = CROSSINGS_SHO
     .slice(0, limit);
 }
 
+/**
+ * Disown one crossing, because the app was wrong about it.
+ *
+ * *"Left Office, 6:12 PM"* while he sat at his desk — a drifting fix, written by a
+ * build with no second opinion, and until this existed **there was no way to take it
+ * out.** A wrong figure that cannot be deleted is worse than a wrong figure: the
+ * median it feeds carries it for twelve weeks.
+ *
+ * Only the crossing goes. An app-open sighting sharing the same moment stays, because
+ * the app was open then and that much did happen.
+ */
+export async function forgetCrossing(at: number): Promise<void> {
+  try {
+    const seen = await loadSeen();
+    const kept = seen.filter((s) => !(s.at === at && s.via));
+    if (kept.length === seen.length) return;
+    await AsyncStorage.setItem(KEY, JSON.stringify(kept));
+  } catch {
+    /* a store that cannot be read cannot be corrected */
+  }
+}
+
 /** forget the lot — paired with the location-sharing switch going off */
 export async function forgetSeen(): Promise<void> {
   try {

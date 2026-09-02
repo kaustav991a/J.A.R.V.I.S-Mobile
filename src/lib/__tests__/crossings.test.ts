@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { noteSweep, sweepsToday } from '../geofence';
-import { crossings } from '../timeline';
+import { crossings, forgetCrossing, loadSeen } from '../timeline';
 import type { Seen } from '../timeline';
 
 /**
@@ -76,5 +76,45 @@ describe('what it threw away', () => {
     const yesterday = at(16, 3) - 24 * 60 * 60 * 1000;
     await noteSweep(yesterday);
     expect(await sweepsToday(Date.now())).toBe(0);
+  });
+});
+
+describe('taking a crossing back', () => {
+  const store = async (seen: Seen[]) => {
+    await AsyncStorage.setItem('jarvis_place_seen', JSON.stringify(seen));
+  };
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('removes the one crossing and leaves the rest', async () => {
+    // "Left Office, 6:12 PM" while he sat at his desk: written by a build that had no
+    // drift check, and no way to take it out again. A wrong figure nobody can delete
+    // is worse than a wrong figure, because it teaches a habit for twelve weeks
+    await store([
+      { place: 'Home', at: at(8, 6), via: 'exit' },
+      { place: 'Office', at: at(18, 12), via: 'exit' },
+      { place: 'Office', at: at(19, 8), via: 'exit' },
+    ]);
+    await forgetCrossing(at(18, 12));
+    expect((await loadSeen()).map((s) => s.at)).toEqual([at(8, 6), at(19, 8)]);
+  });
+
+  it('leaves an app-open sighting that happens to share the moment', async () => {
+    // only the crossing is being disowned; the app was still open at that time and
+    // that much did happen
+    await store([
+      { place: 'Office', at: at(18, 12) },
+      { place: 'Office', at: at(18, 12), via: 'exit' },
+    ]);
+    await forgetCrossing(at(18, 12));
+    expect(await loadSeen()).toEqual([{ place: 'Office', at: at(18, 12) }]);
+  });
+
+  it('does nothing when the moment is not in the store', async () => {
+    await store([{ place: 'Office', at: at(19, 8), via: 'exit' }]);
+    await forgetCrossing(at(1, 0));
+    expect(await loadSeen()).toHaveLength(1);
   });
 });

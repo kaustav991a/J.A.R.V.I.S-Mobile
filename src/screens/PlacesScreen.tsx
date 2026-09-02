@@ -13,7 +13,7 @@ import { useJarvis } from '../state/JarvisProvider';
 import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
-import { crossings, loadSeen } from '../lib/timeline';
+import { crossings, forgetCrossing, loadSeen } from '../lib/timeline';
 import type { Seen } from '../lib/timeline';
 import {
   askForBackgroundLocation,
@@ -140,6 +140,19 @@ export function PlacesScreen() {
    * behalf. On Android 11 and later the second dialog is a trip to Settings, so
    * "still foreground only" is a normal answer and the toast says where to go.
    */
+  /**
+   * Take a crossing back, when the app was wrong about it.
+   *
+   * Nothing else in the app can edit this store, and a figure nobody can correct is
+   * how "usually gone by 3:40 PM" survived a fortnight.
+   */
+  const disown = async (c: Seen) => {
+    await forgetCrossing(c.at);
+    setCrossed((held) => held.filter((x) => x.at !== c.at));
+    haptic.tap();
+    toast.show('Taken out. It will not count towards your hours.');
+  };
+
   const startWatching = async () => {
     const granted = await askForBackgroundLocation();
     setBgLocation(granted);
@@ -759,12 +772,32 @@ export function PlacesScreen() {
           <Text style={styles.rowTitle}>Crossings recorded</Text>
           {crossed.length ? (
             crossed.map((c) => (
-              <Text key={`${c.place}-${c.at}`} style={styles.rowSub} testID={`crossing-${c.at}`}>
-                {`${c.via === 'exit' ? 'Left' : 'Reached'} ${c.place} · ${clockLabel(
-                  new Date(c.at).getHours(),
-                  new Date(c.at).getMinutes()
-                )}`}
-              </Text>
+              <View key={`${c.place}-${c.at}`} style={styles.crossing}>
+                <Text style={styles.rowSub} testID={`crossing-${c.at}`}>
+                  {`${c.via === 'exit' ? 'Left' : 'Reached'} ${c.place} · ${clockLabel(
+                    new Date(c.at).getHours(),
+                    new Date(c.at).getMinutes()
+                  )}`}
+                </Text>
+                {/*
+                  Disowning one, because the app is sometimes wrong about them. A
+                  drifting fix wrote "Left Office, 6:12 PM" from a desk he had not
+                  left, and until this control existed there was no way to take it
+                  back out — the median would have carried it for twelve weeks.
+                */}
+                <Pressable
+                  testID={`crossing-forget-${c.at}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`That was wrong: ${c.place}`}
+                  hitSlop={8}
+                  onPress={() => {
+                    void disown(c);
+                  }}
+                  style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+                >
+                  <Ionicons name="close" size={15} color={COLOR.dim} />
+                </Pressable>
+              </View>
             ))
           ) : (
             <Text style={styles.rowSub} testID="crossings-none">
@@ -844,6 +877,9 @@ const styles = StyleSheet.create({
     borderColor: COLOR.line,
     overflow: 'hidden',
   },
+  // the time and its disown control on one line, the control small enough not to
+  // read as the row's main action
+  crossing: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
