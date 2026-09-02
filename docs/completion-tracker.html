@@ -562,7 +562,16 @@ Still `untested`, and now for the ordinary reason — nobody has watched one app
 
 **The figure is honest and its baseline is not yet.** *"Usually there by 11:51 AM"* is built from app-open arrivals, and he had been at the office since 10:03. Arrival times drift late for exactly the reason departure times drifted early: somebody has to pick the phone up. The geofence `enter` events fix it as they accumulate, and nothing needs writing for that.
 
-**One thing was drawn twice.** The remark rendered as a blue header line AND as the logged turn, colliding with the newest bubble. The header copy is gone; the comment that argued for it — *a turn would claim he said it in conversation* — was reversed on the record, because volunteering something unasked is the whole feature.">Anticipation v1 — noticed when you open the app</span><span class="g-item g-proved" title="**Built and seen on the phone, 2026-09-01.** Asked for as a way to see the match radius and the overlap rather than be told about it: the named places to scale, the 120 m circles, the reading as a dot with its accuracy as a dashed ring, a scale bar, and a caption that says outright when two circles touch. `react-native-svg`, which was already a dependency, so it ships over the air — every real map on Android is a native module. **Only what is within 800 m is drawn**, and the rest is counted in the caption: fitting all ten named places put 150 m in a pixel and the circles rendered at under one, which is how it first appeared on the phone. **Road tiles and a 3D tilt were built here and removed on request the same day** — both worked; the tiles cost a watermark once CARTO wanted a key, and the tilt turned the circles into ellipses, which ruins the comparison the panel exists for. Confirmed on the device at the Office: two circles 700 m apart, not touching, with 8 places counted out.
+**One thing was drawn twice.** The remark rendered as a blue header line AND as the logged turn, colliding with the newest bubble. The header copy is gone; the comment that argued for it — *a turn would claim he said it in conversation* — was reversed on the record, because volunteering something unasked is the whole feature.
+
+**The refusal and the fall-through, both proved at 13:25 the same day.** He said the 11:51 figure was simply wrong, and it was: an app-open median is the hour somebody picks their phone up at a place, never the hour they arrive. `hereEarly` now refuses to speak unless the arrival hour was measured by crossings (`arrivalHour`, the twin of `leftBy`).
+
+CLEAR pressed again on the new build, and the log shows both outcomes an hour apart:
+
+&gt; At Office early, sir — usually you are there by 11:51 AM.  ·  12:58  
+&gt; 53m in System launcher today against a usual 2m, sir.  ·  13:25
+
+The early trigger went quiet and **the day was not wasted on silence** — the ranking fell through to the next candidate holding a real figure, which is exactly what the per-subject cooldown was built for. Both are in the log, so both can be read tomorrow.">Anticipation v1 — noticed when you open the app</span><span class="g-item g-proved" title="**Built and seen on the phone, 2026-09-01.** Asked for as a way to see the match radius and the overlap rather than be told about it: the named places to scale, the 120 m circles, the reading as a dot with its accuracy as a dashed ring, a scale bar, and a caption that says outright when two circles touch. `react-native-svg`, which was already a dependency, so it ships over the air — every real map on Android is a native module. **Only what is within 800 m is drawn**, and the rest is counted in the caption: fitting all ten named places put 150 m in a pixel and the circles rendered at under one, which is how it first appeared on the phone. **Road tiles and a 3D tilt were built here and removed on request the same day** — both worked; the tiles cost a watermark once CARTO wanted a key, and the tilt turned the circles into ellipses, which ruins the comparison the panel exists for. Confirmed on the device at the Office: two circles 700 m apart, not touching, with 8 places counted out.
 
 **The dot moves now, 2026-09-02.** *"im not getting realtime GPS dot as seen on map"* — the panel took one cached fix when Home came into focus, which is right for *where am I* and wrong for watching yourself walk. `watchFix` follows the position every five metres while the tab is focused, stops when it is not, and never runs with location sharing off: a watch that outlives its screen is a background tracker nobody asked for.
 
@@ -1605,7 +1614,16 @@ Still <code>untested</code>, and now for the ordinary reason — nobody has watc
 
 <strong>The figure is honest and its baseline is not yet.</strong> *"Usually there by 11:51 AM"* is built from app-open arrivals, and he had been at the office since 10:03. Arrival times drift late for exactly the reason departure times drifted early: somebody has to pick the phone up. The geofence <code>enter</code> events fix it as they accumulate, and nothing needs writing for that.
 
-<strong>One thing was drawn twice.</strong> The remark rendered as a blue header line AND as the logged turn, colliding with the newest bubble. The header copy is gone; the comment that argued for it — *a turn would claim he said it in conversation* — was reversed on the record, because volunteering something unasked is the whole feature.</div>
+<strong>One thing was drawn twice.</strong> The remark rendered as a blue header line AND as the logged turn, colliding with the newest bubble. The header copy is gone; the comment that argued for it — *a turn would claim he said it in conversation* — was reversed on the record, because volunteering something unasked is the whole feature.
+
+<strong>The refusal and the fall-through, both proved at 13:25 the same day.</strong> He said the 11:51 figure was simply wrong, and it was: an app-open median is the hour somebody picks their phone up at a place, never the hour they arrive. <code>hereEarly</code> now refuses to speak unless the arrival hour was measured by crossings (<code>arrivalHour</code>, the twin of <code>leftBy</code>).
+
+CLEAR pressed again on the new build, and the log shows both outcomes an hour apart:
+
+&gt; At Office early, sir — usually you are there by 11:51 AM.  ·  12:58  
+&gt; 53m in System launcher today against a usual 2m, sir.  ·  13:25
+
+The early trigger went quiet and <strong>the day was not wasted on silence</strong> — the ranking fell through to the next candidate holding a real figure, which is exactly what the per-subject cooldown was built for. Both are in the log, so both can be read tomorrow.</div>
             </div>
             <div class="row-tags">
               

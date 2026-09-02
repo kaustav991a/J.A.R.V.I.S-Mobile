@@ -403,7 +403,16 @@ Still `untested`, and now for the ordinary reason — nobody has watched one app
 
 **The figure is honest and its baseline is not yet.** *"Usually there by 11:51 AM"* is built from app-open arrivals, and he had been at the office since 10:03. Arrival times drift late for exactly the reason departure times drifted early: somebody has to pick the phone up. The geofence `enter` events fix it as they accumulate, and nothing needs writing for that.
 
-**One thing was drawn twice.** The remark rendered as a blue header line AND as the logged turn, colliding with the newest bubble. The header copy is gone; the comment that argued for it — *a turn would claim he said it in conversation* — was reversed on the record, because volunteering something unasked is the whole feature. |
+**One thing was drawn twice.** The remark rendered as a blue header line AND as the logged turn, colliding with the newest bubble. The header copy is gone; the comment that argued for it — *a turn would claim he said it in conversation* — was reversed on the record, because volunteering something unasked is the whole feature.
+
+**The refusal and the fall-through, both proved at 13:25 the same day.** He said the 11:51 figure was simply wrong, and it was: an app-open median is the hour somebody picks their phone up at a place, never the hour they arrive. `hereEarly` now refuses to speak unless the arrival hour was measured by crossings (`arrivalHour`, the twin of `leftBy`).
+
+CLEAR pressed again on the new build, and the log shows both outcomes an hour apart:
+
+> At Office early, sir — usually you are there by 11:51 AM.  ·  12:58  
+> 53m in System launcher today against a usual 2m, sir.  ·  13:25
+
+The early trigger went quiet and **the day was not wasted on silence** — the ranking fell through to the next candidate holding a real figure, which is exactly what the per-subject cooldown was built for. Both are in the log, so both can be read tomorrow. |
 | Anticipation that finds you in your pocket | — | Brain | Needs the gateway push or a foreground service — the phone measurably cannot do it alone. |
 | Anticipation from learned habit rather than a written rule | — |  | **Blocked by time, not by work, and the spec says so outright:** *"Two to four weeks of baseline before 'unusual' means anything, and the senses in §3.2 to notice with. No amount of code shortens the first."* (`docs/superpowers/specs/2026-08-21-anticipation-design.md`.)
 
