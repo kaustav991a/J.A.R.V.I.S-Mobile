@@ -16,6 +16,47 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ CLOSED — 2026-09-01, 19:09. **"Left Office — 7:08 PM. Noted, sir."**
+
+The screenshot is the whole entry. Lock screen, Tue Sep 1, 7:09 PM, one notification
+from an app that was closed and a phone that was in a pocket:
+
+> **Left Office** · now
+> 7:08 PM. Noted, sir.
+
+and eight minutes above it, the scheduled departure briefing — *"On your way out of
+Office, sir. A 63% chance of rain on your way out."*
+
+**He leaves at seven, or ten past. The app said 7:08.** The same event, asked of the
+same app eight days earlier, answered **3:40 PM** — the last time he had happened to
+open it at the office. After the first repair it answered **8:04 PM**, which is when he
+is next SEEN at Home and was never a departure at all. Three answers, one real.
+
+### The morning after is the better proof
+
+09-02, four notifications, one per leg: **Home 8:06 · Barrackpore Railway Station 8:41 ·
+Sealdah Rail Station 9:31 · Sector V Metro Station 10:03.** In order, at commute times,
+from the places he actually passes through. No sweep. Nothing arriving ten at a time.
+Nothing from a place he was not at — which is what the previous evening cost three
+rules to guarantee.
+
+One detail that matters more than it looks: the last two were delivered to the phone
+together at 10:32, half an hour after the second event. Android batches. **The bodies
+still read 9:31 and 10:03**, because the time comes from the event and not from the
+posting — the difference between a figure and a guess about a figure, which is the
+entire subject of this week.
+
+### What this closes
+
+`background-sightings` and `leaving-notification` both PROVED. The app-open bias that
+produced every wrong time this month is gone at the root: sightings now happen because a
+boundary was crossed, not because somebody unlocked a phone.
+
+**What it does not close.** The learned habits — `usuallyGoneBy`, `usuallyHereBy`, the
+WATCHING row — still average twelve weeks of app-open sightings against one day of real
+ones, so they will keep reading wrong until the honest data outnumbers the biased data.
+That is arithmetic, not a bug, and it fixes itself by Friday or so. Do not chase it.
+
 ## 🛑 STOP POINT — 2026-09-01, evening. **The runtime moved. Read this before publishing.**
 
 **The OTA runtime is no longer `31c64113d7d13a400eb1c56ef81c4d0d4be3fa17`. It is
