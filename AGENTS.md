@@ -176,6 +176,20 @@ of rediscovering them is high.
   Anything that must ship over the air goes in `scripts/` and is invoked directly
   (`node scripts/build-status.mjs`), not through `npm run`. If a script is genuinely
   worth the fingerprint change, it needs a new build in the same sitting.
+- **`LIMIT` in a ContentResolver sort order is rejected since Android 11.** Passing
+  `"${Column.DATE} DESC LIMIT 500"` as `sortOrder` throws at the provider; the promise
+  rejects, a `catch` turns it into an empty list, and **an empty list looks exactly
+  like a device with no data**. It cost a build and a wrong hypothesis on 2026-09-03:
+  the Journal card read *Readable · 0 calls · 0 people* on a phone holding 22,165 call
+  log rows. Cap while walking the cursor instead:
+
+  ```kotlin
+  while (rows.moveToNext() && out.size < limit) { … }
+  ```
+
+  And keep the reason a read failed rather than swallowing it — a caught exception that
+  returns `[]` is a silent wrong answer, which is the shape of nearly every bug in this
+  file.
 - **A new local module in `modules/` moves the OTA fingerprint on its own.** Before the
   permission was added, creating `modules/call-log` had already taken the runtime from
   `1818e1b7` to `8670873` — the module directory is a fingerprint input, so the moment

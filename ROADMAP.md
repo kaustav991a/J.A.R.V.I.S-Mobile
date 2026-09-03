@@ -369,7 +369,15 @@ And the note printed literal `**asterisks**` — the panel renders plain text, s
 
 **The trap that would have bricked the installed app:** the JavaScript ships over the air and the native half only arrives with an APK, so for the hours between publishing and installing there is a build in the world whose bundle names a module it does not have. `requireNativeModule` at import scope would have crashed that app at launch — the whole app, over a call log. It is resolved on first use, and a failure is an answer (`unavailable`) rather than an exception.
 
-Runtime moved twice: `1818e1b7` to `8670873` when the module appeared, and to **`ae3937e3`** when `READ_CALL_LOG` was added. `shipped` until the APK is installed and a real remark is seen. |
+Runtime moved twice: `1818e1b7` to `8670873` when the module appeared, and to **`ae3937e3`** when `READ_CALL_LOG` was added. `shipped` until the APK is installed and a real remark is seen.
+
+**It read nothing at first, and the reason is a trap worth the whole detour.** The Journal card said *Readable · 0 calls · 0 people* on a phone holding **22,165** call log rows. The query passed `DATE DESC LIMIT 500` in the sort order — the old SQLite trick every Android answer still recommends, and one the provider has rejected since Android 11. It threw, the promise rejected, JavaScript turned that into `[]`, and an empty list is indistinguishable from a phone nobody rings.
+
+**Fixed by capping while walking the cursor**, which is where the cap belonged, and by keeping the reason a read failed so the card can say *"The read failed: …"* instead of reporting zero.
+
+**Reading now: 468 calls, 12 people named, 120 days.** The diagnostic card is the only reason that was five minutes of work rather than an afternoon — without it, *nobody is overdue* and *the query throws* look identical, and this project has now shipped that confusion five separate times.
+
+Runtime `ae3937e3` to **`5f318efe`**: Kotlin is a fingerprint input too, so the fix needed its own APK. |
 | Archive import — Takeout, Meta DYI | — |  | **Split out of [[call-log]] on 2026-09-03, because it was hiding behind a build it does not need.** Google Takeout and Meta DYI are files somebody downloads: years of history in one archive, no permission, no native module, no APK. It could be done in an afternoon on any day the app-side is open.
 
 What it is worth: the journal starts the day the app was installed and the sightings start twelve weeks ago, so every habit figure is young. An import is the only route to a memory older than the app itself.
