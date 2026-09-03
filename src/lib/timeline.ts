@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { migrateOnce, openSeenStore } from './seenStore';
+import type { SeenStore } from './seenStore';
 
 /**
  * Where you have been seen, and when you are usually gone from there.
@@ -27,7 +28,52 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * reverse-geocoded string drifted across four turns for the same desk, which is why
  * `nameFor` exists at all.
  */
-const KEY = 'jarvis_place_seen';
+/**
+ * How many rows a plain `loadSeen()` reads.
+ *
+ * Generous rather than tight: the table can hold years now, and the readers that want
+ * a year ask `between` for it. This is the ceiling on the convenience read, kept only
+ * so this file can never become the reason the app is slow to start.
+ */
+export const SEEN_WINDOW = 20000;
+
+let store: SeenStore | null = null;
+let opening: Promise<SeenStore | null> | null = null;
+
+/**
+ * Hand this file a store, or take one away.
+ *
+ * Tests give it `:memory:`; `null` puts it back to opening the real database on next
+ * use. Nothing in the app calls this with a store — the app takes the lazy path.
+ */
+export function useSeenStore(s: SeenStore | null): void {
+  store = s;
+  opening = null;
+}
+
+/**
+ * The database, opened once, migrated once.
+ *
+ * A failure to open resolves to `null` and every caller treats that as an empty store,
+ * which is the same contract the blob had: unreadable history is no history, and that
+ * only ever costs a remark.
+ */
+async function theStore(): Promise<SeenStore | null> {
+  if (store) return store;
+  if (!opening) {
+    opening = (async () => {
+      try {
+        const s = await openSeenStore();
+        await migrateOnce(s);
+        store = s;
+        return s;
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return await opening;
+}
 
 /**
  * Twelve weeks.
@@ -88,23 +134,19 @@ const minuteOfDay = (at: number): number => {
   return d.getHours() * 60 + d.getMinutes();
 };
 
+/**
+ * Every sighting the table holds, oldest first, up to `SEEN_WINDOW`.
+ *
+ * **There is no cutoff any more.** This used to drop anything older than
+ * `SEEN_TTL_MS` on every single read, which is how the store came to destroy the
+ * history that every habit figure in this app rests on. A changed routine still fades
+ * on its own, because the rules read the most recent handful of matching days rather
+ * than the whole store — fading is the readers' job, not the store's.
+ */
 export async function loadSeen(): Promise<Seen[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const cutoff = Date.now() - SEEN_TTL_MS;
-    return parsed
-      .filter(
-        (s): s is Seen =>
-          s !== null &&
-          typeof s === 'object' &&
-          typeof (s as Seen).place === 'string' &&
-          typeof (s as Seen).at === 'number' &&
-          (s as Seen).at > cutoff
-      )
-      .slice(-SEEN_KEEP);
+    const s = await theStore();
+    return s ? await s.all(SEEN_WINDOW) : [];
   } catch {
     // unreadable history is no history, which only costs a remark
     return [];
@@ -124,18 +166,19 @@ export async function noteSeen(
 ): Promise<void> {
   if (!place) return;
   try {
-    const seen = await loadSeen();
+    const s = await theStore();
+    if (!s) return;
+    const seen = await s.all(SEEN_WINDOW);
     const last = seen[seen.length - 1];
     // a crossing is not a duplicate of the one before it — a departure and a return
     // twenty minutes apart are two real events — but the SAME crossing delivered twice
     // is one event, and the platform does deliver twice. Every row on the phone
     // appeared in a pair on 2026-09-02
-    if (via && seen.some((s) => s.place === place && s.via === via && Math.abs(s.at - at) < 60_000)) {
+    if (via && seen.some((x) => x.place === place && x.via === via && Math.abs(x.at - at) < 60_000)) {
       return;
     }
     if (!via && last && last.place === place && at - last.at < SAME_VISIT_MIN * 60_000) return;
-    const sighting = via ? { place, at, via } : { place, at };
-    await AsyncStorage.setItem(KEY, JSON.stringify([...seen, sighting].slice(-SEEN_KEEP)));
+    await s.put([via ? { place, at, via } : { place, at }]);
   } catch {
     /* see above */
   }
@@ -172,10 +215,23 @@ export async function dropExitsAround(
     );
     if (!burst.length) return false;
 
-    const kept = seen.filter(
-      (s) => !(s.via === 'exit' && Math.abs(at - s.at) <= windowMs && far(place, s.place))
+    /**
+     * The caller's own sighting goes too.
+     *
+     * It used to be spared, because a place is never far from itself — and that left
+     * exactly one phantom departure standing after every sweep. Whichever handler
+     * recognised the burst wrote `noteSweep`, which makes `inSweep` short-circuit all
+     * the others before they can prune, so nothing came back for it. One exit alone in
+     * the history is also invisible to the launch repair, which needs two to see a
+     * burst. It would simply have become a departure time for a place nobody left.
+     */
+    const doomed = seen.filter(
+      (s) =>
+        s.via === 'exit' &&
+        Math.abs(at - s.at) <= windowMs &&
+        (s.place === place || far(place, s.place))
     );
-    await AsyncStorage.setItem(KEY, JSON.stringify(kept));
+    await (await theStore())?.drop(doomed);
     return true;
   } catch {
     // a store that cannot be read cannot be corrected, and a false departure is
@@ -204,7 +260,9 @@ export async function pruneSweepExits(
     const exits = seen.filter((s) => s.via === 'exit');
     if (!exits.length) return 0;
 
-    const swept = new Set<number>();
+    // the rows themselves, not their moments: a sweep delivers an arrival and several
+    // departures on one clock reading, and dropping by moment took the arrival too
+    const swept = new Set<Seen>();
 
     /**
      * You can only leave where you were.
@@ -236,7 +294,7 @@ export async function pruneSweepExits(
       const near = seen.filter(
         (b) => b.place !== a.place && Math.abs(b.at - a.at) <= CONTRADICTION_MS && far(b.place, a.place)
       );
-      if (near.length) swept.add(a.at);
+      if (near.length) swept.add(a);
     }
 
     for (const a of exits) {
@@ -244,14 +302,14 @@ export async function pruneSweepExits(
         (b) => b.place !== a.place && far(a.place, b.place) && Math.abs(a.at - b.at) <= windowMs
       );
       if (burst.length) {
-        swept.add(a.at);
-        for (const b of burst) swept.add(b.at);
+        swept.add(a);
+        for (const b of burst) swept.add(b);
       }
     }
     if (!swept.size) return 0;
 
-    const kept = seen.filter((s) => !(s.via === 'exit' && swept.has(s.at)));
-    await AsyncStorage.setItem(KEY, JSON.stringify(kept));
+    const kept = seen.filter((s) => !swept.has(s));
+    await (await theStore())?.drop([...swept]);
     return seen.length - kept.length;
   } catch {
     // history that cannot be read cannot be repaired, and nothing depends on this
@@ -295,10 +353,11 @@ export function crossings(seen: Seen[], now: Date, limit: number = CROSSINGS_SHO
  */
 export async function forgetCrossing(at: number): Promise<void> {
   try {
-    const seen = await loadSeen();
-    const kept = seen.filter((s) => !(s.at === at && s.via));
-    if (kept.length === seen.length) return;
-    await AsyncStorage.setItem(KEY, JSON.stringify(kept));
+    const s = await theStore();
+    if (!s) return;
+    const doomed = (await s.all(SEEN_WINDOW)).filter((x) => x.at === at && x.via);
+    if (!doomed.length) return;
+    await s.drop(doomed);
   } catch {
     /* a store that cannot be read cannot be corrected */
   }
@@ -307,7 +366,7 @@ export async function forgetCrossing(at: number): Promise<void> {
 /** forget the lot — paired with the location-sharing switch going off */
 export async function forgetSeen(): Promise<void> {
   try {
-    await AsyncStorage.removeItem(KEY);
+    await (await theStore())?.clear();
   } catch {
     /* nothing to be done, and nothing depends on it */
   }

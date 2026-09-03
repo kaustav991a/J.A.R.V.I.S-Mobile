@@ -55,7 +55,7 @@ describe('the sighting table', () => {
   it('drops the moments it is told to and keeps the rest', async () => {
     const s = await fresh();
     await s.put([sighting('A', 1000), sighting('B', 2000)]);
-    await s.drop([1000]);
+    await s.drop([{ at: 1000, place: 'A' }]);
     expect((await s.all(10)).map((r) => r.place)).toEqual(['B']);
   });
 
@@ -139,4 +139,22 @@ describe('moving the blob across', () => {
     const s = await fresh();
     expect(await migrateOnce(s)).toBe(1);
   });
+});
+
+it('holds two places that reported leaving in the same millisecond', async () => {
+  // 2026-09-01 18:31: ten places reported leaving at once, one delivery, one clock
+  // reading. Keyed on the moment alone the table would have kept one of the ten and
+  // the burst rule would have had nothing left to recognise
+  const s = await fresh();
+  await s.put([sighting('Home', 1000, 'exit'), sighting('Sector V', 1000, 'exit')]);
+  expect(await s.held()).toBe(2);
+});
+
+it('drops the departure and leaves the arrival that shares its moment', async () => {
+  // one sweep delivery: Office enter, Home exit, both on the same clock reading. Taking
+  // the sweep back by moment alone would have taken the real arrival with it
+  const s = await fresh();
+  await s.put([sighting('Office', 1000, 'enter'), sighting('Home', 1000, 'exit')]);
+  await s.drop([{ at: 1000, place: 'Home' }]);
+  expect((await s.all(10)).map((r) => r.place)).toEqual(['Office']);
 });

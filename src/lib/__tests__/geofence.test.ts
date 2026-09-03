@@ -11,7 +11,8 @@ import {
   stopWatchingPlaces,
   watchingPlaces,
 } from '../geofence';
-import { loadSeen } from '../timeline';
+import { openSeenStore } from '../seenStore';
+import { loadSeen, useSeenStore } from '../timeline';
 import type { KnownPlace } from '../knownPlaces';
 
 const mockPosted = jest.fn().mockResolvedValue('id');
@@ -83,6 +84,9 @@ const fire = (
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  // a fresh table per test: the store is a module-level singleton now, so without this
+  // one test's sightings become the next one's history
+  useSeenStore(await openSeenStore(':memory:'));
 });
 
 describe('the regions it watches', () => {
@@ -308,6 +312,16 @@ describe('the sweep Android fires at every restart', () => {
     expect(await loadSeen()).toHaveLength(2);
   });
 
+
+  it('takes its own sighting out with the burst it just recognised', async () => {
+    // whichever handler spots the burst also writes noteSweep, and that makes inSweep
+    // short-circuit every other handler before it can prune. So if this one spared its
+    // own row, one phantom departure survived every sweep — invisible to the launch
+    // repair too, which needs two exits to recognise a burst
+    await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31), 0, SPREAD);
+    await fire({ eventType: 'exit', region: { identifier: 'Sector V' } }, at(18, 31), 0, SPREAD);
+    expect(await loadSeen()).toEqual([]);
+  });
   it('never drops an arrival, which no sweep produces', async () => {
     await fire({ eventType: 'enter', region: { identifier: 'Office' } }, at(18, 31), 0, SPREAD);
     await fire({ eventType: 'exit', region: { identifier: 'Home' } }, at(18, 31), 0, SPREAD);

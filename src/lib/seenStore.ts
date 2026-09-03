@@ -17,12 +17,23 @@ import type { Seen } from './timeline';
  * the arithmetic that turns sightings into habits is untouched by it.
  */
 
+/**
+ * The moment plus the place is the row's identity, not the moment alone.
+ *
+ * A sweep reports every region the phone is outside of, and on 2026-09-01 ten places
+ * reported leaving inside the same minute — timestamps that can land on the identical
+ * millisecond, because they come from one delivery. Keyed on `at` alone the table
+ * would have silently kept one of the ten and the burst rule would have had nothing
+ * left to recognise. The pair still dedupes what matters: the same crossing delivered
+ * twice, which the platform does routinely.
+ */
 const SCHEMA = `
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS sighting (
-    at INTEGER PRIMARY KEY,
+    at INTEGER NOT NULL,
     place TEXT NOT NULL,
-    via TEXT
+    via TEXT,
+    PRIMARY KEY (at, place)
   );
   CREATE INDEX IF NOT EXISTS sighting_place ON sighting (place, at);
 `;
@@ -36,8 +47,14 @@ export type SeenStore = {
   between: (from: number, to: number) => Promise<Seen[]>;
   /** write rows; a moment already held is left alone */
   put: (rows: Seen[]) => Promise<void>;
-  /** disown these moments — a sighting the app turned out to be wrong about */
-  drop: (ats: number[]) => Promise<void>;
+  /**
+   * Disown these rows, each named by the moment AND the place.
+   *
+   * The moment alone is not enough. A sweep delivers an arrival and several departures
+   * on one clock reading — Office `enter`, Home `exit`, Sector V `exit`, all at 18:31
+   * — and taking back the sweep by moment would have taken the real arrival with it.
+   */
+  drop: (rows: Array<{ at: number; place: string }>) => Promise<void>;
   /** empty it, paired with location sharing going off */
   clear: () => Promise<void>;
   /** how many rows, for a diagnostic that has to say so */
@@ -90,8 +107,10 @@ export async function openSeenStore(name = 'jarvis-sightings.db'): Promise<SeenS
       }
     },
 
-    async drop(ats) {
-      for (const at of ats) await db.runAsync('DELETE FROM sighting WHERE at = ?', at);
+    async drop(rows) {
+      for (const r of rows) {
+        await db.runAsync('DELETE FROM sighting WHERE at = ? AND place = ?', r.at, r.place);
+      }
     },
 
     async clear() {

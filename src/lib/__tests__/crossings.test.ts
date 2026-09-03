@@ -1,8 +1,31 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { noteSweep, sweepsToday } from '../geofence';
-import { crossings, forgetCrossing, loadSeen } from '../timeline';
+import { openSeenStore } from '../seenStore';
+import type { SeenStore } from '../seenStore';
+import { crossings, forgetCrossing, loadSeen, useSeenStore } from '../timeline';
 import type { Seen } from '../timeline';
+
+/**
+ * Seed the sighting table from the shape the old blob held.
+ *
+ * These tests were written against one AsyncStorage key and there is nothing wrong
+ * with the histories they describe, so the seeding keeps its two arguments and writes
+ * rows to the table instead. The key is ignored.
+ */
+const seedFromBlob = async (_key: string, json: string): Promise<void> => {
+  await seenStore.put(JSON.parse(json) as Seen[]);
+};
+
+let seenStore: SeenStore;
+
+beforeEach(async () => {
+  await AsyncStorage.clear();
+  seenStore = await openSeenStore(':memory:');
+  useSeenStore(seenStore);
+});
+
+afterEach(() => useSeenStore(null));
 
 /**
  * A window into the sighting store, because there was not one.
@@ -81,7 +104,7 @@ describe('what it threw away', () => {
 
 describe('taking a crossing back', () => {
   const store = async (seen: Seen[]) => {
-    await AsyncStorage.setItem('jarvis_place_seen', JSON.stringify(seen));
+    await seedFromBlob('jarvis_place_seen', JSON.stringify(seen));
   };
 
   beforeEach(async () => {

@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { openSeenStore } from '../seenStore';
+import type { SeenStore } from '../seenStore';
 import {
   ENOUGH_PLACE_DAYS,
   LATE_BY_MIN,
@@ -18,8 +20,30 @@ import {
   stillHereLate,
   usuallyGoneBy,
   usuallyHereBy,
+  useSeenStore,
 } from '../timeline';
 import type { Seen } from '../timeline';
+
+/**
+ * Seed the sighting table from the shape the old blob held.
+ *
+ * These tests were written against one AsyncStorage key and there is nothing wrong
+ * with the histories they describe, so the seeding keeps its two arguments and writes
+ * rows to the table instead. The key is ignored.
+ */
+const seedFromBlob = async (_key: string, json: string): Promise<void> => {
+  await seenStore.put(JSON.parse(json) as Seen[]);
+};
+
+let seenStore: SeenStore;
+
+beforeEach(async () => {
+  await AsyncStorage.clear();
+  seenStore = await openSeenStore(':memory:');
+  useSeenStore(seenStore);
+});
+
+afterEach(() => useSeenStore(null));
 
 /**
  * When you are usually gone from a place, and whether you are still there.
@@ -566,7 +590,7 @@ describe('taking the sweeps back out of the history', () => {
   });
 
   const store = async (seen: unknown[]) => {
-    await AsyncStorage.setItem('jarvis_place_seen', JSON.stringify(seen));
+    await seedFromBlob('jarvis_place_seen', JSON.stringify(seen));
   };
 
   it('removes the ten places that all left at 6:31, none of which happened', async () => {
@@ -612,7 +636,7 @@ describe('you can only leave where you were', () => {
   it('drops an exit contradicted by a sighting minutes away', async () => {
     // 2026-09-01 18:40, at the office: Android reported leaving Home, because a sweep
     // reports every region the phone is OUTSIDE of. One event, so no burst to catch it
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([
         // minutes apart, not an hour: a sighting an hour earlier does not contradict
@@ -626,7 +650,7 @@ describe('you can only leave where you were', () => {
   });
 
   it('keeps the departure that follows being seen there', async () => {
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([
         { place: 'Office', at: t(17, 50) },
@@ -638,7 +662,7 @@ describe('you can only leave where you were', () => {
   });
 
   it('keeps an exit with nothing before it, since silence is not evidence', async () => {
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([{ place: 'Office', at: t(19, 5), via: 'exit' }])
     );
@@ -659,7 +683,7 @@ describe('pruning knows which places touch each other', () => {
 
   it('keeps both departures from circles that sit on top of each other', async () => {
     // one walk out of the door crosses both boundaries, and both are true
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([
         { place: 'Home', at: t(8, 0) },
@@ -672,7 +696,7 @@ describe('pruning knows which places touch each other', () => {
   });
 
   it('still throws out a burst from places nobody could have left together', async () => {
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([
         { place: 'Home', at: t(18, 31), via: 'exit' },
@@ -816,7 +840,7 @@ describe('a commute is a chain of exits, not a contradiction', () => {
     // Sector V 10:03 - four real departures, and the launch repair deleted three of
     // them because each was preceded by an exit from somewhere else. That IS a
     // commute. "Crossings recorded" then read "Nothing yet" over a morning of them
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([
         { place: 'Home', at: t(8, 6), via: 'exit' },
@@ -831,7 +855,7 @@ describe('a commute is a chain of exits, not a contradiction', () => {
 
   it('still drops an exit contradicted by a sighting minutes away', async () => {
     // the case the rule was written for: at the office, told he left Home
-    await AsyncStorage.setItem(
+    await seedFromBlob(
       'jarvis_place_seen',
       JSON.stringify([
         { place: 'Office', at: t(18, 10) },
