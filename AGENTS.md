@@ -245,6 +245,12 @@ of rediscovering them is high.
   that reaches the journal drags it in. It fails **after** a full minute of bundling with
   `Web Bundling failed`, `✖ Export failed`, and nothing about Android, which reads like a
   broken publish rather than a platform this app does not ship.
+- **The Settings row's update date is the INSTALL time, not the version.** It read
+  *"updated 2 Sep 18:58"* over a bundle published minutes after that, and two app
+  restarts "failed" to change it — because there was nothing to change. **The figure
+  that answers *is it current* is the Update ID on the Updates screen**, which is the
+  first eight characters of the `eas update` output's Android update ID. Compare that,
+  not the date.
 - **`eas update --non-interactive` also needs `--environment`.** Without it the publish
   dies on `The --environment flag must be set when running in --non-interactive mode`,
   and the only other line is `Error: update command failed.` — which reads like a broken
