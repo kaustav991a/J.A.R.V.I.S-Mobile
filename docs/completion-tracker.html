@@ -573,7 +573,15 @@ So the four rules written under fire on 09-02 all hold at once: distance telling
 
 **The handler ran on time in every case; only the display lagged**, by ten minutes on one and two on another. The store holds the handler figure, so the data is right and two notifications were simply seen late.
 
-**The standing limitation, written down so nobody re-derives it:** the recorded time is when Play Services *reported* the crossing, which is itself two to five minutes after the boundary was crossed. Every figure is therefore late by a consistent few minutes in the same direction, which a median handles. Expo does not expose the event's own `triggeringLocation` timestamp; if it ever does, that is the figure to prefer.">Arrivals and departures seen with the app closed</span><span class="g-item g-proved" title="**Asked for on 2026-09-01, in this shape: exits only, with a cooldown.** Ten named places reporting both crossings is a phone that buzzes all day about things you already know; the departure is the one carrying a figure the app could never measure before.
+**The standing limitation, written down so nobody re-derives it:** the recorded time is when Play Services *reported* the crossing, which is itself two to five minutes after the boundary was crossed. Every figure is therefore late by a consistent few minutes in the same direction, which a median handles. Expo does not expose the event's own `triggeringLocation` timestamp; if it ever does, that is the figure to prefer.
+
+**The Crossings row read back the whole morning on 09-03, and it closes the loop from boundary to store to screen:**
+
+&gt; Reached Office · 10:04 AM · Left Sector V Metro 10:03 · Reached Sector V 9:55 · Left Sealdah Rail 9:30 · Reached Sealdah Rail 9:23 · Left Barrackpore Railway 8:47
+
+A journey that reads correctly as data: thirty-six minutes on the train, seven on the platform at Sealdah, the metro across, and at the desk at 10:04. **Both directions of every boundary, no duplicates, no phantoms, and the times match the notification shade exactly.** *No bursts refused today.*
+
+**`Reached Office 10:04 AM` is the figure that matters next**: the arrival hour the app has never had. Four days of those and `arrivalHour` stops quoting *"usually you are there by 11:51 AM"* — a median of app-opens by a man at his desk since ten.">Arrivals and departures seen with the app closed</span><span class="g-item g-proved" title="**Asked for on 2026-09-01, in this shape: exits only, with a cooldown.** Ten named places reporting both crossings is a phone that buzzes all day about things you already know; the departure is the one carrying a figure the app could never measure before.
 
 *"Left Office — 7:05 PM. Noted, sir."*, on the general channel, two to five minutes after the boundary is crossed and ten seconds after that. Forty-five minutes of quiet per place afterwards, per place rather than per phone, because leaving home and reaching the office are fifteen minutes apart on one morning.
 
@@ -1573,7 +1581,15 @@ So the four rules written under fire on 09-02 all hold at once: distance telling
 
 <strong>The handler ran on time in every case; only the display lagged</strong>, by ten minutes on one and two on another. The store holds the handler figure, so the data is right and two notifications were simply seen late.
 
-<strong>The standing limitation, written down so nobody re-derives it:</strong> the recorded time is when Play Services *reported* the crossing, which is itself two to five minutes after the boundary was crossed. Every figure is therefore late by a consistent few minutes in the same direction, which a median handles. Expo does not expose the event's own <code>triggeringLocation</code> timestamp; if it ever does, that is the figure to prefer.</div>
+<strong>The standing limitation, written down so nobody re-derives it:</strong> the recorded time is when Play Services *reported* the crossing, which is itself two to five minutes after the boundary was crossed. Every figure is therefore late by a consistent few minutes in the same direction, which a median handles. Expo does not expose the event's own <code>triggeringLocation</code> timestamp; if it ever does, that is the figure to prefer.
+
+<strong>The Crossings row read back the whole morning on 09-03, and it closes the loop from boundary to store to screen:</strong>
+
+&gt; Reached Office · 10:04 AM · Left Sector V Metro 10:03 · Reached Sector V 9:55 · Left Sealdah Rail 9:30 · Reached Sealdah Rail 9:23 · Left Barrackpore Railway 8:47
+
+A journey that reads correctly as data: thirty-six minutes on the train, seven on the platform at Sealdah, the metro across, and at the desk at 10:04. <strong>Both directions of every boundary, no duplicates, no phantoms, and the times match the notification shade exactly.</strong> *No bursts refused today.*
+
+<strong><code>Reached Office 10:04 AM</code> is the figure that matters next</strong>: the arrival hour the app has never had. Four days of those and <code>arrivalHour</code> stops quoting *"usually you are there by 11:51 AM"* — a median of app-opens by a man at his desk since ten.</div>
             </div>
             <div class="row-tags">
               
