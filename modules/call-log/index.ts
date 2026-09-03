@@ -32,6 +32,22 @@ const module_ = () => {
   return native;
 };
 
+/**
+ * Why the last read came back empty, when it did.
+ *
+ * An empty list is two different facts — a phone with no calls, and a query that
+ * threw — and they looked identical for exactly as long as it took to ship one. The
+ * first version passed `LIMIT` inside the sort order, which Android has rejected since
+ * 11: the query threw, this file turned it into `[]`, and the diagnostic card read
+ * *Readable · 0 calls · 0 people* on a phone that takes calls all day.
+ */
+let lastError: string | null = null;
+
+/** the reason the last read failed, or null if it did not */
+export function readError(): string | null {
+  return lastError;
+}
+
 /** how far back a read looks: enough to call a gap usual, not enough to be an archive */
 export const READ_DAYS = 120;
 
@@ -70,8 +86,11 @@ export async function recent(since: number, limit = 500): Promise<Call[]> {
   if (!m) return [];
   try {
     const rows = (await m.recent(since, limit)) as Call[];
+    lastError = null;
     return rows.filter((c) => c.kind === 'in' || c.kind === 'out' || c.kind === 'missed');
-  } catch {
+  } catch (e) {
+    // kept rather than swallowed: an empty list and a failed read want different fixes
+    lastError = e instanceof Error ? e.message : 'the read failed';
     return [];
   }
 }

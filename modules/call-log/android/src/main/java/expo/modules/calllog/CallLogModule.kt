@@ -65,12 +65,24 @@ class CallLogModule : Module() {
         CallLog.Calls.DURATION
       )
 
+      /**
+       * No LIMIT in the sort order.
+       *
+       * It read as `DATE DESC LIMIT 500` to begin with, which is the old SQLite trick
+       * every Android answer still recommends — and since Android 11 the provider
+       * rejects it. The query threw, the promise rejected, JavaScript turned that into
+       * an empty list, and the Journal card read **Readable · 0 calls · 0 people** on a
+       * phone that takes calls all day. Measured 2026-09-03.
+       *
+       * The cap is applied while walking the cursor instead, which is where it always
+       * belonged.
+       */
       ctx.contentResolver.query(
         CallLog.Calls.CONTENT_URI,
         columns,
         "${CallLog.Calls.DATE} > ?",
         arrayOf(since.toLong().toString()),
-        "${CallLog.Calls.DATE} DESC LIMIT $limit"
+        "${CallLog.Calls.DATE} DESC"
       )?.use { rows ->
         val number = rows.getColumnIndex(CallLog.Calls.NUMBER)
         val cached = rows.getColumnIndex(CallLog.Calls.CACHED_NAME)
@@ -78,7 +90,7 @@ class CallLogModule : Module() {
         val date = rows.getColumnIndex(CallLog.Calls.DATE)
         val duration = rows.getColumnIndex(CallLog.Calls.DURATION)
 
-        while (rows.moveToNext()) {
+        while (rows.moveToNext() && out.size < limit) {
           val raw = if (number >= 0) rows.getString(number) ?: "" else ""
           val name = if (cached >= 0) rows.getString(cached) else null
           val kind = when (if (type >= 0) rows.getInt(type) else 0) {

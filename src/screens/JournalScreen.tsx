@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Hint, MonoCard, Screen, SectionLabel } from '../components/ui/Atoms';
 import { callSummary } from '../lib/calls';
-import { permission as callPermission, recentCalls } from '../../modules/call-log';
+import { permission as callPermission, readError, recentCalls } from '../../modules/call-log';
 import { Card, InfoRow } from '../components/ui/Card';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
@@ -37,13 +37,17 @@ export function JournalScreen() {
    */
   const [callState, setCallState] = useState<'granted' | 'denied' | 'unavailable'>('unavailable');
   const [calls, setCalls] = useState({ calls: 0, people: 0, days: 0 });
+  const [callProblem, setCallProblem] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     setCallState(callPermission());
     void recentCalls()
       .then((read) => {
-        if (alive) setCalls(callSummary(read));
+        if (!alive) return;
+        setCalls(callSummary(read));
+        // a read that threw and a phone with no calls are different facts
+        setCallProblem(readError());
       })
       .catch(() => undefined);
     return () => {
@@ -157,6 +161,9 @@ export function JournalScreen() {
           value={calls.days ? `${calls.days} days` : '—'}
         />
       </Card>
+      {callProblem ? (
+        <Hint testID="journal-calls-problem">{`The read failed: ${callProblem}`}</Hint>
+      ) : null}
       <Hint testID="journal-calls-hint">
         The number never reaches this app: it is hashed before it leaves the native side, and
         the name is the one Android had already cached against the call. Nothing is stored and
