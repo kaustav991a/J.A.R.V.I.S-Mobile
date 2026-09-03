@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**57 of 90 rows are proved on the phone** (63%). 75 have code (83%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
+**58 of 90 rows are proved on the phone** (64%). 75 have code (83%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
 
 ### Transport, pairing, security
 
@@ -299,7 +299,7 @@ It took two fixes today and the first was incomplete. `place()` orders what arri
 
 ### Memory and the journal
 
-*6 proved of 14.*
+*7 proved of 14.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -349,7 +349,7 @@ Launchers and the system shell are excluded from `appDeltas` now, **matched by s
 **It also counts up rather than denying the evidence it holds.** `leftBy` wants four distinct days before it will call a time usual, and on 09-02 it had one — so the row fell back to the bound and said *nothing has watched you leave yet* while Monday's exit sat in the store. Two different claims, and only the second was true: `exitDaysAt` now feeds *"it has watched you leave once, and wants 4 before calling that your usual time"*.
 
 And the note printed literal `**asterisks**` — the panel renders plain text, so markdown emphasis arrives on screen as the characters themselves. |
-| Call log: who you have lost touch with | undefined |  | Native build, and fatal for a store listing.
+| Call log: who you have lost touch with | proved |  | Native build, and fatal for a store listing.
 
 **The build is the smaller half of this, and it is worth saying which is which.** `READ_CALL_LOG` is a restricted permission: Google grants it only to apps whose core function IS calling or messaging. For a sideloaded personal APK it costs a build and nothing else. For anything that ever goes near a store listing it is a rejection, not a warning.
 
@@ -377,7 +377,17 @@ Runtime moved twice: `1818e1b7` to `8670873` when the module appeared, and to **
 
 **Reading now: 468 calls, 12 people named, 120 days.** The diagnostic card is the only reason that was five minutes of work rather than an afternoon — without it, *nobody is overdue* and *the query throws* look identical, and this project has now shipped that confusion five separate times.
 
-Runtime `ae3937e3` to **`5f318efe`**: Kotlin is a fingerprint input too, so the fix needed its own APK. |
+Runtime `ae3937e3` to **`5f318efe`**: Kotlin is a fingerprint input too, so the fix needed its own APK.
+
+**PROVED on the phone, 2026-09-03 at 15:49:**
+
+> **62 days since you spoke to Debasish Fmpl, sir — usually it is every day.**
+
+The whole chain in one sentence: Android's call log, hashed in Kotlin, derived on the phone, ranked above the app remarks, written into the chat log where it can be read tomorrow. A work contact spoken to daily and silent for two months — which is exactly the thing a person forgets and a phone does not.
+
+**And it proves the cap fix specifically.** *"Reaching back 19 days"* on a 120-day window was the read hitting its 500-row cap newest-first, on a phone taking twenty-five calls a day counting spam. At nineteen days Debasish had made no calls in the window and **could not be seen at all** — the trigger could only notice people who had rung recently, which is the opposite of the question it exists to answer. Six thousand rows covers four months and he appeared immediately.
+
+**Three bugs, one diagnostic card.** The Journal Calls row found the module state, then the empty read, then the truncated window — in an hour, each of which would otherwise have looked like *nobody is overdue today*. |
 | Archive import — Takeout, Meta DYI | — |  | **Split out of [[call-log]] on 2026-09-03, because it was hiding behind a build it does not need.** Google Takeout and Meta DYI are files somebody downloads: years of history in one archive, no permission, no native module, no APK. It could be done in an afternoon on any day the app-side is open.
 
 What it is worth: the journal starts the day the app was installed and the sightings start twelve weeks ago, so every habit figure is young. An import is the only route to a memory older than the app itself.

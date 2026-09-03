@@ -16,6 +16,50 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ 2026-09-03. The call log, and three bugs one diagnostic card found in an hour.
+
+> **62 days since you spoke to Debasish Fmpl, sir — usually it is every day.**
+> Jarvis · 15:49
+
+Asked for in one sentence — *notice who I have lost touch with* — and that is the
+sentence, on the phone, from a work contact spoken to daily and silent for two months.
+
+### What it is, and what it deliberately is not
+
+**The phone number never crosses into JavaScript.** It is hashed in Kotlin and what
+leaves the native module is a stable id plus the name Android had already cached
+against the call, which is why `READ_CONTACTS` was never requested and why an unknown
+caller stays a number that is never named. `src/lib/calls.ts` cannot print a phone
+number because it is never given one.
+
+**Nothing is stored and nothing is uploaded.** The log is on the device already,
+written by the dialler whether this app exists or not, so every figure is derived from
+a fresh read that survives nothing. `call:mom` rules were left alone — they need an
+engine on a gateway nobody is touching this week.
+
+### The three bugs, in order, all found by one small card
+
+1. **Is the module even there?** *Readable* answered it — and would have said *Not in
+   this build* if autolinking had missed it.
+2. **Readable · 0 calls · 0 people**, on a phone holding **22,165** rows. The query
+   passed `DATE DESC LIMIT 500`, the trick every Android answer still recommends and
+   the provider has rejected since Android 11. It threw, the promise rejected, a
+   `catch` turned it into `[]` — and an empty list is indistinguishable from a phone
+   nobody rings.
+3. **Reaching back 19 days** on a 120-day window. The cap is applied newest-first, so
+   on twenty-five calls a day it silently shortened the window — and **the one person
+   the feature exists to notice is by definition someone with no recent calls.** Six
+   thousand rows fixed it and Debasish appeared at once.
+
+**None of those three would have been caught by a test**, and all three look identical
+from outside: *nobody is overdue today*. The card cost twenty lines.
+
+### The cost, honestly
+
+Two native builds, two runtime moves (`ae3937e3`, then `5f318efe` because Kotlin is a
+fingerprint input too), and about three hours. The feature itself was forty minutes of
+it.
+
 ## ✅ 2026-09-03. The conversation outlives its window, and queue 7 finally ran.
 
 **`chat-window`: the phone stops forgetting a Tuesday on Wednesday.** Every turn goes
