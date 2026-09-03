@@ -18,7 +18,7 @@
 
 ## 🛑 STOP POINT — 2026-09-03, evening. Start here. **Supersedes the 16:15 point below.**
 
-**`feat/mobile-hud` at `2c923a5`. 1,485 tests, 101 suites, `tsc` clean,
+**`feat/mobile-hud` at `b3c94b7`. 1,485 tests, 101 suites, `tsc` clean,
 `build-status --check` up to date. 91 rows, 59 proved (65%).**
 
 **Runtime is `5f318efec8f8903cb5585c0d8859a65aaba57f8f` and did NOT move today** —
@@ -79,9 +79,30 @@ prune — so **exactly one phantom departure survived every sweep**. One lone ex
 also invisible to the launch repair, which needs two to see a burst. It would simply
 have become a departure time for a place he never left. Regression test added.
 
+### The import plan is written — start at Task 1
+
+`docs/superpowers/plans/2026-09-03-archive-import.md`, five tasks, 1,614 lines, every
+step carrying its code. **Tasks 1 and 2 are JavaScript and ship over the air; Task 3 is
+the build and cannot be split** — a new `modules/` directory and `expo-document-picker`
+both move the fingerprint, so they land in one local `assembleRelease` or not at all.
+
+**Two things the plan decided that the spec had left open.** The spec said `via:
+'import'`, one value: that cannot work, because an import writes a row for the arrival
+*and* one for the departure and telling those apart is the basis of every figure in
+`timeline.ts`. It is `import-enter` and `import-exit`. And **every existing truthiness
+check on `.via` silently means *a geofence crossing*** — there are three, and left alone
+an import would put 8,000 rows into the diagnostic row that made the geofence
+trustworthy, and would let `alreadyInside` consult a visit Google recorded this morning
+and then refuse to announce a real arrival.
+
+**The check that matters is on the device, not in the suite.** After FORGET, `Crossings
+recorded` must still read six crossings rather than eight thousand. That one observation
+is what proves Task 1 was right, and no test in the plan can prove it the way reading
+the row does.
+
 ### What is left, in the order I would take it
 
-1. **`archive-import` Plan B — queue 27.** Needs a **native build**: the parser is
+1. **`archive-import` Plan B — queue 27, and the plan is written (see above).** Needs a **native build**: the parser is
    streaming Kotlin in a new `modules/` directory, and that is a fingerprint input, so
    expect one more runtime move and a local `assembleRelease`. Owes, in order: the
    parser; `via: 'import'` counted by the habit figures and **never reported as
