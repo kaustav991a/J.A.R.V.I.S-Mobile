@@ -1,4 +1,6 @@
-import { openSeenStore } from '../seenStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { migrateOnce, openSeenStore } from '../seenStore';
 import type { SeenStore } from '../seenStore';
 import type { Seen } from '../timeline';
 
@@ -83,5 +85,58 @@ describe('the sighting table', () => {
     const s = await fresh();
     await s.put([sighting('Office', 1000)]);
     expect('via' in (await s.all(10))[0]).toBe(false);
+  });
+});
+
+describe('moving the blob across', () => {
+  beforeEach(() => AsyncStorage.clear());
+
+  const seed = (value: unknown) =>
+    AsyncStorage.setItem('jarvis_place_seen', JSON.stringify(value));
+
+  it('moves what the blob was holding', async () => {
+    await seed([sighting('Home', 1000, 'exit'), sighting('Office', 2000, 'enter')]);
+    const s = await fresh();
+    expect(await migrateOnce(s)).toBe(2);
+    expect(await s.all(10)).toEqual([
+      { place: 'Home', at: 1000, via: 'exit' },
+      { place: 'Office', at: 2000, via: 'enter' },
+    ]);
+  });
+
+  it('leaves the blob where it found it', async () => {
+    await seed([sighting('Home', 1000)]);
+    await migrateOnce(await fresh());
+    // the only way back if the migration turns out to be wrong, and twelve weeks of
+    // somebody's movements is not where you find that out the hard way
+    expect(await AsyncStorage.getItem('jarvis_place_seen')).not.toBeNull();
+  });
+
+  it('runs once however often it is called', async () => {
+    await seed([sighting('Home', 1000), sighting('Office', 2000)]);
+    const s = await fresh();
+    expect(await migrateOnce(s)).toBe(2);
+    expect(await migrateOnce(s)).toBe(0);
+    expect(await s.held()).toBe(2);
+  });
+
+  it('has nothing to do on a fresh install', async () => {
+    expect(await migrateOnce(await fresh())).toBe(0);
+  });
+
+  it('survives a blob that is not JSON', async () => {
+    await AsyncStorage.setItem('jarvis_place_seen', 'not json at all');
+    expect(await migrateOnce(await fresh())).toBe(0);
+  });
+
+  it('takes the rows it recognises and drops the rest', async () => {
+    // this file outlives the code that wrote it, so a shape from an older build has
+    // to be survivable rather than fatal
+    await AsyncStorage.setItem(
+      'jarvis_place_seen',
+      JSON.stringify([{ place: 'Home', at: 1000 }, { nonsense: true }, null])
+    );
+    const s = await fresh();
+    expect(await migrateOnce(s)).toBe(1);
   });
 });

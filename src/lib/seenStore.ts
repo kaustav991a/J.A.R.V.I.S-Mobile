@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SQLite from 'expo-sqlite';
 
 import type { Seen } from './timeline';
@@ -111,4 +112,45 @@ export async function openSeenStore(name = 'jarvis-sightings.db'): Promise<SeenS
       return row?.at ?? null;
     },
   };
+}
+
+/** the blob's key, verbatim — it is not deleted, so the name has to stay exact */
+const BLOB_KEY = 'jarvis_place_seen';
+/** the marker that stops the move running a second time */
+const MOVED_KEY = 'jarvis_place_seen_moved';
+
+const isSeen = (v: unknown): v is Seen =>
+  !!v &&
+  typeof v === 'object' &&
+  typeof (v as Seen).place === 'string' &&
+  Number.isFinite((v as Seen).at);
+
+/**
+ * Move the old AsyncStorage blob into the table, once.
+ *
+ * The blob is **kept**. It costs a few kilobytes and it is the only way back if this
+ * migration is wrong — and a store holding twelve weeks of somebody's movements is not
+ * where you want to discover that the hard way.
+ *
+ * Returns how many rows moved: 0 if it has already run, if there was nothing to move,
+ * or if the blob could not be read at all. An unreadable blob is not worth crashing a
+ * launch over; this file outlives the code that wrote it, so a shape from an older
+ * build has to be survivable.
+ */
+export async function migrateOnce(store: SeenStore): Promise<number> {
+  try {
+    if (await AsyncStorage.getItem(MOVED_KEY)) return 0;
+    const raw = await AsyncStorage.getItem(BLOB_KEY);
+    if (!raw) {
+      await AsyncStorage.setItem(MOVED_KEY, '1');
+      return 0;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    const rows = Array.isArray(parsed) ? parsed.filter(isSeen) : [];
+    await store.put(rows);
+    await AsyncStorage.setItem(MOVED_KEY, '1');
+    return rows.length;
+  } catch {
+    return 0;
+  }
 }
