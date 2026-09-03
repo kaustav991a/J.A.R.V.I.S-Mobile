@@ -235,8 +235,12 @@ of rediscovering them is high.
   `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`, checked on
   2026-09-01 against the APK pulled off the device. **An EAS build carries a different
   key**, so `adb install -r` refuses it, and the only way to install one is
-  `adb uninstall` first — which destroys twelve weeks of sightings, the chat log and
-  the journal. That is also why queue 18's real keystore is not free: rotating the key
+  `adb uninstall` first — which destroys the journal's 52,000 usage moments, the chat
+  archive, the memory facts and the sightings. (**The sightings are twelve DAYS, not
+  twelve weeks** — the phone reported 138 rows reaching back 12 days on 2026-09-03.
+  Twelve weeks was the old store's TTL and got quoted for a week as though it were the
+  contents. The journal is the expensive part.) That is also why queue 18's real
+  keystore is not free: rotating the key
   costs the data unless it is done as signing-scheme v3 rotation.
 
   Check before any install, and dry-run the install itself:

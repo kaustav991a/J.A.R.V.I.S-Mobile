@@ -18,14 +18,32 @@
 
 ## 🛑 STOP POINT — 2026-09-03, evening. Start here. **Supersedes the 16:15 point below.**
 
-**`feat/mobile-hud` at `eaba64f`. 1,485 tests, 101 suites, `tsc` clean,
-`build-status --check` up to date. 91 rows, 58 proved (64%).**
+**`feat/mobile-hud` at `2c923a5`. 1,485 tests, 101 suites, `tsc` clean,
+`build-status --check` up to date. 91 rows, 59 proved (65%).**
 
 **Runtime is `5f318efec8f8903cb5585c0d8859a65aaba57f8f` and did NOT move today** —
 everything below is JavaScript. Published to `production` as update group
 `601a95f0-c256-4a7e-bfc8-cba0e4dc7e60`. The APK is still the local
 `./gradlew assembleRelease` signed with `android/app/debug.keystore` (cert
 `fac61745dc09`); read the 16:15 entry below before touching the keystore or `prebuild`.
+
+### Read on the phone, 17:44 — and the number corrects a week of notes
+
+**Places → Crossings recorded: "138 sightings held, reaching back 12 days."** Above it,
+six real crossings from this morning — Barrackpore 8:29 and 8:47, Sealdah 9:23 and
+9:30, Sector V 9:55, Office 10:04 — and *"6 bursts refused today"*. Settings → Updates
+reads *"updated 3 Sep 17:28"*. The migration ran.
+
+**Every note about the keystore in this file says an uninstall costs "twelve weeks of
+sightings". It costs twelve days.** Twelve weeks was the old blob's TTL — the cutoff it
+filtered to on every read — and it has been quoted all week as though it were the
+contents. The store has never held more than the fortnight since the habit feature was
+built. The real cost of an uninstall is the journal's 52,000 usage moments and the chat
+archive; the sightings are the cheap part. The dated entries below are left as written.
+
+That makes queue 27 worth **more**, not less: `anticipate-habit` wants four distinct
+days and there are twelve altogether, most of them app-open bounds rather than measured
+crossings.
 
 ### Sightings moved to SQLite — Plan A, all five tasks
 
@@ -44,9 +62,7 @@ would have been discarded as it arrived.
 - `storeHeld()` and a new line on **Places → Crossings recorded**:
   *"N sightings held, reaching back M days"*.
 
-**Not yet read on the device.** The phone was at the JARVIS unlock screen when the
-update landed. **First thing next session: Places → Crossings recorded.** If it reads
-*Nothing held yet*, the migration did not run — chase that, not the import.
+**Read on the device — see the section above this one.**
 
 ### Three things the tests caught, and one of them was a live bug
 
@@ -100,7 +116,7 @@ Kotlin edit, because native source is an input too.
 
 The installed APK is a **local `./gradlew assembleRelease`**, signed with
 `android/app/debug.keystore` (cert `fac61745dc09`). **An EAS build cannot update this
-phone** — it would need an uninstall, which costs twelve weeks of sightings, the chat
+phone** — it would need an uninstall, which costs the journal, the chat
 archive, the journal and the facts. Back the keystore up before any `prebuild --clean`,
 and bake the fingerprint into `strings.xml` by hand; `prebuild` writes the literal
 `file:fingerprint` every time.
