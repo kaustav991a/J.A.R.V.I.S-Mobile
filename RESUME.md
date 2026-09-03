@@ -16,6 +16,59 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## 🛑 STOP POINT — 2026-09-03, 16:15. Start here. **Supersedes the 09-02 stop point below.**
+
+**`feat/mobile-hud` at `814b989`. 1457 tests, 99 suites, `tsc` clean,
+`build-status --check` up to date. 90 rows, 58 proved (64%).**
+
+### The runtime moved twice today and the APK is local
+
+**`1818e1b7` → `ae3937e3` → `5f318efe`.** The first move was `modules/call-log`
+existing at all — **a local module is a fingerprint input**, so the phone went stale
+before a single permission was added. The second was `READ_CALL_LOG`. The third was a
+Kotlin edit, because native source is an input too.
+
+The installed APK is a **local `./gradlew assembleRelease`**, signed with
+`android/app/debug.keystore` (cert `fac61745dc09`). **An EAS build cannot update this
+phone** — it would need an uninstall, which costs twelve weeks of sightings, the chat
+archive, the journal and the facts. Back the keystore up before any `prebuild --clean`,
+and bake the fingerprint into `strings.xml` by hand; `prebuild` writes the literal
+`file:fingerprint` every time.
+
+### What was built today
+
+- **Memory learned to take from conversation and give things back** — candidates you
+  keep or dismiss, and a tidy pass that offers stale facts up for forgetting. Proved
+  both ways on the phone.
+- **The chat archive** — every turn into SQLite before the hundred-turn window trims,
+  with *Load earlier*. `partial` until the log passes a hundred turns.
+- **The call log** — *"62 days since you spoke to Debasish Fmpl, sir — usually it is
+  every day."* Numbers hashed in Kotlin, nothing stored, nothing uploaded.
+- **Three sweep/drift fixes on the geofence**, and the commute survived them: eleven
+  departures across two days, none false.
+
+### What is left, in the order I would take it
+
+1. **`archive-import`** — unblocked, no permission, no build. Takeout and Meta DYI are
+   just files, and they are the only route to a memory older than the app itself.
+2. **`chat-window`** — needs the log past a hundred turns. A day.
+3. **`anticipate-habit`** — needs four days of crossings. Two departures and two
+   arrivals are in; Friday or Monday.
+4. **Queue 26, the security pass** — asked for explicitly and asked to be kept last.
+   Threat model first: at rest, backup, `FLAG_SECURE`, and what leaves the phone.
+5. **The brain**, when the freeze lifts, owes two things: stop distilling chat into
+   facts by itself, then `situation-block`.
+
+### The rule this week keeps paying for
+
+**Every bug that mattered was found by a person reading a sentence the app wrote, and
+none by the suite** — which went from 1179 to 1457 green across the same week. Three of
+today's were found by one twenty-line diagnostic card, and all three looked identical
+from outside: *nothing to report*.
+
+So: **when a feature can produce nothing, build the thing that says which nothing it
+is** — before shipping it, not after an afternoon of guessing.
+
 ## ✅ 2026-09-03. The call log, and three bugs one diagnostic card found in an hour.
 
 > **62 days since you spoke to Debasish Fmpl, sir — usually it is every day.**
@@ -133,7 +186,7 @@ sweep rule had been doing.
 leaves at seven. Two more days and `leftBy` starts quoting it instead of the old
 app-open bound.
 
-## 🛑 STOP POINT — 2026-09-02, 19:00. Start here.
+## 🛑 STOP POINT — 2026-09-02, 19:00. Superseded by the 09-03 point above.
 
 **`feat/mobile-hud` at `4130e85`. 1410 tests, 97 suites, `tsc` clean,
 `build-status --check` up to date. 89 rows, 56 proved (63%).**
