@@ -173,6 +173,33 @@ export async function seenSince(days: number): Promise<Seen[]> {
 }
 
 /**
+ * How much history there is, and how far back it reaches.
+ *
+ * This exists **before** anything imports a Timeline export, on purpose. A migration
+ * that silently does nothing is the worst outcome available: the app would run on an
+ * empty table while twelve weeks of history sat in a blob nobody reads, every figure
+ * would say *"Nothing yet"*, and it would look exactly like a store that had simply
+ * never been written to. That confusion has already shipped in this project five
+ * times, and every one of them was found by somebody reading a sentence the app wrote.
+ *
+ * Zeroes rather than nulls: the row has to be able to say *nothing held yet* without
+ * a caller deciding what a null means.
+ */
+export async function storeHeld(): Promise<{ rows: number; days: number }> {
+  try {
+    const s = await theStore();
+    if (!s) return { rows: 0, days: 0 };
+    const rows = await s.held();
+    if (!rows) return { rows: 0, days: 0 };
+    const oldest = await s.oldest();
+    const days = oldest === null ? 0 : Math.floor((Date.now() - oldest) / 86_400_000);
+    return { rows, days };
+  } catch {
+    return { rows: 0, days: 0 };
+  }
+}
+
+/**
  * Record that you were at a named place, unless the same visit was just recorded.
  *
  * Silent on every failure. A sighting that cannot be written is a sighting that never

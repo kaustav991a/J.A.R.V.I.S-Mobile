@@ -1,7 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { openSeenStore } from '../seenStore';
-import { forgetSeen, loadSeen, noteSeen, seenSince, useSeenStore } from '../timeline';
+import {
+  forgetSeen,
+  loadSeen,
+  noteSeen,
+  seenSince,
+  storeHeld,
+  useSeenStore,
+} from '../timeline';
 
 /**
  * `timeline.ts` against a real table.
@@ -67,4 +74,17 @@ it('has nothing to read back when there is no store', async () => {
   // the real database is not open in a test, so this is the failure path, and a
   // habit figure with no history is a habit figure that says nothing
   expect(await seenSince(365)).toEqual([]);
+});
+
+it('says how much it holds and how far back', async () => {
+  const now = Date.now();
+  await noteSeen('Home', now - 100 * DAY, 'exit');
+  await noteSeen('Office', now - DAY, 'exit');
+  expect(await storeHeld()).toEqual({ rows: 2, days: 100 });
+});
+
+it('says nothing rather than nulls when the store is empty', async () => {
+  // a migration nobody can see is a migration nobody can trust, and "the import found
+  // nothing" must never look like "the store is empty"
+  expect(await storeHeld()).toEqual({ rows: 0, days: 0 });
 });

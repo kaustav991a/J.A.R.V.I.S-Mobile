@@ -13,7 +13,7 @@ import { useJarvis } from '../state/JarvisProvider';
 import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
-import { crossings, forgetCrossing, loadSeen } from '../lib/timeline';
+import { crossings, forgetCrossing, loadSeen, storeHeld } from '../lib/timeline';
 import type { Seen } from '../lib/timeline';
 import {
   askForBackgroundLocation,
@@ -89,6 +89,7 @@ export function PlacesScreen() {
    */
   const [crossed, setCrossed] = useState<Seen[]>([]);
   const [sweeps, setSweeps] = useState(0);
+  const [held, setHeld] = useState({ rows: 0, days: 0 });
 
   /**
    * The one repair this screen can make, and it makes it once.
@@ -126,6 +127,7 @@ export function PlacesScreen() {
       void watchingPlaces().then(l.only(setWatching));
       void loadSeen().then((seen) => l.only(setCrossed)(crossings(seen, new Date())));
       void sweepsToday().then(l.only(setSweeps));
+      void storeHeld().then(l.only(setHeld));
       void readHealth(l);
       return l.end;
     }, [readHealth])
@@ -811,6 +813,18 @@ export function PlacesScreen() {
               : sweeps === 1
                 ? 'One burst refused today — several places at once, which is the platform and not you. Nothing was recorded from it.'
                 : `${sweeps} bursts refused today — several places at once, which is the platform and not you. Nothing was recorded from them.`}
+          </Text>
+          {/*
+           * What the store actually holds.
+           *
+           * A migration nobody can see is a migration nobody can trust. This row is
+           * here before anything imports a Timeline export, so that "the import found
+           * nothing" and "the store is empty" can never look the same on screen.
+           */}
+          <Text style={styles.rowSub} testID="crossings-held">
+            {held.rows === 0
+              ? 'Nothing held yet.'
+              : `${held.rows} sightings held, reaching back ${held.days} ${held.days === 1 ? 'day' : 'days'}.`}
           </Text>
         </View>
       </View>
