@@ -176,6 +176,29 @@ of rediscovering them is high.
   Anything that must ship over the air goes in `scripts/` and is invoked directly
   (`node scripts/build-status.mjs`), not through `npm run`. If a script is genuinely
   worth the fingerprint change, it needs a new build in the same sitting.
+- **A new local module in `modules/` moves the OTA fingerprint on its own.** Before the
+  permission was added, creating `modules/call-log` had already taken the runtime from
+  `1818e1b7` to `8670873` — the module directory is a fingerprint input, so the moment
+  it exists the phone in your pocket is stale. Check before publishing anything, the
+  same way `packageJson:scripts` is checked.
+- **Never `requireNativeModule` at import scope for a module that ships with a build.**
+  The JavaScript travels over the air and the native half only arrives with an APK, so
+  between publishing and installing there is an app whose bundle names a module it does
+  not have. At import scope that throws while the screen is loading and takes the whole
+  app down over one feature. Resolve it lazily inside the function and return an answer
+  — `unavailable` — rather than an exception:
+
+  ```ts
+  let native: Native | null = null;
+  let looked = false;
+  const module_ = () => {
+    if (!looked) {
+      looked = true;
+      try { native = requireNativeModule('CallLog'); } catch { native = null; }
+    }
+    return native;
+  };
+  ```
 - **A local release build silently breaks OTA.** `runtimeVersion` is
   `{ policy: "fingerprint" }`, and `expo prebuild` writes the literal placeholder
   `file:fingerprint` into `android/app/src/main/res/values/strings.xml`. **EAS builds

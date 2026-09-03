@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**57 of 90 rows are proved on the phone** (63%). 74 have code (82%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
+**57 of 90 rows are proved on the phone** (63%). 75 have code (83%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
 
 ### Transport, pairing, security
 
@@ -349,7 +349,7 @@ Launchers and the system shell are excluded from `appDeltas` now, **matched by s
 **It also counts up rather than denying the evidence it holds.** `leftBy` wants four distinct days before it will call a time usual, and on 09-02 it had one — so the row fell back to the bound and said *nothing has watched you leave yet* while Monday's exit sat in the store. Two different claims, and only the second was true: `exitDaysAt` now feeds *"it has watched you leave once, and wants 4 before calling that your usual time"*.
 
 And the note printed literal `**asterisks**` — the panel renders plain text, so markdown emphasis arrives on screen as the characters themselves. |
-| Call log: who you have lost touch with | — |  | Native build, and fatal for a store listing.
+| Call log: who you have lost touch with | undefined |  | Native build, and fatal for a store listing.
 
 **The build is the smaller half of this, and it is worth saying which is which.** `READ_CALL_LOG` is a restricted permission: Google grants it only to apps whose core function IS calling or messaging. For a sideloaded personal APK it costs a build and nothing else. For anything that ever goes near a store listing it is a rejection, not a warning.
 
@@ -361,7 +361,15 @@ And the note printed literal `**asterisks**` — the panel renders plain text, s
 
 **No number ever reaches the derived layer.** The native side hands over a stable id and the name Android had already cached against the call, so `READ_CONTACTS` is not needed and an unknown caller stays a number that is never named. `src/lib/calls.ts` cannot print a phone number because it is never given one.
 
-**2026-09-03: the gateway half of `call:<alias>` is being built and the gateway half is not.** The call log becomes readable on the next APK, so when the freeze lifts, `call:mom` needs only what the rules spec already describes: the subject accepted at declaration, and the phone answering a boolean against an alias. **The call log itself never leaves the device** — no numbers, no timestamps, no durations, which is the rule that made this safe to build before the engine exists. |
+**2026-09-03: the gateway half of `call:<alias>` is being built and the gateway half is not.** The call log becomes readable on the next APK, so when the freeze lifts, `call:mom` needs only what the rules spec already describes: the subject accepted at declaration, and the phone answering a boolean against an alias. **The call log itself never leaves the device** — no numbers, no timestamps, no durations, which is the rule that made this safe to build before the engine exists.
+
+**Built 2026-09-03, all four layers, and the privacy line is drawn in Kotlin rather than in a comment.** The native module hashes the number before it crosses into JavaScript — SHA-256 of the last ten digits, truncated — so the phone number is not something the layer above chooses not to print; it is something it is never given. `CACHED_NAME` supplies the name Android had already stored against the call, which is why `READ_CONTACTS` is not requested at all.
+
+**Nothing is stored.** The log is on the device already, written by the dialler whether this app exists or not, so every figure comes from a fresh 120-day read and nothing survives it. A copy would be a second thing to secure and a second thing to leak, for a read that takes milliseconds.
+
+**The trap that would have bricked the installed app:** the JavaScript ships over the air and the native half only arrives with an APK, so for the hours between publishing and installing there is a build in the world whose bundle names a module it does not have. `requireNativeModule` at import scope would have crashed that app at launch — the whole app, over a call log. It is resolved on first use, and a failure is an answer (`unavailable`) rather than an exception.
+
+Runtime moved twice: `1818e1b7` to `8670873` when the module appeared, and to **`ae3937e3`** when `READ_CALL_LOG` was added. `shipped` until the APK is installed and a real remark is seen. |
 | Archive import — Takeout, Meta DYI | — |  | **Split out of [[call-log]] on 2026-09-03, because it was hiding behind a build it does not need.** Google Takeout and Meta DYI are files somebody downloads: years of history in one archive, no permission, no native module, no APK. It could be done in an afternoon on any day the app-side is open.
 
 What it is worth: the journal starts the day the app was installed and the sightings start twelve weeks ago, so every habit figure is young. An import is the only route to a memory older than the app itself.
