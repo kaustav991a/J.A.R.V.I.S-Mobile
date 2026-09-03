@@ -48,7 +48,8 @@ The morning and evening departure briefings, pushed by the gateway.
 adb shell "dumpsys notification --noredact" > shade.txt
 grep -a -B 30 "Before you leave" shade.txt | grep -a "tag="
 ```
-
+He reaches you without the app being open || A conversation you can trust || He speaks, and he listens || He knows where and when he is --- those
+  are
 The gateway's push carries `tag=FCM-Notification:*`. A notification the phone posted
 itself does not. Two records, one of each, means both senders fired.
 
