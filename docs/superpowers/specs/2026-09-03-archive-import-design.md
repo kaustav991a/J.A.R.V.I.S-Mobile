@@ -92,6 +92,55 @@ was a correct median over data that measured something else.
 6. **Say what happened, and offer the undo.** A row on Places: *"4,000 visits imported
    from your Timeline, 8 Mar 2025 to 3 Sep 2026"*, with FORGET beside it.
 
+## Naming what he has not named — decided 2026-09-03
+
+Asked directly: *if anything unnamed, can we name it by Google Maps places?*
+
+**Every visit carries a `placeId` and a `semanticType`.** 238 distinct places across the
+export, and the types are worth more than they look:
+
+| semanticType | visits |
+| --- | --- |
+| UNKNOWN | 2,906 |
+| **INFERRED_HOME** | 743 |
+| **INFERRED_WORK** | 344 |
+| ALIASED_LOCATION | 6 |
+| SEARCHED_ADDRESS | 1 |
+
+So three tiers, and only one of them costs anything.
+
+**1. Home and work are free.** Google has already decided which cluster is which, and
+that arrives in the file. No network, no key, no lookup.
+
+**2. `placeId` is a better key than coordinates.** It is stable across visits, so once a
+named place is linked to one, matching stops depending on a 120 m radius and starts
+being exact. Worth storing on `KnownPlace` as an optional field.
+
+**3. Names for the other 236 would need the Places Details API** — a key, 238 network
+lookups, and **sending his place ids to Google**. Rejected. Every feature in this app
+has held one line: the file never leaves the phone, the call log never leaves the
+phone, the journal never leaves the phone. Buying prettier labels with that line is a
+bad trade, and it would be the first time this app sent personal data somewhere to make
+a screen look better.
+
+**Decided: he proposes, you name.** After matching, the importer shows the unnamed
+clusters ranked by visits, each with its hint and its typical hour, and he types a name
+or ignores it:
+
+```
+  UNNAMED PLACES HE HAS SEEN
+  ○ Looks like your home · 743 visits · 516 days · usually 20:55   [ name ]
+  ○ 261 visits · 211 days · usually 19:20                          [ name ]
+  ○ 66 visits · 55 days · usually 13:27                            [ name ]
+```
+
+This keeps the rule the app already lives by — **a place is named by a person, not
+guessed** — while removing the part that was genuinely limiting: until now the only way
+to name somewhere was to be standing in it with the app open. Now he can name a place
+he has visited two hundred times and never had the app open at.
+
+Naming one re-runs the match, so its history joins the store immediately.
+
 ## What it deliberately does not do
 
 - **The file is not kept.** It is read once, matched, and never copied into the app.
@@ -99,8 +148,8 @@ was a correct median over data that measured something else.
   second thing to secure.
 - **Nothing is uploaded.** Imported sightings are local, exactly like measured ones.
 - **No new places are invented.** A cluster with 300 visits that he has never named
-  stays unnamed. Naming a place is a gesture he makes by standing in it, and an
-  importer that guesses would undo that.
+  stays unnamed until he names it — see the naming section above. The importer proposes
+  and never decides.
 - **No activities, no routes.** 4,406 activity segments and 3,163 paths are ignored;
   they describe movement between places rather than being at one, and nothing in the
   app asks that question yet.
