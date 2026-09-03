@@ -559,7 +559,21 @@ Distance is what tells them apart, and nothing else does. A person can leave two
 
 **09-03 morning did it again outbound:** Home 8:07 · Laxminath Nagar 8:10 · Musalman Para 8:11 · Barrackpore Railway Station 8:47 · Sealdah Rail Station 9:30.
 
-So the four rules written under fire on 09-02 all hold at once: distance telling overlapping circles from a platform sweep, the ten-minute contradiction window that stopped deleting commutes, the fresh-fix second opinion against drift, and the burst race. **Every one of them was found by him reading a sentence the app wrote.**">Arrivals and departures seen with the app closed</span><span class="g-item g-proved" title="**Asked for on 2026-09-01, in this shape: exits only, with a cooldown.** Ten named places reporting both crossings is a phone that buzzes all day about things you already know; the departure is the one carrying a figure the app could never measure before.
+So the four rules written under fire on 09-02 all hold at once: distance telling overlapping circles from a platform sweep, the ten-minute contradiction window that stopped deleting commutes, the fresh-fix second opinion against drift, and the burst race. **Every one of them was found by him reading a sentence the app wrote.**
+
+**Checked 09-03: the delivery lag is cosmetic, and the recorded times are not.** He noticed some notifications only appearing when he opened the app, which is the one observation that could have meant the whole feature was still measuring *when you looked at your phone*. Android records a post time per notification and the body carries the figure the handler computed, so the two can be compared:
+
+| Place | Recorded | Posted |
+| --- | --- | --- |
+| Home | 8:07 | 8:07 |
+| Laxminath Nagar | 8:10 | 8:10 |
+| Musalman Para | 8:11 | 8:11 |
+| Barrackpore | 8:47 | **8:57** |
+| Sealdah | 9:30 | **9:32** |
+
+**The handler ran on time in every case; only the display lagged**, by ten minutes on one and two on another. The store holds the handler figure, so the data is right and two notifications were simply seen late.
+
+**The standing limitation, written down so nobody re-derives it:** the recorded time is when Play Services *reported* the crossing, which is itself two to five minutes after the boundary was crossed. Every figure is therefore late by a consistent few minutes in the same direction, which a median handles. Expo does not expose the event's own `triggeringLocation` timestamp; if it ever does, that is the figure to prefer.">Arrivals and departures seen with the app closed</span><span class="g-item g-proved" title="**Asked for on 2026-09-01, in this shape: exits only, with a cooldown.** Ten named places reporting both crossings is a phone that buzzes all day about things you already know; the departure is the one carrying a figure the app could never measure before.
 
 *"Left Office — 7:05 PM. Noted, sir."*, on the general channel, two to five minutes after the boundary is crossed and ten seconds after that. Forty-five minutes of quiet per place afterwards, per place rather than per phone, because leaving home and reaching the office are fifteen minutes apart on one morning.
 
@@ -1545,7 +1559,21 @@ Distance is what tells them apart, and nothing else does. A person can leave two
 
 <strong>09-03 morning did it again outbound:</strong> Home 8:07 · Laxminath Nagar 8:10 · Musalman Para 8:11 · Barrackpore Railway Station 8:47 · Sealdah Rail Station 9:30.
 
-So the four rules written under fire on 09-02 all hold at once: distance telling overlapping circles from a platform sweep, the ten-minute contradiction window that stopped deleting commutes, the fresh-fix second opinion against drift, and the burst race. <strong>Every one of them was found by him reading a sentence the app wrote.</strong></div>
+So the four rules written under fire on 09-02 all hold at once: distance telling overlapping circles from a platform sweep, the ten-minute contradiction window that stopped deleting commutes, the fresh-fix second opinion against drift, and the burst race. <strong>Every one of them was found by him reading a sentence the app wrote.</strong>
+
+<strong>Checked 09-03: the delivery lag is cosmetic, and the recorded times are not.</strong> He noticed some notifications only appearing when he opened the app, which is the one observation that could have meant the whole feature was still measuring *when you looked at your phone*. Android records a post time per notification and the body carries the figure the handler computed, so the two can be compared:
+
+| Place | Recorded | Posted |
+| --- | --- | --- |
+| Home | 8:07 | 8:07 |
+| Laxminath Nagar | 8:10 | 8:10 |
+| Musalman Para | 8:11 | 8:11 |
+| Barrackpore | 8:47 | <strong>8:57</strong> |
+| Sealdah | 9:30 | <strong>9:32</strong> |
+
+<strong>The handler ran on time in every case; only the display lagged</strong>, by ten minutes on one and two on another. The store holds the handler figure, so the data is right and two notifications were simply seen late.
+
+<strong>The standing limitation, written down so nobody re-derives it:</strong> the recorded time is when Play Services *reported* the crossing, which is itself two to five minutes after the boundary was crossed. Every figure is therefore late by a consistent few minutes in the same direction, which a median handles. Expo does not expose the event's own <code>triggeringLocation</code> timestamp; if it ever does, that is the figure to prefer.</div>
             </div>
             <div class="row-tags">
               
