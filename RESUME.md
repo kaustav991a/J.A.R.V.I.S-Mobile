@@ -16,7 +16,7 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-09-03, evening. Start here. **Supersedes the 16:15 point below.**
+## 🛑 STOP POINT — 2026-09-03, end of day. **Start at "Tomorrow" below.** Supersedes the 16:15 point.
 
 **`feat/mobile-hud` at `6adf351`. 1,495 tests, 102 suites, `tsc` clean,
 `build-status --check` up to date. 91 rows, 59 proved (65%).**
@@ -26,6 +26,60 @@ everything below is JavaScript. Published to `production` as update group
 `601a95f0-c256-4a7e-bfc8-cba0e4dc7e60`. The APK is still the local
 `./gradlew assembleRelease` signed with `android/app/debug.keystore` (cert
 `fac61745dc09`); read the 16:15 entry below before touching the keystore or `prebuild`.
+
+### 🌅 Tomorrow, 2026-09-04 — do these three in this order
+
+**1. Task 2 of the import, then publish 1 and 2 together.** `src/lib/archive.ts`, pure
+matching arithmetic, 18 tests already written out in
+`docs/superpowers/plans/2026-09-03-archive-import.md`. No build, no device needed. Task 1
+is already committed at `6adf351` and unpublished on purpose — it pairs with this.
+Verify the fingerprint has not moved, then:
+
+```bash
+npx eas update --channel production --platform android --environment production \
+  --message "Imported sightings, matched and marked" --non-interactive
+```
+
+**2. Then the build — and put everything in it.** Task 3 needs an APK anyway, and
+**three other things have been waiting for one**: the alarm intent and `expo-battery`
+from queue 23, and the real release keystore from queue 18 which closes completion
+point 9 outright. `modules/timeline-import` and `expo-document-picker` each move the
+fingerprint, so this is one local `./gradlew assembleRelease` carrying all of it.
+
+**Before touching anything native:**
+
+```bash
+cp android/app/debug.keystore "$HOME/jarvis-debug.keystore.bak"
+keytool -list -v -keystore android/app/debug.keystore -storepass android | grep SHA256   # fac61745dc09…
+```
+
+**Never `prebuild --clean`** — it deletes that file, and `android/` is gitignored, so it
+is the only copy. Bake the new fingerprint into
+`android/app/src/main/res/values/strings.xml` by hand, run Gradle detached (a release
+build outruns the tool timeout), and install with `adb install -r`.
+
+**3. Then an evening with the phone, which is worth more than more code.**
+
+### Why that order, from going through the ten points
+
+**0 of 10 completion criteria are met, and the ceiling is 50% while the brain is
+frozen** — five of the ten need the gateway. Of the five that do not:
+
+| Point | Needs |
+| --- | --- |
+| 3 · reached without the app being opened | **watching it happen** |
+| 4 · he speaks and he listens | **watching it happen** (and `voice-out` is unwritten) |
+| 8 · a crash is visible | one queue item, `3` |
+| 9 · a second device is possible | **the keystore, i.e. the build above** |
+| 10 · usable without good sight | **the phone in hand** |
+
+**Only one of those five wants code.** Three are verification of features that already
+exist and that nobody has ever watched work, and one is a build. That is the same
+lesson this whole week paid for — *a feature nobody can observe is indistinguishable
+from a broken one* — and four of the ten points are sitting in exactly that gap.
+
+`voice` is **0 of 2 rows proved** and is the oldest unverified thing in the project.
+`voice-out` is app-side, `expo-speech`, no brain dependency, and has never been started.
 
 ### Read on the phone, 17:44 — and the number corrects a week of notes
 
