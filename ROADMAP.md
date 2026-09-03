@@ -321,7 +321,15 @@ Also visible: `Kaustav asked about Marco Polo`, which is not a fact about him at
 **One control bug found by the test and fixed:** FORGET was a `Touchable` and took three taps from a laptop without firing. Animated controls do not receive synthetic input — the trap this repo recorded on 2026-08-26 and walked into again. Every control on both offer sections is a plain `Pressable` now. |
 | A chat log that is not a one-day window | partial | App | `CHAT_CAP = 100` in `hudReducer.ts`, original and deliberate — a phone should not carry an unbounded log. Measured 2026-08-24: the whole persisted log spanned **Fri 20:03 to Sat 15:28**, so at real conversation pace 100 entries is about one day. Worth naming because the cap is silent: nothing tells you a turn is about to leave, and nothing is harvested before it does — see [facts-from-talking]. The brain keeps the turns; only the phone forgets.
 
-**2026-09-02: the silent half is no longer silent.** Candidates are harvested while a turn is still in the log, so `CHAT_CAP` now drops sentences that have already been offered rather than ones nobody ever saw. The cap itself is unchanged and still deliberate — a phone should not carry an unbounded log — so this row stays `partial`: what leaves is still not announced, it is merely no longer unread. |
+**2026-09-02: the silent half is no longer silent.** Candidates are harvested while a turn is still in the log, so `CHAT_CAP` now drops sentences that have already been offered rather than ones nobody ever saw. The cap itself is unchanged and still deliberate — a phone should not carry an unbounded log — so this row stays `partial`: what leaves is still not announced, it is merely no longer unread.
+
+**2026-09-03: the conversation now outlives the window it is rendered in.** Every turn goes into SQLite on the way through `saveChat`, **before the slice that trims to a hundred** — because that slice is exactly where a turn used to be lost. Chat gained *Load earlier* at the visual top of the inverted list, paging fifty at a time, deduped on the timestamp.
+
+**The cap is unchanged and that is the point.** A phone should not render an unbounded list, and the reducer still runs on the recent hundred; reading further back is something the screen does, not something the app carries. The AsyncStorage blob is untouched and still hydrates the app at launch — a database read before the first bubble appears would be a worse app for a feature nobody uses daily.
+
+`clearChat` empties both stores. A log somebody asked to forget must not survive in the one they cannot see.
+
+**Still `partial`, and now for one reason only: the archive starts from now.** There is nothing older than the window to fetch until the log passes a hundred turns, so the proof is scrolling up tomorrow and watching today come back. |
 | One assistant across desk, phone and chat | partial | Brain | App and chat share one history. A desk answering with its own brain bypasses it, so those turns never join the shared history. |
 | Rolling memory durable across restarts | partial | Brain | In Postgres, not RAM — the RAM claim was stale. Whether the shared-memory flag is actually on in Render's environment is unverified. |
 | Deploy-durable gateway state | untested | Brain | Committed on `fix/durable-state`, two commits ahead of the gateway branch, undeployed. Until it merges, every deploy silently disarms the briefing. |
@@ -341,7 +349,11 @@ Launchers and the system shell are excluded from `appDeltas` now, **matched by s
 **It also counts up rather than denying the evidence it holds.** `leftBy` wants four distinct days before it will call a time usual, and on 09-02 it had one — so the row fell back to the bound and said *nothing has watched you leave yet* while Monday's exit sat in the store. Two different claims, and only the second was true: `exitDaysAt` now feeds *"it has watched you leave once, and wants 4 before calling that your usual time"*.
 
 And the note printed literal `**asterisks**` — the panel renders plain text, so markdown emphasis arrives on screen as the characters themselves. |
-| Call log, archive import | — | App · build | Native build, and fatal for a store listing. |
+| Call log, archive import | — | App · build | Native build, and fatal for a store listing.
+
+**The build is the smaller half of this, and it is worth saying which is which.** `READ_CALL_LOG` is a restricted permission: Google grants it only to apps whose core function IS calling or messaging. For a sideloaded personal APK it costs a build and nothing else. For anything that ever goes near a store listing it is a rejection, not a warning.
+
+**So the decision comes before the work:** is this app ever intended to be distributed? Until that is answered, spending a native build on it risks building the thing that makes the app undistributable. |
 
 ### Knowing and acting
 

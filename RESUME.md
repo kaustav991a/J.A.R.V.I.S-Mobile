@@ -16,6 +16,42 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ 2026-09-03. The conversation outlives its window, and queue 7 finally ran.
+
+**`chat-window`: the phone stops forgetting a Tuesday on Wednesday.** Every turn goes
+into SQLite on the way through `saveChat`, before the slice that trims to a hundred —
+that slice is where a turn was lost. Chat gained *Load earlier* at the visual top of
+the inverted list, fifty at a time, deduped on the timestamp.
+
+The cap is deliberately unchanged. A phone should not render an unbounded list, the
+reducer still runs on the recent hundred, and the AsyncStorage blob still hydrates the
+app at launch. `clearChat` empties both, because a log somebody asked to forget must
+not survive in the one they cannot see. **Still `partial` for one reason: the archive
+starts from now**, so the proof is scrolling up tomorrow.
+
+**Queue 7 ran, eleven days after it was written.** Usage access revoked from the
+laptop, and the Journal read **NO ACCESS** · *"I cannot see your usage, sir — the
+permission is off"* — with **52,598 moments still listed underneath**. That last part
+is the whole test: it says *cannot see*, never *nothing recorded*, and proves the
+difference by showing what it holds while blind. Restored, it healed and caught up 47
+moments.
+
+### What is left in this app, honestly
+
+Two device-blocked rows, and one decision that is not a coding question.
+
+- `chat-window` needs a day to pass.
+- `anticipate-habit` needs four days of crossings; two departures and one arrival are
+  in.
+- **`call-log` needs a decision before a build.** `READ_CALL_LOG` is restricted:
+  Google grants it only to apps whose core function is calling or messaging. Sideloaded
+  it costs a build; on a store listing it is a rejection. **Is this app ever meant to be
+  distributed?** Building it first risks building the thing that makes it
+  undistributable.
+
+Everything else under *He remembers, and it survives a deploy* is gateway work, which
+is where that criterion has always really lived.
+
 ## ✅ 2026-09-02 evening / 09-03 morning. Two clean commutes, eleven departures, none false.
 
 The screenshot at 21:34 is the whole evening, in order, from a phone in a pocket:
