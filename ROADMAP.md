@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**58 of 90 rows are proved on the phone** (64%). 75 have code (83%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
+**58 of 91 rows are proved on the phone** (64%). 76 have code (84%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
 
 ### Transport, pairing, security
 
@@ -402,7 +402,7 @@ What it is worth: the journal starts the day the app was installed and the sight
 
 ### Knowing and acting
 
-*10 proved of 17.*
+*10 proved of 18.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -484,6 +484,13 @@ A journey that reads correctly as data: thirty-six minutes on the train, seven o
 **Verified on the phone 09-03: the build that recorded that morning already had every fix.** Updates reads runtime `1818e1b7`, channel `production`, Running **Downloaded**, update `01a0624e` — the arrival guard and the duplicate-delivery dedupe. So the clean enter/exit pairs were not luck: yesterday the same walk produced six phantom *"Reached Office"* rows in duplicate, and today produced a journey.
 
 **The label on the Settings row is the install time, not the version** — *"updated 2 Sep 18:58"* over a bundle published minutes later. Worth knowing before chasing a phantom stale build: the Update ID on the Updates screen is the figure that answers "is it current", and the date line is not. |
+| Sightings in a table that can hold years, not twelve weeks | undefined |  | **Sightings live in SQLite as of 2026-09-03, and nothing above them changed.** The store was one JSON blob in AsyncStorage, capped at 1,200 rows and filtered to the last 84 days *on every read* — so it destroyed the history every habit figure here rests on, and a Timeline export of seventeen months would have been thrown away as it arrived. `timeline.ts` keeps every signature; only its six I/O functions moved. `seenSince(days)` reads as far back as there is, `storeHeld()` says how much, and Places → Crossings recorded now prints **"N sightings held, reaching back M days"** — because a migration nobody can see is a migration nobody can trust, and *the import found nothing* must never look like *the store is empty*.
+
+The old blob is **kept, not deleted**. A few kilobytes, and the only way back if the migration is wrong.
+
+**Two design faults and one real bug, all found by tests during the move.** The plan keyed rows on the moment alone; a sweep is one delivery on one clock reading, so ten places at 18:31 collapsed to a single row and the burst rule had nothing left to recognise — the key is `(at, place)`. Dropping by moment then deleted a genuine arrival sharing a sweep's timestamp, so `drop` names the row. And `dropExitsAround` had always spared its own sighting, because a place is never far from itself: whichever handler recognised the burst wrote `noteSweep`, `inSweep` short-circuited every other handler, and **exactly one phantom departure survived every sweep** — invisible to the launch repair too, which needs two exits to see a burst. It would have become a departure time for a place he never left.
+
+Plan: `docs/superpowers/plans/2026-09-03-sightings-to-sqlite.md`. 1,485 tests, runtime unmoved at `5f318efe`, published as `601a95f0`. **Device row not yet read** — the phone was at the JARVIS unlock screen. |
 | He tells you when you left | proved |  | **Asked for on 2026-09-01, in this shape: exits only, with a cooldown.** Ten named places reporting both crossings is a phone that buzzes all day about things you already know; the departure is the one carrying a figure the app could never measure before.
 
 *"Left Office — 7:05 PM. Noted, sir."*, on the general channel, two to five minutes after the boundary is crossed and ten seconds after that. Forty-five minutes of quiet per place afterwards, per place rather than per phone, because leaving home and reaching the office are fifteen minutes apart on one morning.

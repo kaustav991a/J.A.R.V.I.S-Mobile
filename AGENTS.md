@@ -327,6 +327,35 @@ of rediscovering them is high.
   `(AsyncStorage.setItem as jest.Mock).mockRejectedValueOnce(...)` to make one call
   fail and leave the implementation alone.
 
+- **A store that is a module-level singleton needs a fresh one per test.** `timeline.ts`
+  opens the sighting database once and caches it, so without
+  `useSeenStore(await openSeenStore(':memory:'))` in `beforeEach`, one test's sightings
+  become the next test's history — and the failure reads *"expected 1, received 18"*,
+  which looks like a broken dedupe rule rather than leakage.
+- **`at INTEGER PRIMARY KEY` is wrong for anything the platform delivers in a batch.**
+  A Play Services geofence sweep is one delivery on one clock reading: ten regions can
+  report at the identical millisecond. Keyed on the moment alone, SQLite's
+  `INSERT OR IGNORE` silently kept one of the ten and the burst rule had nothing left
+  to recognise. The row's identity is `(at, place)`.
+- **A delete keyed on the moment takes the innocent rows with it.** Office `enter`,
+  Home `exit` and Sector V `exit` all arrived at 18:31 from one sweep;
+  `DELETE WHERE at = ?` removed the genuine arrival along with the two artifacts. Name
+  the row, not the moment.
+- **`$CLAUDE_JOB_DIR` is not exported into `node -e`'s environment by default.**
+  `node -e "fs.readFileSync(process.env.T + '/x.txt')"` reads `undefined/x.txt` and
+  throws `ENOENT` with a path that contains the literal word `undefined` — which is the
+  tell. Pass it explicitly: `VAR=value node -e '…process.env.VAR…'`.
+- **`adb shell cat /sdcard/x` mangles the path in Git Bash.** MSYS rewrites a leading
+  `/` into the Windows install prefix, so it reads `C:/Program Files/Git/sdcard/x` and
+  reports `No such file or directory` from the *host*, not the phone. Use
+  `adb exec-out cat //sdcard/x` (double slash) or quote the whole remote command.
+- **The package is `com.mypersonalintelligence.jarvis`, and the launcher activity is not
+  `.MainActivity` under that name.** `am start -n com.kaustav.jarvis/.MainActivity`
+  fails with `Error type 3`. Use
+  `adb shell monkey -p com.mypersonalintelligence.jarvis -c android.intent.category.LAUNCHER 1`.
+- **An OTA lands on the launch *after* the one that downloads it.** Force-stop and
+  relaunch twice, or the screen you are reading is still the old bundle.
+
 ## House style
 
 Comments explain *why*, especially where the obvious approach was tried and

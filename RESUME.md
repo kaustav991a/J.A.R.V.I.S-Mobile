@@ -16,7 +16,77 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-09-03, 16:15. Start here. **Supersedes the 09-02 stop point below.**
+## 🛑 STOP POINT — 2026-09-03, evening. Start here. **Supersedes the 16:15 point below.**
+
+**`feat/mobile-hud` at `eaba64f`. 1,485 tests, 101 suites, `tsc` clean,
+`build-status --check` up to date. 91 rows, 58 proved (64%).**
+
+**Runtime is `5f318efec8f8903cb5585c0d8859a65aaba57f8f` and did NOT move today** —
+everything below is JavaScript. Published to `production` as update group
+`601a95f0-c256-4a7e-bfc8-cba0e4dc7e60`. The APK is still the local
+`./gradlew assembleRelease` signed with `android/app/debug.keystore` (cert
+`fac61745dc09`); read the 16:15 entry below before touching the keystore or `prebuild`.
+
+### Sightings moved to SQLite — Plan A, all five tasks
+
+`docs/superpowers/plans/2026-09-03-sightings-to-sqlite.md`, executed inline with a
+checkpoint per task. The store was one JSON blob capped at 1,200 rows **and filtered to
+the last 84 days on every single read**, so it was actively deleting the history that
+every habit figure in this app rests on — and a Timeline export of seventeen months
+would have been discarded as it arrived.
+
+- `src/lib/seenStore.ts` — the table, the reads and writes it owns, and `migrateOnce`.
+  **The old blob is kept, not deleted**: a few kilobytes, and the only way back.
+- `src/lib/timeline.ts` — the six I/O functions go through the table. Every signature
+  above them is unchanged; `useSeenStore(s)` exists for tests. The TTL filter is gone.
+- `seenSince(days)` reads as far back as there is. `loadSeen()` stays a window, because
+  it runs on every screen focus.
+- `storeHeld()` and a new line on **Places → Crossings recorded**:
+  *"N sightings held, reaching back M days"*.
+
+**Not yet read on the device.** The phone was at the JARVIS unlock screen when the
+update landed. **First thing next session: Places → Crossings recorded.** If it reads
+*Nothing held yet*, the migration did not run — chase that, not the import.
+
+### Three things the tests caught, and one of them was a live bug
+
+Two were faults in my own plan. It keyed rows on the moment alone: a sweep is **one
+delivery on one clock reading**, so ten places leaving at 18:31 collapsed into a single
+row and the burst rule had nothing left to recognise. The key is `(at, place)`. Then
+dropping by moment deleted a *real arrival* that shared a sweep's timestamp — Office
+`enter` with Home and Sector V `exit`, all at 18:31 — so `drop` names the row now.
+
+The third was shipped code. **`dropExitsAround` spared its own sighting**, because a
+place is never far from itself. Whichever handler recognised the burst wrote
+`noteSweep`, and `inSweep` then short-circuits every other handler before it can
+prune — so **exactly one phantom departure survived every sweep**. One lone exit is
+also invisible to the launch repair, which needs two to see a burst. It would simply
+have become a departure time for a place he never left. Regression test added.
+
+### What is left, in the order I would take it
+
+1. **`archive-import` Plan B — queue 27.** Needs a **native build**: the parser is
+   streaming Kotlin in a new `modules/` directory, and that is a fingerprint input, so
+   expect one more runtime move and a local `assembleRelease`. Owes, in order: the
+   parser; `via: 'import'` counted by the habit figures and **never reported as
+   measured**; matching against `seenSince` so importing twice imports once; naming
+   unnamed clusters **by consent, not the Places API**; the import screen.
+2. **`voice-out`** — app-side, `expo-speech`, no brain dependency, not started.
+3. **`chat-window`** — needs the log past a hundred turns. A day.
+4. **`anticipate-habit`** — needs four days of crossings. Two departures and two
+   arrivals are in.
+5. **Queue 26, the security pass** — asked for explicitly and asked to be kept last.
+   Threat model first: at rest, backup, `FLAG_SECURE`, and what leaves the phone.
+6. **The brain**, when the freeze lifts, owes two things: stop distilling chat into
+   facts by itself, then `situation-block`.
+
+### The stated rhythm still does not match what is being worked
+
+*"from monday to friday work on brain, saturday and sunday desktop"* — and the brain has
+been frozen all week by a standing instruction while this app took every sitting.
+Left unresolved on purpose; it is a scheduling call, not a technical one.
+
+## 🛑 STOP POINT — 2026-09-03, 16:15. Superseded by the evening point above.
 
 **`feat/mobile-hud` at `814b989`. 1457 tests, 99 suites, `tsc` clean,
 `build-status --check` up to date. 90 rows, 58 proved (64%).**
