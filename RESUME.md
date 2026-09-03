@@ -16,6 +16,43 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+## ✅ 2026-09-02 evening / 09-03 morning. Two clean commutes, eleven departures, none false.
+
+The screenshot at 21:34 is the whole evening, in order, from a phone in a pocket:
+
+> Left Office · **7:07 PM** · Left Sector V Metro Station · 7:21 · Left Sealdah Rail
+> Station · 8:12 · Left Mousumi's Home · 9:21 · Left Musalman Para · 9:26 · Left
+> Laxminath Nagar · 9:29
+
+and above it the seven o'clock briefing — *"Before Office is behind you, sir.
+Thunderstorms forecast… a 64% chance of rain on your way out, around 3.0 mm. An
+umbrella exists for precisely this forecast. Yours, specifically."*
+
+The next morning did it in reverse: **Home 8:07 · Laxminath Nagar 8:10 · Musalman Para
+8:11 · Barrackpore 8:47 · Sealdah 9:30.**
+
+### What that proves, all at once
+
+Every rule written under fire the previous day holds:
+
+- **distance** telling overlapping circles from a platform sweep — Mousumi's, Musalman
+  Para and Laxminath Nagar are minutes apart and all three were reported, which is the
+  bug he opened the day with
+- **the ten-minute contradiction window**, which stopped deleting commutes for being
+  chains of exits from different places
+- **the fresh-fix second opinion**, which refused the drifting departures that produced
+  *"Left Office"* from a desk he had not left
+- **the burst race**, closed, so two sweep exits in one second cannot both slip through
+
+`places` is PROVED on the last question it had: two circles 150 m apart. A coherent
+sequence in both directions settles it — a wrong radius scrambles the order or repeats
+a name, and a guard set too tight drops the middle ones, which is precisely what the
+sweep rule had been doing.
+
+**And 7:07 PM is the second measured office departure**, against a man who says he
+leaves at seven. Two more days and `leftBy` starts quoting it instead of the old
+app-open bound.
+
 ## 🛑 STOP POINT — 2026-09-02, 19:00. Start here.
 
 **`feat/mobile-hud` at `4130e85`. 1410 tests, 97 suites, `tsc` clean,
