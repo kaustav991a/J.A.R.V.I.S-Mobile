@@ -14,6 +14,8 @@ import * as Clipboard from 'expo-clipboard';
 import { turnMark } from '../lib/turnMark';
 import { captionOf } from '../lib/photoTurn';
 import { anticipate } from '../lib/anticipate';
+import { lostTouch, missedToday } from '../lib/calls';
+import { recentCalls } from '../../modules/call-log';
 import { loadSpoken, noteSpoken } from '../lib/spokenStore';
 import {
   absentFrom,
@@ -269,13 +271,16 @@ export function ChatScreen() {
         try {
           const now = new Date();
           const journal = await openJournal();
-          const [spokenBefore, departure, usage, seen, apps, commute] = await Promise.all([
+          const [spokenBefore, departure, usage, seen, apps, commute, calls] = await Promise.all([
             loadSpoken(),
             dueToday(now),
             usageForAsk(journal, now.getTime()).catch(() => null),
             loadSeen(),
             appDeltas(journal, now.getTime()).catch(() => []),
             loadCommute(),
+            // read fresh and never kept: the call log is already on the device, and a
+            // copy would be a second thing to secure for a read that takes milliseconds
+            recentCalls(now.getTime()).catch(() => []),
           ]);
           if (!alive) return;
           const said = anticipate({
@@ -352,6 +357,15 @@ export function ChatScreen() {
               goneBy: usuallyGoneBy(seen, label, now),
               days: daysSeenAt(seen, label, now),
             })),
+            /**
+             * The people, derived on the phone and never uploaded.
+             *
+             * `calls` holds no phone numbers — the native side hashes them before they
+             * cross into JavaScript — so the worst these two can say is a name Android
+             * had already cached against a call.
+             */
+            missed: missedToday(calls, now),
+            lostTouch: lostTouch(calls, now),
             spokenBefore,
           });
           if (!said) return;

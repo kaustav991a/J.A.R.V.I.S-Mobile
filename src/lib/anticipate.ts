@@ -75,6 +75,10 @@ export type Observations = {
    * fallback for a heavy day spread across everything.
    */
   topApp: { app: string; today: number; usual: number; days: number } | null;
+  /** somebody who tried more than once today, named only if Android had a name */
+  missed?: { name: string | null; count: number } | null;
+  /** the person whose silence is furthest past their own usual */
+  lostTouch?: { name: string; days: number; usual: number } | null;
   /**
    * An arrival well before the hour he usually gets there, from `hereEarly`.
    *
@@ -178,6 +182,8 @@ export function anticipate(o: Observations): Remark | null {
     earlyRemark(o),
     scheduleRemark(o),
     appRemark(o),
+    missedRemark(o),
+    lostTouchRemark(o),
     usageRemark(o),
     pickupsRemark(o),
   ];
@@ -265,6 +271,46 @@ function scheduleRemark(o: Observations): Remark | null {
     line:
       `Your ${s.place} departure is set for ${clock(s.setAt)}, sir, ` +
       `and you were last seen there by ${clock(s.goneBy)} on ${s.days} days.`,
+  };
+}
+
+/**
+ * Somebody who tried to reach you more than once today.
+ *
+ * Ranked above the quiet-friendship remark and below everything about where he is: a
+ * missed call can be returned this afternoon, which is the test every trigger above it
+ * also passes.
+ */
+function missedRemark(o: Observations): Remark | null {
+  if (!o.missed) return null;
+  const { name, count } = o.missed;
+  return {
+    about: 'missed',
+    // a caller Android had no name for is a number, and this app does not invent one
+    line: name
+      ? `${count} missed calls from ${name} today, sir.`
+      : `${count} missed calls from one number today, sir.`,
+  };
+}
+
+/**
+ * Somebody you have not spoken to in far longer than you usually do.
+ *
+ * **Against their own pattern, never against each other.** Somebody spoken to every
+ * ten days is not neglected on day nine, and somebody spoken to daily is missed by
+ * Wednesday; one threshold across an address book would be wrong about both.
+ *
+ * The figures are quoted for the usual reason — a remark that cannot name its own
+ * basis is the thing this file refuses to make.
+ */
+function lostTouchRemark(o: Observations): Remark | null {
+  if (!o.lostTouch) return null;
+  const { name, days, usual } = o.lostTouch;
+  return {
+    about: 'calls',
+    line: `${days} days since you spoke to ${name}, sir — usually it is every ${
+      usual === 1 ? 'day' : `${usual} days`
+    }.`,
   };
 }
 

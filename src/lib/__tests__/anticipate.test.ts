@@ -404,3 +404,71 @@ describe('being somewhere your weekdays say you are not', () => {
     expect(said?.about).toBe('place');
   });
 });
+
+describe('the people, not the places', () => {
+  /**
+   * Asked for on 2026-09-03: *notice who I have lost touch with*.
+   *
+   * Ranked below everything about where he is, and above the screen-time remarks. A
+   * departure can be acted on in the next ten minutes; a friendship cannot be repaired
+   * in ten minutes but is worth more than a day's app total.
+   */
+  const base = (over: Partial<Observations> = {}): Observations => ({
+    now: new Date('2026-09-03T13:00:00'),
+    usage: null,
+    departure: null,
+    pickups: null,
+    place: null,
+    stillHereLate: false,
+    goneBy: null,
+    goneTo: null,
+    topApp: null,
+    early: null,
+    absent: null,
+    left: null,
+    elsewhere: null,
+    schedule: null,
+    spokenBefore: null,
+    ...over,
+  });
+
+  it('says who has gone quiet, with both figures', () => {
+    const said = anticipate(base({ lostTouch: { name: 'Mousumi', days: 6, usual: 2 } }));
+    expect(said?.about).toBe('calls');
+    expect(said?.line).toContain('Mousumi');
+    expect(said?.line).toContain('6');
+    expect(said?.line).toContain('2');
+  });
+
+  it('mentions somebody who tried more than once today', () => {
+    const said = anticipate(base({ missed: { name: 'Rahul', count: 3 } }));
+    expect(said?.line).toContain('Rahul');
+    expect(said?.line).toContain('3');
+  });
+
+  it('says a number tried rather than naming one it does not know', () => {
+    const said = anticipate(base({ missed: { name: null, count: 3 } }));
+    expect(said?.line).toMatch(/number|caller/i);
+    expect(said?.line).not.toMatch(/null|undefined/);
+  });
+
+  it('puts a missed call today above a friendship that has been quiet for a week', () => {
+    // one can be answered this afternoon; the other is a standing fact
+    const said = anticipate(
+      base({ missed: { name: 'Rahul', count: 3 }, lostTouch: { name: 'Mousumi', days: 6, usual: 2 } })
+    );
+    expect(said?.about).toBe('missed');
+  });
+
+  it('ranks both below where he is, which can be acted on now', () => {
+    const said = anticipate(
+      base({
+        place: 'Office',
+        stillHereLate: true,
+        goneBy: 19 * 60 + 8,
+        missed: { name: 'Rahul', count: 3 },
+      })
+    );
+    expect(said?.about).toBe('place');
+  });
+});
