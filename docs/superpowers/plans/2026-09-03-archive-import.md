@@ -369,8 +369,12 @@ export function leftBy(
 ```
 
 `arrivalHour` takes the identical shape with `'enter'` / `'import-enter'` and
-`pick: 'first'`, returning `source: 'crossing' | 'import'` — and `null` rather than an
-app-open fallback, which it has never had.
+`pick: 'first'`, and the same three-way `source`.
+
+**Corrected while executing:** this plan claimed `arrivalHour` had no app-open fallback.
+It does — `usuallyHereBy`, which is where *"usually you are there by 11:51 AM"* came
+from. Removing it would have deleted a working figure, so the fallback stays and
+returns `source: 'app-open'`.
 
 `exitDaysAt` counts both kinds:
 

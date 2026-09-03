@@ -18,7 +18,7 @@
 
 ## 🛑 STOP POINT — 2026-09-03, evening. Start here. **Supersedes the 16:15 point below.**
 
-**`feat/mobile-hud` at `b3c94b7`. 1,485 tests, 101 suites, `tsc` clean,
+**`feat/mobile-hud` at `6adf351`. 1,495 tests, 102 suites, `tsc` clean,
 `build-status --check` up to date. 91 rows, 59 proved (65%).**
 
 **Runtime is `5f318efec8f8903cb5585c0d8859a65aaba57f8f` and did NOT move today** —
@@ -99,6 +99,23 @@ and then refuse to announce a real arrival.
 recorded` must still read six crossings rather than eight thousand. That one observation
 is what proves Task 1 was right, and no test in the plan can prove it the way reading
 the row does.
+
+### Task 1 of the import plan is done — start at Task 2
+
+`6adf351`. `Seen.via` gains `import-enter` and `import-exit`; `leftBy` and
+`arrivalHour` count imported rows and return a `source`; `putMany`, `dropImported` and
+`forgetImported` exist; and the three truthiness checks on `.via` that silently meant
+*a geofence crossing* now say `isCrossing`. 1,495 tests, 102 suites, `tsc` clean.
+
+**Runtime still `5f318efe` — checked after the commit.** Not published yet: Tasks 1 and
+2 are one shipment, per the plan.
+
+One correction to the plan, made while executing it: it claimed `arrivalHour` had no
+app-open fallback. It does, and removing it would have deleted the figure that produced
+*"usually you are there by 11:51 AM"*. The fallback stays and reports
+`source: 'app-open'`.
+
+**Next: Task 2** — `src/lib/archive.ts`, pure matching arithmetic, 18 tests, no build.
 
 ### What is left, in the order I would take it
 
