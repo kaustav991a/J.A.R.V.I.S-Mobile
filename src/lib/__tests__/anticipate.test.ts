@@ -472,3 +472,47 @@ describe('the people, not the places', () => {
     expect(said?.about).toBe('place');
   });
 });
+
+describe('a person outranks an app', () => {
+  const base = (over: Partial<Observations> = {}): Observations => ({
+    now: new Date('2026-09-03T13:00:00'),
+    usage: null,
+    departure: null,
+    pickups: null,
+    place: null,
+    stillHereLate: false,
+    goneBy: null,
+    goneTo: null,
+    topApp: null,
+    early: null,
+    absent: null,
+    left: null,
+    elsewhere: null,
+    schedule: null,
+    spokenBefore: null,
+    ...over,
+  });
+
+  it('puts somebody who has gone quiet above an app that is up on its usual', () => {
+    // measured on the phone, 2026-09-03: "1h 5m in Instagram today against a usual
+    // 21m" spoke while the call remarks sat below it. An hour of Instagram is a fact
+    // about a phone; a fortnight of silence is a fact about a person
+    const said = anticipate(
+      base({
+        topApp: { app: 'Instagram', today: 65, usual: 21, days: 9 },
+        lostTouch: { name: 'Mousumi', days: 14, usual: 2 },
+      })
+    );
+    expect(said?.about).toBe('calls');
+  });
+
+  it('puts a missed call above it too', () => {
+    const said = anticipate(
+      base({
+        topApp: { app: 'Instagram', today: 65, usual: 21, days: 9 },
+        missed: { name: 'Rahul', count: 3 },
+      })
+    );
+    expect(said?.about).toBe('missed');
+  });
+});

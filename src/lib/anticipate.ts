@@ -181,9 +181,11 @@ export function anticipate(o: Observations): Remark | null {
     elsewhereRemark(o),
     earlyRemark(o),
     scheduleRemark(o),
-    appRemark(o),
+    // a person before an app: an hour of Instagram is a fact about a phone, and a
+    // fortnight of silence is a fact about somebody you know
     missedRemark(o),
     lostTouchRemark(o),
+    appRemark(o),
     usageRemark(o),
     pickupsRemark(o),
   ];
