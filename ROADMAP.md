@@ -392,7 +392,13 @@ The whole chain in one sentence: Android's call log, hashed in Kotlin, derived o
 
 What it is worth: the journal starts the day the app was installed and the sightings start twelve weeks ago, so every habit figure is young. An import is the only route to a memory older than the app itself.
 
-**The parsing is the whole job and it is unglamorous** — a Takeout location history is JSON in a shape Google changes without notice, and a DYI export is HTML or JSON depending on the year. Worth a spike before a spec. |
+**The parsing is the whole job and it is unglamorous** — a Takeout location history is JSON in a shape Google changes without notice, and a DYI export is HTML or JSON depending on the year. Worth a spike before a spec.
+
+**Spike run 2026-09-03, and the answer is build it.** The on-device export exists — *Settings → Location → Location Services → Timeline → Export Timeline data* — and wrote a 47.2 MB `Timeline.json` holding **11,570 segments: 4,000 visits with places across 529 distinct days**, from 8 Mar 2025 to today. The floor for building was thirty days.
+
+**The clusters corroborate this week's measurements.** Office arrival sits at **09:49 across 344 days**, against the app's current *"usually you are there by 11:51 AM"* — a median of four app-opens by a man at his desk since ten. Sealdah matches the crossing recorded on 09-03 to the minute.
+
+**The one hard problem is size:** 47 MB parses on a laptop in seconds and would take the phone down, so the importer streams, pre-filters, or does the work in Kotlin. Everything else is already decided — join on `AT_PLACE_KM` the way `nameFor` does, mark imported sightings so they cannot pose as measured ones, and show the count and range before writing anything. |
 
 ### Knowing and acting
 

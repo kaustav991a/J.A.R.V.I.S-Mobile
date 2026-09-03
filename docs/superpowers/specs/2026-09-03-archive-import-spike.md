@@ -101,3 +101,58 @@ the script never uploads anything and never writes to the app's store.
 Out of scope for this spike. It carries messages and calls rather than places, so it
 answers a different question and should get its own probe once the location one is
 settled.
+
+## The answer, 2026-09-03
+
+**BUILD IT.** The probe ran against the real export and every question came back well
+past its floor.
+
+The export exists and is the **on-device shape**: `semanticSegments`, each one a
+`visit`, an `activity` or a `timelinePath`. Taken from
+*Settings → Location → Location Services → Timeline → Export Timeline data*, which
+wrote `Timeline.json` to Downloads — **47.2 MB**.
+
+| | |
+| --- | --- |
+| segments | 11,570 — 4,000 visits, 4,406 activities, 3,163 paths |
+| visits carrying a place | **4,000** |
+| distinct days | **529** |
+| range | 8 Mar 2025 → 3 Sep 2026 |
+
+The floor was thirty days. It cleared it by a factor of seventeen.
+
+### It is his life, and it corroborates what the app measured this week
+
+Clustered to about a hundred metres, the top of the list is unmistakable:
+
+| Cluster | Visits | Days | Typical arrival |
+| --- | --- | --- | --- |
+| 22.81515, 88.37191 — Home | 751 | 516 | 20:55 |
+| 22.57705, 88.43435 — Office | 699 | 344 | **09:49** |
+| 22.56779, 88.37102 — Sealdah | 381 | 259 | 09:23 |
+| 22.76020, 88.37090 — Barrackpore | 321 | 301 | 08:19 |
+
+**Office arrival at 09:49 across 344 days**, against the app's current *"usually you
+are there by 11:51 AM"* — a median of four app-opens by a man at his desk since ten.
+And Sealdah at 09:23 matches the geofence crossing recorded on 09-03 to the minute,
+which is the strongest evidence available that the two sources agree.
+
+### What the spec has to solve
+
+1. **47 MB cannot be `JSON.parse`d on a phone.** It parses on a laptop in seconds and
+   would take the app down. The importer streams, or filters before parsing, or does
+   the work in Kotlin — that is the first design decision and the only hard one.
+2. **Matching.** A visit is coordinates; a sighting is a named place. The join is
+   `distanceKm <= AT_PLACE_KM`, the same rule `nameFor` already uses, so an imported
+   visit is only kept when it lands inside a circle he has named.
+3. **Marking.** `via` separates a crossing from an app-open. Imports need their own
+   value, because 529 days of imported history silently outvoting four days of
+   measured crossings is this project's oldest mistake in its newest coat.
+4. **Consent.** He sees the count, the range and the places before anything is written,
+   and says yes. Same shape as the memory candidates.
+
+### What it would be worth
+
+Every habit figure the app quotes today rests on two to twelve weeks. This is
+**seventeen months**, and it makes `usuallyHereBy`, `leftBy`, `nextSeenElsewhere` and
+`anticipate-habit` true on the day it lands rather than in a fortnight.
