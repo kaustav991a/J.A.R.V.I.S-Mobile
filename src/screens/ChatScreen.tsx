@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Image, FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, FlatList, Pressable, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -45,6 +45,7 @@ import { MIN_CLIP_MS, RECORDING, meterLevel, prepareToRecord, readClip } from '.
 import { haptic } from '../lib/haptics';
 import { useAuth } from '../security/AuthProvider';
 import { useJarvis } from '../state/JarvisProvider';
+import { EARLIER_PAGE, earlierThan } from '../state/chatStore';
 import { takeShot } from '../lib/vision';
 import type { ChatEntry } from '../state/hudReducer';
 import type { CommandsStackParams } from '../navigation/types';
@@ -126,8 +127,40 @@ export function ChatScreen() {
   const toast = useToast();
   const list = useRef<FlatList<ChatEntry>>(null);
 
-  // newest first, because the list is inverted
-  const turns = [...hud.chat].reverse();
+  /**
+   * Turns read back from the archive, above the live window.
+   *
+   * `CHAT_CAP` renders a hundred, which is about a day, and everything before that
+   * lives in the archive rather than in the reducer. Kept here rather than dispatched
+   * into the log deliberately: the state the app runs on stays the recent window, and
+   * reading further back is a thing this screen does, not a thing the app carries.
+   */
+  const [earlier, setEarlier] = useState<ChatEntry[]>([]);
+  const [reachedStart, setReachedStart] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+
+  const loadEarlier = async () => {
+    const oldest = earlier[0]?.at ?? hud.chat[0]?.at;
+    if (!oldest || loadingEarlier) return;
+    setLoadingEarlier(true);
+    try {
+      const page = await earlierThan(oldest, EARLIER_PAGE);
+      // deduped on the timestamp, which is the log's own identity for a turn: the
+      // window and the archive overlap by design, and a turn shown twice reads as the
+      // app having said it twice
+      const held = new Set([...earlier, ...hud.chat].map((t: ChatEntry) => t.at));
+      const fresh = page.filter((t) => !held.has(t.at));
+      if (!fresh.length) setReachedStart(true);
+      else setEarlier((was) => [...fresh, ...was]);
+    } catch {
+      setReachedStart(true);
+    } finally {
+      setLoadingEarlier(false);
+    }
+  };
+
+  // newest first, because the list is inverted, and the archive sits below the window
+  const turns = [...earlier, ...hud.chat].reverse();
   const thinking = hud.status === 'thinking' || hud.status === 'agent';
 
   /**
@@ -754,6 +787,30 @@ export function ChatScreen() {
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={waiting ? <Typing accent={accent} /> : null}
+            /**
+             * The way further back, at the visual top of an inverted list.
+             *
+             * `ListFooterComponent` because the list is inverted: the footer of the
+             * data is the top of the screen, which is where "earlier" belongs and
+             * where a person scrolling up arrives.
+             */
+            ListFooterComponent={
+              reachedStart || !turns.length ? null : (
+                <Pressable
+                  testID="chat-earlier"
+                  accessibilityRole="button"
+                  accessibilityLabel="Load earlier messages"
+                  onPress={() => {
+                    void loadEarlier();
+                  }}
+                  style={({ pressed }) => [styles.earlier, pressed ? styles.pressed : null]}
+                >
+                  <Text style={styles.earlierText}>
+                    {loadingEarlier ? 'Reading…' : 'Load earlier'}
+                  </Text>
+                </Pressable>
+              )
+            }
             // No tap target. A reply used to open the Command Result terminal
             // view, which reads as a mis-tap: a chat bubble that navigates away is
             // not what a chat bubble does, and the terminal framing suits a run's
@@ -1089,6 +1146,14 @@ function Typing({ accent }: { accent: string }) {
 }
 
 const styles = StyleSheet.create({
+  // sits at the visual top of the inverted list, small enough to read as a way back
+  // rather than as an action somebody is being asked to take
+  // a Pressable has no feedback of its own, and this one is deliberately not a
+  // Touchable so that it can be driven from a laptop like every other control added
+  // since 2026-08-26
+  pressed: { opacity: 0.5 },
+  earlier: { alignSelf: 'center', paddingVertical: SPACE.md, paddingHorizontal: SPACE.lg },
+  earlierText: { ...TYPE.meta, fontSize: 11, letterSpacing: 1, color: COLOR.dim },
   root: { flex: 1, backgroundColor: COLOR.bg },
   fill: { flex: 1 },
   head: { paddingHorizontal: SPACE.lg },

@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChatEntry } from './hudReducer';
+import { openArchive } from './chatArchive';
+import type { Archive } from './chatArchive';
 
 /**
  * The conversation, kept across launches.
@@ -53,7 +55,45 @@ export async function loadChat(): Promise<ChatEntry[]> {
   }
 }
 
+/**
+ * The archive, opened once and kept.
+ *
+ * Held rather than opened per call: `saveChat` runs on every change, and opening a
+ * database four hundred milliseconds apart all day would be a cost paid for nothing.
+ * A failure to open is remembered as null so the log still saves — the archive is the
+ * long memory, and the window is the one somebody is looking at.
+ */
+let archive: Archive | null = null;
+let opening: Promise<Archive | null> | null = null;
+
+const theArchive = async (): Promise<Archive | null> => {
+  if (archive) return archive;
+  if (!opening) {
+    opening = openArchive()
+      .then((a) => {
+        archive = a;
+        return a;
+      })
+      .catch(() => null);
+  }
+  return opening;
+};
+
+/** for tests and for the switch that forgets the conversation */
+export const useArchive = (a: Archive | null): void => {
+  archive = a;
+  opening = a ? Promise.resolve(a) : null;
+};
+
 export async function saveChat(chat: ChatEntry[]): Promise<void> {
+  try {
+    // archived BEFORE the slice, because the slice is where a turn is lost: the
+    // window keeps the last hundred and the archive keeps the conversation
+    const kept = await theArchive();
+    if (kept) await kept.archive(chat);
+  } catch {
+    // the long memory failing must never cost the short one
+  }
   try {
     await AsyncStorage.setItem(KEY, JSON.stringify(chat.slice(-CHAT_KEEP)));
   } catch {
@@ -61,8 +101,34 @@ export async function saveChat(chat: ChatEntry[]): Promise<void> {
   }
 }
 
+/** how many turns come back per tap of "load earlier" */
+export const EARLIER_PAGE = 50;
+
+/**
+ * A page of conversation from before a moment.
+ *
+ * The screen's way into the archive, kept here so the screen holds no database
+ * knowledge and so the paging is testable without rendering anything.
+ */
+export async function earlierThan(at: number, limit: number = EARLIER_PAGE): Promise<ChatEntry[]> {
+  try {
+    const kept = await theArchive();
+    return kept ? await kept.olderThan(at, limit) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** forget the conversation — the only way back from a log you do not want kept */
 export async function clearChat(): Promise<void> {
+  try {
+    // both stores, and this is the point rather than tidiness: a log somebody asked
+    // to forget must not survive in the one they cannot see
+    const kept = await theArchive();
+    if (kept) await kept.forgetAll();
+  } catch {
+    /* nothing archived, or nothing openable */
+  }
   try {
     await AsyncStorage.removeItem(KEY);
   } catch {
