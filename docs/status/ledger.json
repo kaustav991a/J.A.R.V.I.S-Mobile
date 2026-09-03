@@ -1140,9 +1140,9 @@
     {
       "n": 7,
       "title": "The journal denial path, and the other never-run paths",
-      "state": "open",
-      "blockedBy": "device",
-      "detail": "Settings → Journal → usage access off → return. It must say *I cannot see your usage*, never *Nothing recorded*. Built, tested, and never once run by a human. Same sitting: the location timeline and anticipation v1, both unexercised for the same reason.",
+      "state": "proved",
+      "blockedBy": "none",
+      "detail": "Settings → Journal → usage access off → return. It must say *I cannot see your usage*, never *Nothing recorded*. Built, tested, and never once run by a human. Same sitting: the location timeline and anticipation v1, both unexercised for the same reason.\n\n**RUN 2026-09-03, and it passes on both halves.** Usage access revoked from the laptop (`appops set … android:get_usage_stats deny`), the app restarted, and the Journal read:\n\n> **NO ACCESS** · TODAY — *\"I cannot see your usage, sir — the permission is off.\"* · HELD ON THIS DEVICE — Moments **52,598**, Day totals 921, Leaves the phone **Never**\n\n**It says *cannot see*, never *nothing recorded* — and it proves the difference by still showing the 52,598 moments it holds.** A screen claiming an empty journal over three years of stored moments is the failure this row was written to catch.\n\n**And it healed.** Permission restored, app restarted: *ON THIS PHONE* · *\"5h 23m on the phone, sir, across 43 pickups. Facebook 56m, Instagram 50m, eFootball 45m\"* · *\"Last synced 1:08 PM. 47 new moments\"* — it caught up what it could not see while it was denied.\n\nThe two siblings named in this entry are closed as well: `timeline` was proved on 08-27 and `anticipate-v1` on 09-02.",
       "goal": "memory"
     },
     {
