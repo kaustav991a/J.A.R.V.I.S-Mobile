@@ -1,4 +1,4 @@
-import { lostTouch, missedToday, usualGapDays } from '../calls';
+import { callSummary, lostTouch, missedToday, usualGapDays } from '../calls';
 import type { Call } from '../calls';
 
 /**
@@ -95,5 +95,27 @@ describe('missed calls today', () => {
 
   it('is not confused by answered calls', () => {
     expect(missedToday([call('Rahul', 0), call('Rahul', 0)], new Date(NOW))).toBeNull();
+  });
+});
+
+describe('what it managed to read', () => {
+  /**
+   * The row that answers *did it read anything at all*.
+   *
+   * On 2026-09-03 the app spoke about Instagram twice while the call triggers said
+   * nothing, and there was no way to tell a module that had not loaded from a call log
+   * where nobody was overdue. Those want different fixes and looked identical.
+   */
+  it('counts the calls and the people behind them', () => {
+    const calls = [call('Mousumi', 1), call('Mousumi', 3), call('Rahul', 2), call(null, 4)];
+    expect(callSummary(calls)).toMatchObject({ calls: 4, people: 2 });
+  });
+
+  it('says how far back the reading goes, since that is what a habit is built from', () => {
+    expect(callSummary([call('Mousumi', 30), call('Mousumi', 1)]).days).toBe(30);
+  });
+
+  it('answers zero rather than nothing, so the row can say it read none', () => {
+    expect(callSummary([])).toEqual({ calls: 0, people: 0, days: 0 });
   });
 });

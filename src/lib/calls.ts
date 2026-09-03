@@ -127,3 +127,23 @@ export function missedToday(
   if (most.length < MISSED_FLOOR) return null;
   return { name: most.find((c) => c.name)?.name ?? null, count: most.length };
 }
+
+/**
+ * What a read managed to see, for a row that has to say so.
+ *
+ * On 2026-09-03 the app spoke about Instagram twice while both call triggers stayed
+ * silent, and nothing on screen could tell **a module that had not loaded** from **a
+ * call log where nobody is overdue**. Those want completely different fixes and looked
+ * identical from outside — which is the failure this project has now shipped five
+ * times.
+ */
+export function callSummary(calls: Call[]): { calls: number; people: number; days: number } {
+  if (!calls.length) return { calls: 0, people: 0, days: 0 };
+  const people = new Set(calls.filter((c) => c.name).map((c) => c.who));
+  const oldest = Math.min(...calls.map((c) => c.at));
+  return {
+    calls: calls.length,
+    people: people.size,
+    days: Math.round((Date.now() - oldest) / DAY),
+  };
+}

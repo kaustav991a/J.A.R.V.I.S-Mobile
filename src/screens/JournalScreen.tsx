@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Hint, MonoCard, Screen, SectionLabel } from '../components/ui/Atoms';
+import { callSummary } from '../lib/calls';
+import { permission as callPermission, recentCalls } from '../../modules/call-log';
 import { Card, InfoRow } from '../components/ui/Card';
 import { ScreenTitle } from '../components/ui/ScreenTitle';
 import { SettingsRow } from '../components/ui/SettingsRow';
@@ -25,6 +27,29 @@ export function JournalScreen() {
   const [held, setHeld] = useState<{ events: number; daily: number }>({ events: 0, daily: 0 });
   const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
+  /**
+   * What the call log returned, read fresh and never stored.
+   *
+   * Read here rather than remembered anywhere: this is a diagnostic somebody opens to
+   * answer one question — did it see anything — and a stored copy of a call log is a
+   * second thing to secure for no gain.
+   */
+  const [callState, setCallState] = useState<'granted' | 'denied' | 'unavailable'>('unavailable');
+  const [calls, setCalls] = useState({ calls: 0, people: 0, days: 0 });
+
+  useEffect(() => {
+    let alive = true;
+    setCallState(callPermission());
+    void recentCalls()
+      .then((read) => {
+        if (alive) setCalls(callSummary(read));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   /**
    * What the last sync did, and when.
    *
@@ -99,6 +124,44 @@ export function JournalScreen() {
         />
       </Card>
       <Hint testID="journal-size">{`${held.events} moments and ${held.daily} day totals, all of it on this phone.`}</Hint>
+
+      {/**
+       * What the call log actually returned.
+       *
+       * On 2026-09-03 the app spoke about Instagram twice while both call triggers
+       * stayed silent, and nothing on screen could tell **a module that had not
+       * loaded** from **a call log where nobody is overdue**. Those want completely
+       * different fixes and looked identical from outside — which is the failure this
+       * project has now shipped five times, in five different costumes.
+       */}
+      <SectionLabel>Calls</SectionLabel>
+      <Card testID="journal-calls">
+        <InfoRow
+          first
+          icon="call-outline"
+          label="Call log"
+          value={
+            callState === 'granted'
+              ? 'Readable'
+              : callState === 'denied'
+                ? 'Permission off'
+                : 'Not in this build'
+          }
+          valueColor={callState === 'granted' ? COLOR.green : COLOR.dim}
+        />
+        <InfoRow icon="people-outline" label="Calls read" value={String(calls.calls)} />
+        <InfoRow icon="person-outline" label="People named" value={String(calls.people)} />
+        <InfoRow
+          icon="hourglass-outline"
+          label="Reaching back"
+          value={calls.days ? `${calls.days} days` : '—'}
+        />
+      </Card>
+      <Hint testID="journal-calls-hint">
+        The number never reaches this app: it is hashed before it leaves the native side, and
+        the name is the one Android had already cached against the call. Nothing is stored and
+        nothing is uploaded.
+      </Hint>
 
       <SectionLabel>Collection</SectionLabel>
       {denied ? (
