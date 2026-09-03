@@ -55,6 +55,15 @@ export type SeenStore = {
    * — and taking back the sweep by moment would have taken the real arrival with it.
    */
   drop: (rows: Array<{ at: number; place: string }>) => Promise<void>;
+  /**
+   * Write many rows in one transaction.
+   *
+   * `put` is a statement per row, which is right for one crossing and wrong for eight
+   * thousand. An import is one transaction or it is a progress bar nobody asked for.
+   */
+  putMany: (rows: Seen[]) => Promise<void>;
+  /** take every imported row back out, and say how many went */
+  dropImported: () => Promise<number>;
   /** empty it, paired with location sharing going off */
   clear: () => Promise<void>;
   /** how many rows, for a diagnostic that has to say so */
@@ -111,6 +120,24 @@ export async function openSeenStore(name = 'jarvis-sightings.db'): Promise<SeenS
       for (const r of rows) {
         await db.runAsync('DELETE FROM sighting WHERE at = ? AND place = ?', r.at, r.place);
       }
+    },
+
+    async putMany(rows) {
+      await db.withTransactionAsync(async () => {
+        for (const r of rows) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO sighting (at, place, via) VALUES (?, ?, ?)',
+            r.at,
+            r.place,
+            r.via ?? null
+          );
+        }
+      });
+    },
+
+    async dropImported() {
+      const r = await db.runAsync("DELETE FROM sighting WHERE via LIKE 'import%'");
+      return r.changes;
     },
 
     async clear() {

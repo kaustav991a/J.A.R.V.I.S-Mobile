@@ -7,7 +7,7 @@ import { AT_PLACE_KM, distanceKm, farApart, loadKnown } from './knownPlaces';
 import { currentFix } from './place';
 import type { KnownPlace } from './knownPlaces';
 import { dismiss, postNow } from './notify';
-import { dropExitsAround, loadSeen, noteSeen } from './timeline';
+import { dropExitsAround, isCrossing, loadSeen, noteSeen } from './timeline';
 
 /**
  * Sightings that happen whether or not anybody is holding the phone.
@@ -293,7 +293,7 @@ export const FIX_TRUSTED_M = 150;
 async function alreadyInside(label: string): Promise<boolean> {
   try {
     const seen = await loadSeen();
-    const last = seen.filter((s) => s.place === label && s.via).pop();
+    const last = seen.filter((s) => s.place === label && isCrossing(s)).pop();
     return last?.via === 'enter';
   } catch {
     return false;

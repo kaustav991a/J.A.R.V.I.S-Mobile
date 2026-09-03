@@ -121,8 +121,25 @@ export type Seen = {
    * phone happened to resolve a place because somebody was using it, which is why
    * every figure derived from those is a bound rather than a time.
    */
-  via?: 'enter' | 'exit';
+  via?: 'enter' | 'exit' | 'import-enter' | 'import-exit';
 };
+
+/**
+ * A boundary this device actually watched being crossed.
+ *
+ * Every check on `.via` being merely truthy used to mean this, back when truthy and
+ * crossing were the same thing. They stopped being the same thing the moment an import
+ * could write a row, so the meaning is named here once rather than assumed in three
+ * places — one of which is the diagnostic row that caught three bugs in an hour.
+ */
+export const isCrossing = (s: Seen): boolean => s.via === 'enter' || s.via === 'exit';
+
+/** from a Timeline export rather than from this phone */
+export const isImported = (s: Seen): boolean =>
+  s.via === 'import-enter' || s.via === 'import-exit';
+
+/** which kinds of sighting a figure was built from */
+export type Source = 'crossing' | 'import' | 'app-open';
 
 const dayKey = (at: number): string => {
   const d = new Date(at);
@@ -381,7 +398,7 @@ export const CROSSINGS_SHOWN = 6;
  */
 export function crossings(seen: Seen[], now: Date, limit: number = CROSSINGS_SHOWN): Seen[] {
   return seen
-    .filter((s) => s.via && s.at <= now.getTime())
+    .filter((s) => isCrossing(s) && s.at <= now.getTime())
     .sort((a, b) => b.at - a.at)
     .slice(0, limit);
 }
@@ -401,11 +418,27 @@ export async function forgetCrossing(at: number): Promise<void> {
   try {
     const s = await theStore();
     if (!s) return;
-    const doomed = (await s.all(SEEN_WINDOW)).filter((x) => x.at === at && x.via);
+    const doomed = (await s.all(SEEN_WINDOW)).filter((x) => x.at === at && isCrossing(x));
     if (!doomed.length) return;
     await s.drop(doomed);
   } catch {
     /* a store that cannot be read cannot be corrected */
+  }
+}
+
+/**
+ * Take back everything a Timeline import wrote.
+ *
+ * One gesture, because an import is eight thousand rows of somebody else's arithmetic
+ * and the only honest way to offer that is to make it free to refuse afterwards.
+ * Crossings and app-open sightings are untouched.
+ */
+export async function forgetImported(): Promise<number> {
+  try {
+    const s = await theStore();
+    return s ? await s.dropImported() : 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -460,35 +493,72 @@ export function usuallyGoneBy(seen: Seen[], place: string, now: Date): number | 
  * Exits are only trusted once there are as many as any other habit here needs. Two
  * of them is a coincidence with a timestamp.
  */
+/**
+ * The median of one minute per day, across the days a predicate matches.
+ *
+ * `pick` decides which of a day's several sightings counts — the LAST exit of a day,
+ * because stepping out for lunch is not going home; the FIRST arrival, because coming
+ * back from lunch is not arriving.
+ */
+function medianPerDay(
+  seen: Seen[],
+  place: string,
+  now: Date,
+  keep: (s: Seen) => boolean,
+  pick: 'last' | 'first'
+): { minute: number; days: number } | null {
+  const today = dayKey(now.getTime());
+  const perDay = new Map<string, number>();
+  for (const s of seen) {
+    if (s.place !== place || !keep(s)) continue;
+    const key = dayKey(s.at);
+    if (key === today) continue;
+    const minute = minuteOfDay(s.at);
+    const held = perDay.get(key);
+    if (held === undefined || (pick === 'last' ? minute > held : minute < held)) {
+      perDay.set(key, minute);
+    }
+  }
+  if (!perDay.size) return null;
+  const times = [...perDay.values()].sort((a, b) => a - b);
+  const mid = Math.floor(times.length / 2);
+  // an even count takes the lower of the two middles, which errs toward saying it
+  // earlier rather than later
+  return { minute: times.length % 2 ? times[mid] : times[mid - 1], days: perDay.size };
+}
+
+/**
+ * Imports count, and they are not measured.
+ *
+ * `measured: true` means *this phone watched a boundary being crossed*, and nothing
+ * else may claim it — that single word is what stops a sentence being worded as a
+ * departure when it is really a bound. The figure is still worth having: the spike
+ * found Google's Sealdah arrival matching a recorded crossing to the minute, from two
+ * sources that have never met.
+ */
 export function leftBy(
   seen: Seen[],
   place: string,
   now: Date
-): { minute: number; measured: boolean } | null {
-  const today = dayKey(now.getTime());
-  const exits = new Map<string, number>();
-
-  for (const s of seen) {
-    if (s.place !== place || s.via !== 'exit') continue;
-    const key = dayKey(s.at);
-    if (key === today) continue;
-    // the last exit of a day: stepping out for lunch is not going home
-    const held = exits.get(key);
-    const minute = minuteOfDay(s.at);
-    if (held === undefined || minute > held) exits.set(key, minute);
+): { minute: number; measured: boolean; source: Source } | null {
+  const crossed = medianPerDay(seen, place, now, (s) => s.via === 'exit', 'last');
+  if (crossed && crossed.days >= ENOUGH_PLACE_DAYS) {
+    return { minute: crossed.minute, measured: true, source: 'crossing' };
   }
 
-  if (exits.size >= ENOUGH_PLACE_DAYS) {
-    const times = [...exits.values()].sort((a, b) => a - b);
-    const mid = Math.floor(times.length / 2);
-    return {
-      minute: times.length % 2 ? times[mid] : times[mid - 1],
-      measured: true,
-    };
+  const withImports = medianPerDay(
+    seen,
+    place,
+    now,
+    (s) => s.via === 'exit' || s.via === 'import-exit',
+    'last'
+  );
+  if (withImports && withImports.days >= ENOUGH_PLACE_DAYS) {
+    return { minute: withImports.minute, measured: false, source: 'import' };
   }
 
   const floor = usuallyGoneBy(seen, place, now);
-  return floor === null ? null : { minute: floor, measured: false };
+  return floor === null ? null : { minute: floor, measured: false, source: 'app-open' };
 }
 /**
  * How many earlier days a departure from a place was actually watched.
@@ -504,7 +574,7 @@ export function exitDaysAt(seen: Seen[], place: string, now: Date): number {
   const today = dayKey(now.getTime());
   const days = new Set<string>();
   for (const s of seen) {
-    if (s.place !== place || s.via !== 'exit') continue;
+    if (s.place !== place || (s.via !== 'exit' && s.via !== 'import-exit')) continue;
     const key = dayKey(s.at);
     if (key !== today) days.add(key);
   }
@@ -687,28 +757,34 @@ export function arrivalHour(
   seen: Seen[],
   place: string,
   now: Date
-): { minute: number; measured: boolean } | null {
-  const today = dayKey(now.getTime());
-  const crossings = new Map<string, number>();
-
-  for (const s of seen) {
-    if (s.place !== place || s.via !== 'enter') continue;
-    const key = dayKey(s.at);
-    if (key === today) continue;
-    // the FIRST crossing of a day: coming back from lunch is not arriving
-    const held = crossings.get(key);
-    const minute = minuteOfDay(s.at);
-    if (held === undefined || minute < held) crossings.set(key, minute);
+): { minute: number; measured: boolean; source: Source } | null {
+  // the FIRST crossing of a day: coming back from lunch is not arriving
+  const crossed = medianPerDay(seen, place, now, (s) => s.via === 'enter', 'first');
+  if (crossed && crossed.days >= ENOUGH_PLACE_DAYS) {
+    return { minute: crossed.minute, measured: true, source: 'crossing' };
   }
 
-  if (crossings.size >= ENOUGH_PLACE_DAYS) {
-    const times = [...crossings.values()].sort((a, b) => a - b);
-    const mid = Math.floor(times.length / 2);
-    return { minute: times.length % 2 ? times[mid] : times[mid - 1], measured: true };
+  /**
+   * Imported arrivals count, and are never called measured.
+   *
+   * The app said *"usually you are there by 11:51 AM"* about a man at his desk since
+   * ten — a correct median over four app-opens. The export says **09:49 across 344
+   * days**, which is a better figure from a source this phone did not watch, and both
+   * of those facts have to survive into the sentence.
+   */
+  const withImports = medianPerDay(
+    seen,
+    place,
+    now,
+    (s) => s.via === 'enter' || s.via === 'import-enter',
+    'first'
+  );
+  if (withImports && withImports.days >= ENOUGH_PLACE_DAYS) {
+    return { minute: withImports.minute, measured: false, source: 'import' };
   }
 
   const guess = usuallyHereBy(seen, place, now);
-  return guess === null ? null : { minute: guess, measured: false };
+  return guess === null ? null : { minute: guess, measured: false, source: 'app-open' };
 }
 
 /** how far before the usual arrival before being early is worth a remark */

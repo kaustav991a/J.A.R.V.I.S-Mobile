@@ -546,7 +546,7 @@ describe('departures from geofence exits', () => {
       ...exits([17, 19, 10, 'Office'], [18, 19, 5, 'Office'], [19, 19, 20, 'Office'], [20, 19, 12, 'Office']),
     ];
     // 19:05, 19:10, 19:12, 19:20 -> 19:10 (lower middle of an even count)
-    expect(leftBy(left, 'Office', NOW)).toEqual({ minute: 19 * 60 + 10, measured: true });
+    expect(leftBy(left, 'Office', NOW)).toEqual({ minute: 19 * 60 + 10, measured: true, source: 'crossing' });
   });
 
   it('says it is only a floor when every sighting came from the app being opened', () => {
@@ -775,6 +775,7 @@ describe('an arrival hour it has actually watched', () => {
     expect(arrivalHour(appOpens(), 'Office', new Date())).toEqual({
       minute: 11 * 60 + 51,
       measured: false,
+      source: 'app-open',
     });
   });
 
@@ -782,6 +783,7 @@ describe('an arrival hour it has actually watched', () => {
     expect(arrivalHour(measured(), 'Office', new Date())).toEqual({
       minute: 10 * 60 + 3,
       measured: true,
+      source: 'crossing',
     });
   });
 
