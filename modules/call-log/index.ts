@@ -52,6 +52,21 @@ export function readError(): string | null {
 export const READ_DAYS = 120;
 
 /**
+ * How many rows a read will take, and why it is not a round hundred.
+ *
+ * The cap is applied newest-first, so a cap that bites is a cap that **shortens the
+ * window**: 500 rows on this phone reached back nineteen days, not a hundred and
+ * twenty, because it takes about twenty-five calls a day counting the spam. That
+ * silently broke the only thing this feature does — somebody you have genuinely lost
+ * touch with made no calls in those nineteen days, so they were not in the read at all
+ * and could never be noticed as missing.
+ *
+ * Six thousand covers four months at that rate with room to spare. Rows are five small
+ * fields and nothing is stored, so the cost is a few milliseconds once per chat open.
+ */
+export const READ_LIMIT = 6000;
+
+/**
  * `granted` · `denied` · `unavailable`.
  *
  * Three answers because they want three sentences: a build without the module, a
@@ -81,7 +96,7 @@ export function permission(): 'granted' | 'denied' | 'unavailable' {
  * are neither conversations nor somebody trying to reach you, which are the only two
  * things anything above this cares about.
  */
-export async function recent(since: number, limit = 500): Promise<Call[]> {
+export async function recent(since: number, limit = READ_LIMIT): Promise<Call[]> {
   const m = module_();
   if (!m) return [];
   try {
