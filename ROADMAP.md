@@ -215,7 +215,7 @@ in §2; `—` — not built.
 **Blocked-on** is the column that stops a brain dependency hiding in prose.
 `Brain` · `Desk` · `Phone` · `App · build` · `App` — a blank means nothing is owed.
 
-**57 of 89 rows are proved on the phone** (64%). 74 have code (83%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
+**57 of 90 rows are proved on the phone** (63%). 74 have code (82%). 23 cannot be finished in this repo: 19 on the brain, 2 on the desk, 2 on the phone.
 
 ### Transport, pairing, security
 
@@ -253,7 +253,9 @@ It took two fixes today and the first was incomplete. `place()` orders what arri
 **A new state rather than reusing `failed`, and that distinction is the point.** `failed` renders `NOT SENT` and carries this app's one unambiguous retry, justified by nothing having carried the message. An interrupted turn may already have gone — the window spans `link.send()` — so `NOT SENT` would be a guess and a safe-looking `SEND AGAIN` on *run script X* could run it twice. `awaiting` asserts *carried*, equally unknown. `INTERRUPTED` says what happened and claims nothing about the outcome: tone `bad`, no retry, words left there to be copied.
 
 **Seen on the phone at `01a042b3`:** the Monday turn now reads `You · 20:02 INTERRUPTED` in red. It repaired itself on load, since `hydrate` does the marking — no migration, and nothing else on the device had to change. 7 tests, 5 of which failed first. |
-| The voice rule applied to what the model writes | broken | Brain | **Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it. **Seen again 2026-09-01 on the current bundle**, in a reply about a photo: *"…is a rather grim sight, Sir."* Capitalised, mid-sentence. So the gateway fix is still not deployed, and this row has fresh evidence rather than only the August sighting. Seen a second time the same afternoon, in the reply to the retried photo: *"…scribbled notes, Sir."* Twice in one hour on the current bundle. |
+| The voice rule applied to what the model writes | broken | Brain | **Found on the phone 2026-08-24.** `sir` is punctuation — lowercase, spent once. The situation line obeys it; every model reply capitalises it: *Standing by, Sir.*, *I can’t see your screen from here in the cloud, Sir.*, *I can’t authorise task approvals from the cloud, Sir.* Systematic rather than a one-off, and the same gap the nudge path has. The rule lives in `commute.ts` and `_briefing_text`; the persona prompt never got it. **Seen again 2026-09-01 on the current bundle**, in a reply about a photo: *"…is a rather grim sight, Sir."* Capitalised, mid-sentence. So the gateway fix is still not deployed, and this row has fresh evidence rather than only the August sighting. Seen a second time the same afternoon, in the reply to the retried photo: *"…scribbled notes, Sir."* Twice in one hour on the current bundle.
+
+**2026-09-03: the phone half of `call:<alias>` is being built and the gateway half is not.** The call log becomes readable on the next APK, so when the freeze lifts, `call:mom` needs only what the rules spec already describes: the subject accepted at declaration, and the phone answering a boolean against an alias. **The call log itself never leaves the device** — no numbers, no timestamps, no durations, which is the rule that made this safe to build before the engine exists. |
 | No unprompted weekday assertion | broken | Brain | **Seen again on the phone 2026-08-24, a Monday.** *I can’t authorise task approvals from the cloud, Sir. Are you working this Saturday, by the way?* — a weekend question appended to an unrelated refusal. Same class as the false Saturday shift: a stored Mon–Fri pattern being asserted as a fact about today. The fix is committed in the brain as `c86d176` and undeployed, which is exactly what this looks like. |
 | Reasoning monologues can never reach the screen | proved |  | `_strip_reasoning()`. **Device pass 2026-08-24:** two full screens of real model replies read off the phone, including multi-sentence answers and one that reasoned about a screenshot — no monologue, no stray tags, nothing leaked. Previously proved in the harness only. |
 | The opening line is the real situation | proved |  | On-device, no model, no await. **Read again 2026-08-24:** *12:24 PM, sir. You are at Office and Office briefing at 7:00 PM.* Note the lowercase `sir` — this line obeys the voice rule, which is what makes the replies below it violating the same rule so visible. |
@@ -299,7 +301,7 @@ It took two fixes today and the first was incomplete. `place()` orders what arri
 
 ### Memory and the journal
 
-*6 proved of 13.*
+*6 proved of 14.*
 
 | | Status | Blocked on | Note |
 | --- | --- | --- | --- |
@@ -349,11 +351,22 @@ Launchers and the system shell are excluded from `appDeltas` now, **matched by s
 **It also counts up rather than denying the evidence it holds.** `leftBy` wants four distinct days before it will call a time usual, and on 09-02 it had one — so the row fell back to the bound and said *nothing has watched you leave yet* while Monday's exit sat in the store. Two different claims, and only the second was true: `exitDaysAt` now feeds *"it has watched you leave once, and wants 4 before calling that your usual time"*.
 
 And the note printed literal `**asterisks**` — the panel renders plain text, so markdown emphasis arrives on screen as the characters themselves. |
-| Call log, archive import | — | App · build | Native build, and fatal for a store listing.
+| Call log: who you have lost touch with | — |  | Native build, and fatal for a store listing.
 
 **The build is the smaller half of this, and it is worth saying which is which.** `READ_CALL_LOG` is a restricted permission: Google grants it only to apps whose core function IS calling or messaging. For a sideloaded personal APK it costs a build and nothing else. For anything that ever goes near a store listing it is a rejection, not a warning.
 
-**So the decision comes before the work:** is this app ever intended to be distributed? Until that is answered, spending a native build on it risks building the thing that makes the app undistributable. |
+**So the decision comes before the work:** is this app ever intended to be distributed? Until that is answered, spending a native build on it risks building the thing that makes the app undistributable.
+
+**Answered 2026-09-03: no store listing, ever. It is a personal J.A.R.V.I.S.** So `READ_CALL_LOG` costs one native build and nothing else, and the row is unblocked.
+
+**Scoped to one sentence he asked for: *notice who I have lost touch with*.** Derived on the phone — who you speak to most, whose silence is furthest past their own usual, and missed calls today. Against each person's own pattern rather than one threshold across an address book: somebody spoken to every ten days is not neglected on day nine, and somebody spoken to daily is missed by Wednesday.
+
+**No number ever reaches the derived layer.** The native side hands over a stable id and the name Android had already cached against the call, so `READ_CONTACTS` is not needed and an unknown caller stays a number that is never named. `src/lib/calls.ts` cannot print a phone number because it is never given one. |
+| Archive import — Takeout, Meta DYI | — |  | **Split out of [[call-log]] on 2026-09-03, because it was hiding behind a build it does not need.** Google Takeout and Meta DYI are files somebody downloads: years of history in one archive, no permission, no native module, no APK. It could be done in an afternoon on any day the app-side is open.
+
+What it is worth: the journal starts the day the app was installed and the sightings start twelve weeks ago, so every habit figure is young. An import is the only route to a memory older than the app itself.
+
+**The parsing is the whole job and it is unglamorous** — a Takeout location history is JSON in a shape Google changes without notice, and a DYI export is HTML or JSON depending on the year. Worth a spike before a spec. |
 
 ### Knowing and acting
 
