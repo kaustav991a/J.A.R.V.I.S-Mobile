@@ -117,22 +117,51 @@ app-open fallback. It does, and removing it would have deleted the figure that p
 
 **Next: Task 2** — `src/lib/archive.ts`, pure matching arithmetic, 18 tests, no build.
 
-### What is left, in the order I would take it
+### The plan from here, in order
 
-1. **`archive-import` Plan B — queue 27, and the plan is written (see above).** Needs a **native build**: the parser is
-   streaming Kotlin in a new `modules/` directory, and that is a fingerprint input, so
-   expect one more runtime move and a local `assembleRelease`. Owes, in order: the
-   parser; `via: 'import'` counted by the habit figures and **never reported as
-   measured**; matching against `seenSince` so importing twice imports once; naming
-   unnamed clusters **by consent, not the Places API**; the import screen.
-2. **`voice-out`** — app-side, `expo-speech`, no brain dependency, not started.
-3. **`chat-window`** — needs the log past a hundred turns. A day.
-4. **`anticipate-habit`** — needs four days of crossings. Two departures and two
-   arrivals are in.
-5. **Queue 26, the security pass** — asked for explicitly and asked to be kept last.
+**The import, task by task — `docs/superpowers/plans/2026-09-03-archive-import.md`.**
+
+| # | What | Costs a build? | State |
+| --- | --- | --- | --- |
+| 1 | `via` tells measured from imported | no | **done, `6adf351`, unpublished** |
+| 2 | `archive.ts` — matching and proposals, pure | no | next |
+| 3 | The streaming Kotlin parser | **yes, and cannot be split** | not started |
+| 4 | Pick it, see it, agree to it, undo it | no | not started |
+| 5 | Name the clusters he never named | no | not started |
+
+**Tasks 1 and 2 publish together**, per the plan — Task 1 alone changes nothing you can
+see, because no imports exist yet. **Task 3 is the APK**: a new `modules/` directory and
+`expo-document-picker` each move the fingerprint, so they land in one local
+`./gradlew assembleRelease` signed with `android/app/debug.keystore` or the phone is
+stranded. Back the keystore up first and never run `prebuild --clean`.
+
+**The check that matters is on the device, not in the suite.** After FORGET, `Crossings
+recorded` must still read six crossings rather than eight thousand. That single
+observation is what proves Task 1's three `isCrossing` narrowings were right, and no
+test in the plan can prove it the way reading the row does.
+
+### Then, in order
+
+1. **`voice-out`** — app-side, `expo-speech`, no brain dependency, not started. The
+   oldest unverified thing in this project.
+2. **`chat-window`** — needs the log past a hundred turns. A day of using it.
+3. **`anticipate-habit`** — needs four days of crossings, and **the import satisfies it
+   outright**: 344 days at the office against a floor of four.
+4. **Queue 26, the security pass** — asked for explicitly and asked to be kept last.
    Threat model first: at rest, backup, `FLAG_SECURE`, and what leaves the phone.
-6. **The brain**, when the freeze lifts, owes two things: stop distilling chat into
+5. **The brain**, when the freeze lifts, owes two things: stop distilling chat into
    facts by itself, then `situation-block`.
+
+### What is actually on the phone
+
+**OTA `601a95f0`, installed 3 Sep 17:28** — Plan A, the sightings table and the row that
+says what it holds. Read and confirmed: *"138 sightings held, reaching back 12 days"*
+over six real crossings from that morning's commute.
+
+**Nothing since.** Task 1 is committed and waiting on Task 2. The way to tell whether
+the phone is current is the **Update ID** on the Updates screen — the first eight
+characters of the `eas update` output — and never the date beside it, which is the
+install time.
 
 ### The stated rhythm still does not match what is being worked
 
