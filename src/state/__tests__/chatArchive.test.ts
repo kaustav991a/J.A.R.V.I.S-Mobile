@@ -1,7 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { openArchive } from '../chatArchive';
 import type { Archive } from '../chatArchive';
 import type { ChatEntry } from '../hudReducer';
-import { clearChat, loadChat, saveChat, useArchive } from '../chatStore';
+import { clearChat, heldTurns, loadChat, saveChat, useArchive } from '../chatStore';
 
 /**
  * The conversation, kept past the window the phone renders.
@@ -139,5 +140,52 @@ describe('saveChat feeding the archive', () => {
     useArchive(null);
     await saveChat([turn(1000, 'x')]);
     expect(await loadChat()).toHaveLength(1);
+  });
+});
+
+describe('the archive arriving late', () => {
+  /**
+   * The feature shipped on 2026-09-03 and the log was already months old.
+   *
+   * Without a backfill the archive would start empty while a hundred turns sat in
+   * AsyncStorage — so the first thing it can say about the conversation is that it
+   * knows nothing about it, over a log the app is rendering at that moment.
+   */
+  it('takes in the log that already exists', async () => {
+    const a = await fresh();
+    useArchive(a);
+    await saveChat([turn(1000, 'from before the archive existed')]);
+    expect(await a.held()).toBe(1);
+    useArchive(null);
+  });
+
+  it('says how many turns it is holding, so the count can be watched', async () => {
+    const a = await fresh();
+    useArchive(a);
+    await saveChat(Array.from({ length: 12 }, (_, i) => turn(1000 + i, `t${i}`)));
+    expect(await heldTurns()).toBe(12);
+    useArchive(null);
+  });
+
+  it('answers zero rather than throwing when there is no archive', async () => {
+    useArchive(null);
+    expect(await heldTurns()).toBe(0);
+  });
+});
+
+describe('backfilling at launch', () => {
+  it('archives the log it reads, so a quiet day still keeps what exists', async () => {
+    // saveChat only runs when something changes. An app opened and closed without a
+    // word would archive nothing, and the turns already in AsyncStorage would stay
+    // outside the long memory until the next message
+    await AsyncStorage.setItem(
+      'jarvis_chat_log',
+      JSON.stringify([turn(1000, 'said before the archive existed')])
+    );
+    const a = await fresh();
+    useArchive(a);
+    await loadChat();
+    expect(await a.held()).toBe(1);
+    useArchive(null);
   });
 });

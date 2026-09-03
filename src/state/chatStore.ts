@@ -48,7 +48,22 @@ export async function loadChat(): Promise<ChatEntry[]> {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isEntry).slice(-CHAT_KEEP);
+    const held = parsed.filter(isEntry).slice(-CHAT_KEEP);
+
+    /**
+     * Backfilled at launch, not only on the next save.
+     *
+     * The archive arrived on 2026-09-03 over a log that was already months old, and
+     * `saveChat` only runs when something changes — so an app opened and closed without
+     * a word would have archived nothing while a hundred turns sat in AsyncStorage.
+     * Fire and forget: the log is returned either way, and the long memory catching up
+     * is never a reason to make somebody wait for their conversation.
+     */
+    void theArchive()
+      .then((kept) => kept?.archive(held))
+      .catch(() => undefined);
+
+    return held;
   } catch {
     // unreadable storage is not worth taking the app down for; the log restarts
     return [];
@@ -116,6 +131,23 @@ export async function earlierThan(at: number, limit: number = EARLIER_PAGE): Pro
     return kept ? await kept.olderThan(at, limit) : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * How many turns the archive is holding.
+ *
+ * A number somebody can watch. The archive is invisible by nature — it matters only
+ * on the day you scroll back far enough to need it — and *"trust me, it is saving"* is
+ * the shape of every bug this project has shipped. Watching this pass a hundred is
+ * proof the long memory exists before anybody needs it.
+ */
+export async function heldTurns(): Promise<number> {
+  try {
+    const kept = await theArchive();
+    return kept ? await kept.held() : 0;
+  } catch {
+    return 0;
   }
 }
 

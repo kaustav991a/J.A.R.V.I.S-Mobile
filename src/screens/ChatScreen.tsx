@@ -45,7 +45,7 @@ import { MIN_CLIP_MS, RECORDING, meterLevel, prepareToRecord, readClip } from '.
 import { haptic } from '../lib/haptics';
 import { useAuth } from '../security/AuthProvider';
 import { useJarvis } from '../state/JarvisProvider';
-import { EARLIER_PAGE, earlierThan } from '../state/chatStore';
+import { EARLIER_PAGE, earlierThan, heldTurns } from '../state/chatStore';
 import { takeShot } from '../lib/vision';
 import type { ChatEntry } from '../state/hudReducer';
 import type { CommandsStackParams } from '../navigation/types';
@@ -138,6 +138,26 @@ export function ChatScreen() {
   const [earlier, setEarlier] = useState<ChatEntry[]>([]);
   const [reachedStart, setReachedStart] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
+
+  /**
+   * How many turns the archive holds, said out loud.
+   *
+   * The archive matters only on the day somebody scrolls back far enough to need it,
+   * which makes it invisible until then — and *"trust me, it is saving"* is the shape
+   * of every bug this project has shipped. A number that can be watched past a hundred
+   * is proof the long memory exists before anybody needs it.
+   */
+  const [kept, setKept] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    void heldTurns().then((n) => {
+      if (alive) setKept(n);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [hud.chat.length]);
 
   const loadEarlier = async () => {
     const oldest = earlier[0]?.at ?? hud.chat[0]?.at;
@@ -795,7 +815,14 @@ export function ChatScreen() {
              * where a person scrolling up arrives.
              */
             ListFooterComponent={
-              reachedStart || !turns.length ? null : (
+              !turns.length ? null : reachedStart ? (
+                // the end of the archive, and what it is holding: a count somebody can
+                // watch is the difference between a kept log and a claimed one
+                <Text testID="chat-kept" style={styles.earlierText}>
+                  {(kept === 1 ? '1 turn kept.' : `${kept} turns kept.`) +
+                    ' Nothing earlier than this.'}
+                </Text>
+              ) : (
                 <Pressable
                   testID="chat-earlier"
                   accessibilityRole="button"
