@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { openSeenStore } from '../seenStore';
-import { forgetSeen, loadSeen, noteSeen, useSeenStore } from '../timeline';
+import { forgetSeen, loadSeen, noteSeen, seenSince, useSeenStore } from '../timeline';
 
 /**
  * `timeline.ts` against a real table.
@@ -52,4 +52,19 @@ it('empties out when told to forget', async () => {
   await noteSeen('Office', 1_000_000, 'exit');
   await forgetSeen();
   expect(await loadSeen()).toEqual([]);
+});
+
+it('reads further back than the render window when asked', async () => {
+  const now = Date.now();
+  await noteSeen('Home', now - 200 * DAY, 'exit');
+  await noteSeen('Office', now - DAY, 'exit');
+  expect(await seenSince(365)).toHaveLength(2);
+  expect(await seenSince(30)).toHaveLength(1);
+});
+
+it('has nothing to read back when there is no store', async () => {
+  useSeenStore(null);
+  // the real database is not open in a test, so this is the failure path, and a
+  // habit figure with no history is a habit figure that says nothing
+  expect(await seenSince(365)).toEqual([]);
 });

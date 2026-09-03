@@ -154,6 +154,25 @@ export async function loadSeen(): Promise<Seen[]> {
 }
 
 /**
+ * Every sighting inside the last `days`, oldest first.
+ *
+ * Two readers, deliberately. `loadSeen()` runs on every screen focus and wants a
+ * window — it is drawing a handful of rows and must never be the reason a screen is
+ * slow. The habit figures want as much history as there is, because a median over
+ * four Saturdays is a guess and a median over forty is a habit. Before the table there
+ * was no difference worth naming: the store held twelve weeks and threw the rest away.
+ */
+export async function seenSince(days: number): Promise<Seen[]> {
+  try {
+    const s = await theStore();
+    const now = Date.now();
+    return s ? await s.between(now - days * 86_400_000, now) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Record that you were at a named place, unless the same visit was just recorded.
  *
  * Silent on every failure. A sighting that cannot be written is a sighting that never
