@@ -393,3 +393,10 @@ saying which bug they exist to prevent.
   **written correctly and read back with no `via` at all**. The write worked and the
   read threw the information away — no error, no warning, and every figure downstream
   saw them as app-open sightings.
+- **DocumentsUI's *Recent* list reports every file as `0 B`.** `Timeline.json` showed as
+  *"3 Sept, 0 B, JSON document"* in the picker while `ls -la` on the device reported
+  49,498,457 bytes. The Recent provider does not carry size; read nothing into it, and
+  check with `adb shell ls -la //sdcard/Download/` before forming a hypothesis.
+- **`adb shell input keyevent 4` is the reliable way out of a screen.** A back chevron
+  scrolls out of view on a long screen, and a tap aimed at where it used to be hits
+  whatever is now there — twice it re-opened the file picker. Use the hardware key.

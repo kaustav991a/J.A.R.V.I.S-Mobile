@@ -679,7 +679,11 @@ Places → Crossings recorded gains an IMPORTED line with FORGET beside it, kept
 
 **The screen says which nothing it is.** Four different empty answers get four different sentences: a parser that threw (verbatim), a format Google changed (*"11,570 segments and no visits"*), a file whose visits are all outside any named circle, and a build without the native half. Those looked identical for as long as it took to ship one.
 
-**Still unproved: the parser has never run.** Nothing had called it until this screen existed, and the device check has not happened yet — the phone locked itself before the import could be driven. *The module loads* and *the export parses* are both open questions, and the honest reading of this row is that the plumbing is complete and untested end to end.
+**PROVED on the phone, 2026-09-04 11:56, against the real 49,498,457-byte file.** `Timeline.json · 11,570 segments · 4,000 visits · 8 Mar 2025 to 3 Sept 2026`, and then **4,415 sightings added**. Every figure matches the laptop spike from two days ago, computed by a completely different parser: 11,570 segments, 4,000 visits, Office **344 days at 9:49 AM**, Barrackpore 8:19 AM, Home 8:55 PM. Two independent implementations agreeing on seventeen months of somebody's movements is the strongest evidence available that either is right.
+
+Eleven named places matched, 2,225 visits between them — 4,450 rows, less 35 that `withoutNear` dropped as already-held. And the naming case is now a measured argument rather than a hypothesis: **381 visits across 259 days at a place he has never named**, plus 297/275, 275/211, 118/112, 91/78 and 66/55. The biggest of those sits at 9:23 AM near Sealdah, which the spike also found — so his named Sealdah circle is catching 44 visits out of 381, and the pin is probably in the wrong place by more than 120 m.
+
+**Superseded note:** the parser was unexercised until this screen existed. Both open questions are now closed — `available()` returned true on the device, which is what says `requireNativeModule` found the module.
 
 **Task 5, the naming flow, is what remains.** The clusters are already computed and shown; what is missing is typing a name against one and re-running the match.
 
@@ -2765,7 +2769,11 @@ Places → Crossings recorded gains an IMPORTED line with FORGET beside it, kept
 
 <strong>The screen says which nothing it is.</strong> Four different empty answers get four different sentences: a parser that threw (verbatim), a format Google changed (*"11,570 segments and no visits"*), a file whose visits are all outside any named circle, and a build without the native half. Those looked identical for as long as it took to ship one.
 
-<strong>Still unproved: the parser has never run.</strong> Nothing had called it until this screen existed, and the device check has not happened yet — the phone locked itself before the import could be driven. *The module loads* and *the export parses* are both open questions, and the honest reading of this row is that the plumbing is complete and untested end to end.
+<strong>PROVED on the phone, 2026-09-04 11:56, against the real 49,498,457-byte file.</strong> <code>Timeline.json · 11,570 segments · 4,000 visits · 8 Mar 2025 to 3 Sept 2026</code>, and then <strong>4,415 sightings added</strong>. Every figure matches the laptop spike from two days ago, computed by a completely different parser: 11,570 segments, 4,000 visits, Office <strong>344 days at 9:49 AM</strong>, Barrackpore 8:19 AM, Home 8:55 PM. Two independent implementations agreeing on seventeen months of somebody's movements is the strongest evidence available that either is right.
+
+Eleven named places matched, 2,225 visits between them — 4,450 rows, less 35 that <code>withoutNear</code> dropped as already-held. And the naming case is now a measured argument rather than a hypothesis: <strong>381 visits across 259 days at a place he has never named</strong>, plus 297/275, 275/211, 118/112, 91/78 and 66/55. The biggest of those sits at 9:23 AM near Sealdah, which the spike also found — so his named Sealdah circle is catching 44 visits out of 381, and the pin is probably in the wrong place by more than 120 m.
+
+<strong>Superseded note:</strong> the parser was unexercised until this screen existed. Both open questions are now closed — <code>available()</code> returned true on the device, which is what says <code>requireNativeModule</code> found the module.
 
 <strong>Task 5, the naming flow, is what remains.</strong> The clusters are already computed and shown; what is missing is typing a name against one and re-running the match.
 

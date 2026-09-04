@@ -16,6 +16,60 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+### ✅ 2026-09-04, 11:56. Seventeen months landed, and two parsers agree
+
+**The import ran on the phone, against the real 49,498,457-byte file.**
+
+```
+Timeline.json · 11,570 segments · 4,000 visits · 8 Mar 2025 to 3 Sept 2026
+→ 4415 sightings added
+```
+
+**Every figure matches the laptop spike from two days ago, computed by a completely
+different parser** — 11,570 segments, 4,000 visits, Office **344 days at 9:49 AM**,
+Barrackpore 8:19 AM, Home 8:55 PM. Two independent implementations agreeing on
+seventeen months of somebody's movements is the strongest evidence available that
+either of them is right, and it is a great deal better than one of them being green.
+
+Eleven named places matched, 2,225 visits between them — 4,450 rows, less the 35
+`withoutNear` dropped as already held. The arithmetic reconciles exactly, which is the
+other thing worth having.
+
+### The naming case stopped being a hypothesis
+
+| Unnamed cluster | Visits | Days | Usually |
+| --- | --- | --- | --- |
+| near Sealdah | **381** | 259 | 9:23 AM |
+| | 297 | 275 | 8:28 PM |
+| | 275 | 211 | 7:20 PM |
+| | 118 | 112 | 8:31 PM |
+| | 91 | 78 | 8:06 PM |
+| | 66 | 55 | 1:19 PM |
+
+**381 visits across 259 days at a place he has never named.** And the biggest one is
+diagnostic in a second way: his named *Sealdah Rail Station* caught 44 visits out of
+381 at essentially the same place, so **that pin is more than 120 m off** — the circle
+is missing nine visits in ten. Task 5 is worth building on this evidence alone.
+
+None of the clusters carries a *"looks like your home/work"* hint, which is correct
+rather than missing: `INFERRED_HOME` and `INFERRED_WORK` fall inside Home and Office,
+which are named, so those visits are matched and never reach the proposals.
+
+### What the device run also settled
+
+**`available()` returned true**, which is what says `requireNativeModule('TimelineImport')`
+found the module — the open question from the build entry above. And the preview wrote
+nothing: the store was untouched until IMPORT was pressed.
+
+**One picker quirk worth knowing.** DocumentsUI's *Recent* list showed `Timeline.json`
+as **0 B** while `ls -la` on the device reported 49,498,457 bytes. The Recent provider
+does not report size; do not read anything into it. Checking the real size over `adb`
+took one command and stopped a wrong hypothesis before it started.
+
+**Driving the picker from adb is not worth it.** The back chevron scrolls out of view on
+a long screen, and taps aimed at where it used to be re-opened the file picker instead.
+`adb shell input keyevent 4` is the reliable way out of any screen.
+
 ### 🔨 2026-09-04, 10:40. The APK, and the runtime moved to `5a67da27`
 
 **`b0ae3e3`. Read this before publishing anything: the OTA runtime is
