@@ -46,6 +46,14 @@ export type SettingsStackParams = {
    */
   Capabilities: undefined;
   Places: undefined;
+  /**
+   * A Google Timeline export, read once and never copied.
+   *
+   * Under Settings rather than inside Places, because it is a one-off act rather
+   * than a setting: nothing on this screen changes what the app does tomorrow, it
+   * changes what the app knows about last year.
+   */
+  Import: undefined;
   /** what the cloud brain holds as true about him, and the way to correct it */
   Memory: undefined;
   /**

@@ -118,6 +118,13 @@ export function SettingsScreen() {
           onPress={() => nav.navigate('Places')}
         />
         <SettingsRow
+          testID="settings-import"
+          icon="cloud-download-outline"
+          title="Import your Timeline"
+          subtitle="Years of where you have been, from a file Google gives you — read once, never copied"
+          onPress={() => nav.navigate('Import')}
+        />
+        <SettingsRow
           testID="settings-memory"
           icon="bookmark-outline"
           title="Memory"

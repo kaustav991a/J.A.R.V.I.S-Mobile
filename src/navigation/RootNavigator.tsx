@@ -19,6 +19,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { AppearanceScreen } from '../screens/AppearanceScreen';
 import { AboutScreen } from '../screens/AboutScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
+import { ImportScreen } from '../screens/ImportScreen';
 import { PlacesScreen } from '../screens/PlacesScreen';
 import { MemoryScreen } from '../screens/MemoryScreen';
 import { CapabilitiesScreen } from '../screens/CapabilitiesScreen';
@@ -120,6 +121,7 @@ function SettingsStackScreens() {
       <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
       <SettingsStack.Screen name="Security" component={SecurityScreen} />
       <SettingsStack.Screen name="Places" component={PlacesScreen} />
+      <SettingsStack.Screen name="Import" component={ImportScreen} />
       <SettingsStack.Screen name="Memory" component={MemoryScreen} />
       <SettingsStack.Screen name="Journal" component={JournalScreen} />
       <SettingsStack.Screen name="Updates" component={UpdatesScreen} />

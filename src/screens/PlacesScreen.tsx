@@ -13,7 +13,8 @@ import { useJarvis } from '../state/JarvisProvider';
 import { FIXED_SLOTS, forgetPlace, loadKnown, nameHere } from '../lib/knownPlaces';
 import type { KnownPlace } from '../lib/knownPlaces';
 import { currentFix } from '../lib/place';
-import { crossings, forgetCrossing, loadSeen, storeHeld } from '../lib/timeline';
+import { crossings, forgetCrossing, forgetImported, loadSeen, storeHeld } from '../lib/timeline';
+import { importedHeld } from '../lib/archiveImport';
 import type { Seen } from '../lib/timeline';
 import {
   askForBackgroundLocation,
@@ -90,6 +91,18 @@ export function PlacesScreen() {
   const [crossed, setCrossed] = useState<Seen[]>([]);
   const [sweeps, setSweeps] = useState(0);
   const [held, setHeld] = useState({ rows: 0, days: 0 });
+  /**
+   * What an import wrote, kept apart from what the phone measured.
+   *
+   * Two rows rather than one total, because 529 days of imported history and
+   * thirteen days of measured crossings are different claims and a single number
+   * would let the bigger one stand for both.
+   */
+  const [imported, setImported] = useState<{ rows: number; from: number | null; to: number | null }>({
+    rows: 0,
+    from: null,
+    to: null,
+  });
 
   /**
    * The one repair this screen can make, and it makes it once.
@@ -128,6 +141,7 @@ export function PlacesScreen() {
       void loadSeen().then((seen) => l.only(setCrossed)(crossings(seen, new Date())));
       void sweepsToday().then(l.only(setSweeps));
       void storeHeld().then(l.only(setHeld));
+      void importedHeld().then(l.only(setImported));
       void readHealth(l);
       return l.end;
     }, [readHealth])
@@ -826,6 +840,42 @@ export function PlacesScreen() {
               ? 'Nothing held yet.'
               : `${held.rows} sightings held, reaching back ${held.days} ${held.days === 1 ? 'day' : 'days'}.`}
           </Text>
+          {/*
+           * What an import put here, and the one gesture that takes it back.
+           *
+           * FORGET does not confirm. The whole argument for offering an import at
+           * all is that refusing it afterwards is free — a confirmation dialogue
+           * would make taking back eight thousand rows of somebody else's
+           * arithmetic feel like a decision, which is exactly backwards.
+           */}
+          <View style={styles.importedLine}>
+            <Text style={[styles.rowSub, styles.importedText]} testID="crossings-imported">
+              {imported.rows === 0
+                ? 'Nothing imported.'
+                : `${imported.rows} sightings imported from your Timeline${
+                    imported.from === null || imported.to === null
+                      ? ''
+                      : `, ${dayLabel(imported.from)} to ${dayLabel(imported.to)}`
+                  }.`}
+            </Text>
+            {imported.rows > 0 ? (
+              <Pressable
+                testID="crossings-forget-imported"
+                onPress={() => {
+                  void forgetImported().then((gone) => {
+                    haptic.good();
+                    toast.show(gone ? `${gone} imported sightings forgotten` : 'Nothing to forget', 'good');
+                    void storeHeld().then(setHeld);
+                    void importedHeld().then(setImported);
+                    void loadSeen().then((seen) => setCrossed(crossings(seen, new Date())));
+                  });
+                }}
+                style={({ pressed }) => [styles.forget, pressed ? styles.forgetPressed : null]}
+              >
+                <Text style={[styles.forgetText, { color: accent }]}>FORGET</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -880,7 +930,16 @@ function Stepper({
   );
 }
 
+/** a date without a time: an import spans months, and the hour of it means nothing */
+const dayLabel = (at: number): string =>
+  new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
 const styles = StyleSheet.create({
+  importedLine: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
+  importedText: { flex: 1 },
+  forget: { paddingVertical: 2 },
+  forgetPressed: { opacity: 0.6 },
+  forgetText: { ...TYPE.meta, fontSize: 11, letterSpacing: 1.2 },
   // Pressable has no feedback of its own, and Touchable's is what was given up to
   // make this reachable by adb
   pressed: { opacity: 0.55 },
