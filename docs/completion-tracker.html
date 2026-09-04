@@ -663,7 +663,17 @@ The thing to watch for, and the reason this row is not just time passing: the fi
 
 Task 2 (`25bda07`): `src/lib/archive.ts` — which visits match a named place, which clusters are worth asking about, and what to say about each. Pure, 16 tests. Nothing is reachable from the UI yet; this is the arithmetic landing ahead of the build, the same split the geofence work used on 09-01.
 
-**Task 3 is now the next move, and it is the APK.**
+**Task 3 — built and installed 2026-09-04, `b0ae3e3`.** `modules/timeline-import` walks the export with `android.util.JsonReader` in constant memory, so the 47 MB never crosses into JavaScript; `segments` comes back beside the visits because an empty list and a parser that threw look identical otherwise. **Runtime moved `5f318efe` to `5a67da27`** — the module directory, `expo-document-picker` and `expo-battery` are each a fingerprint input, so all three rode one APK.
+
+Checked before the install rather than after: the APK carries the real hash and not the `file:fingerprint` placeholder, and its signer SHA-256 matches `android/app/debug.keystore`. `adb install -r` then kept everything — **157 sightings held, reaching back 13 days**, and this morning's six crossings still listed. The app launched clean, which is what says the lazy `requireNativeModule` held.
+
+**The parser itself is still unexercised on the device.** Nothing calls it until Task 4 puts a screen in front of it, so *the module loaded* is not yet proved — only *the app did not crash without it*.
+
+**Two bugs the tests caught while Gradle ran.** `archiveImport` opened its own `openSeenStore()` instead of going through `timeline.ts`, so it wrote to a different database than everything reads — an import that typechecks, reviews clean and lands nowhere. And `asSeen` dropped `import-enter`/`import-exit` on read: rows were written correctly and came back with no `via` at all, which would have counted 8,000 imported rows as app-open sightings.
+
+**Not in this build, correcting earlier advice in this row.** Queue 18's real keystore is *not* free during a build that is happening anyway — a new key cannot update the installed app, so it costs the journal and the chat archive unless it is done as signing-scheme v3 rotation. The alarm intent needs its own design and tests. `expo-battery` is here for the fingerprint move only, so its feature JavaScript can now ship over the air without a second APK.
+
+**Tasks 4 and 5 need no build** and are the whole of what is left: the screen, and the naming flow.
 
 **Task 3 — the APK, and it cannot be split.** A streaming Kotlin parser in `modules/timeline-import`, because `JSON.parse` on 47 MB takes the phone down and `android.util.JsonReader` walks it in constant memory — the file never crosses into JavaScript. A new `modules/` directory moves the fingerprint and so does `expo-document-picker`, so both land in one local `./gradlew assembleRelease` signed with `android/app/debug.keystore`, or the phone is stranded.
 
@@ -2731,7 +2741,17 @@ The pass wants a threat model first and a list of fixes second, because "secure 
 
 Task 2 (<code>25bda07</code>): <code>src/lib/archive.ts</code> — which visits match a named place, which clusters are worth asking about, and what to say about each. Pure, 16 tests. Nothing is reachable from the UI yet; this is the arithmetic landing ahead of the build, the same split the geofence work used on 09-01.
 
-<strong>Task 3 is now the next move, and it is the APK.</strong>
+<strong>Task 3 — built and installed 2026-09-04, <code>b0ae3e3</code>.</strong> <code>modules/timeline-import</code> walks the export with <code>android.util.JsonReader</code> in constant memory, so the 47 MB never crosses into JavaScript; <code>segments</code> comes back beside the visits because an empty list and a parser that threw look identical otherwise. <strong>Runtime moved <code>5f318efe</code> to <code>5a67da27</code></strong> — the module directory, <code>expo-document-picker</code> and <code>expo-battery</code> are each a fingerprint input, so all three rode one APK.
+
+Checked before the install rather than after: the APK carries the real hash and not the <code>file:fingerprint</code> placeholder, and its signer SHA-256 matches <code>android/app/debug.keystore</code>. <code>adb install -r</code> then kept everything — <strong>157 sightings held, reaching back 13 days</strong>, and this morning's six crossings still listed. The app launched clean, which is what says the lazy <code>requireNativeModule</code> held.
+
+<strong>The parser itself is still unexercised on the device.</strong> Nothing calls it until Task 4 puts a screen in front of it, so *the module loaded* is not yet proved — only *the app did not crash without it*.
+
+<strong>Two bugs the tests caught while Gradle ran.</strong> <code>archiveImport</code> opened its own <code>openSeenStore()</code> instead of going through <code>timeline.ts</code>, so it wrote to a different database than everything reads — an import that typechecks, reviews clean and lands nowhere. And <code>asSeen</code> dropped <code>import-enter</code>/<code>import-exit</code> on read: rows were written correctly and came back with no <code>via</code> at all, which would have counted 8,000 imported rows as app-open sightings.
+
+<strong>Not in this build, correcting earlier advice in this row.</strong> Queue 18's real keystore is *not* free during a build that is happening anyway — a new key cannot update the installed app, so it costs the journal and the chat archive unless it is done as signing-scheme v3 rotation. The alarm intent needs its own design and tests. <code>expo-battery</code> is here for the fingerprint move only, so its feature JavaScript can now ship over the air without a second APK.
+
+<strong>Tasks 4 and 5 need no build</strong> and are the whole of what is left: the screen, and the naming flow.
 
 <strong>Task 3 — the APK, and it cannot be split.</strong> A streaming Kotlin parser in <code>modules/timeline-import</code>, because <code>JSON.parse</code> on 47 MB takes the phone down and <code>android.util.JsonReader</code> walks it in constant memory — the file never crosses into JavaScript. A new <code>modules/</code> directory moves the fingerprint and so does <code>expo-document-picker</code>, so both land in one local <code>./gradlew assembleRelease</code> signed with <code>android/app/debug.keystore</code>, or the phone is stranded.
 

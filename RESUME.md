@@ -16,6 +16,61 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+### 🔨 2026-09-04, 10:40. The APK, and the runtime moved to `5a67da27`
+
+**`b0ae3e3`. Read this before publishing anything: the OTA runtime is
+`5a67da2713980c35ae7eca43f249e502113032ed`, not `5f318efe`.**
+
+Three fingerprint inputs rode one build, which is the whole reason to spend a build at
+all: `modules/timeline-import`, `expo-document-picker`, and `expo-battery`. The last is
+there for the fingerprint move alone — its feature JavaScript can now ship over the air
+without a second APK.
+
+**Checked before the install rather than after**, which is the order that matters:
+
+| | |
+| --- | --- |
+| keystore backed up | `~/jarvis-debug.keystore.bak`, cert `FA:C6:17:45:DC:09…` |
+| APK's baked runtime | `5a67da27…` — the real hash, **not** `file:fingerprint` |
+| APK signer | `fac61745dc09…`, matching the keystore |
+| install | `adb install -r --no-streaming` → **Success**, nothing uninstalled |
+| data after | **157 sightings held, reaching back 13 days**; this morning's six crossings still listed; 11 places watched |
+
+`adb install --dry-run` does not exist on this device — it fails with
+`Unknown option --dry-run` and a Java stack trace that reads like a rejected APK. The
+real gate is `apksigner verify --print-certs`, and a refused install is safe anyway.
+
+**The parser is still unexercised on the device.** The app launched clean, which proves
+the lazy `requireNativeModule` held — it does not prove the module loaded, because
+nothing calls it until Task 4 puts a screen in front of it. Do not record that as
+working.
+
+### Two bugs the tests caught while Gradle ran
+
+**`archiveImport` opened its own `openSeenStore()`** instead of going through
+`timeline.ts`, so it wrote to a different database than everything else reads. It
+typechecks, it reviews clean, and it produces an import that silently lands nowhere.
+`putSeen` now routes every write through the store holder, which is the single point of
+truth about which database is in use.
+
+**`asSeen` dropped `import-enter` and `import-exit` on read.** Task 1 widened
+`Seen.via` and did not widen the store's row mapper, so imported rows were written
+correctly and came back with **no `via` at all** — no error, no warning, and every
+figure downstream would have counted 8,000 imported rows as app-open sightings. The
+write worked and the read threw the information away, which is the shape of nearly
+every bug this project has shipped.
+
+### What was deliberately left out, correcting yesterday's advice
+
+Yesterday's entry says the real keystore is "free during a build that is happening
+anyway". **It is not.** A new signing key cannot update the installed app, so taking
+queue 18 costs the journal's 52,000 moments and the chat archive unless it is done as
+signing-scheme v3 key rotation — which is its own job, not a side effect of this one.
+The alarm intent also needs its own design and tests. Neither is in this build.
+
+**Tasks 4 and 5 need no build** and are the whole of what is left: the import screen,
+and naming the clusters he has never named.
+
 ### Driven on the phone, 10:20 — and two false alarms of my own
 
 **Update `01a06ab7…`** on the Updates screen, runtime `5f318efe…`, channel production.
@@ -98,7 +153,7 @@ hash into `strings.xml` by hand first.
 **`feat/mobile-hud` at `6adf351`. 1,495 tests, 102 suites, `tsc` clean,
 `build-status --check` up to date. 91 rows, 59 proved (65%).**
 
-**Runtime is `5f318efec8f8903cb5585c0d8859a65aaba57f8f` and did NOT move today** —
+**Runtime was `5f318efec8f8903cb5585c0d8859a65aaba57f8f` for this entry; it moved to `5a67da27` at 10:40 — see the entry above.** Everything in this one is JavaScript —
 everything below is JavaScript. Published to `production` as update group
 `601a95f0-c256-4a7e-bfc8-cba0e4dc7e60`. The APK is still the local
 `./gradlew assembleRelease` signed with `android/app/debug.keystore` (cert
