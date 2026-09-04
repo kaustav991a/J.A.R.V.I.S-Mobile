@@ -367,3 +367,18 @@ failed — that is what most of the comments in this codebase are. Match the
 surrounding density rather than adding or stripping commentary. Tests are named as
 sentences describing the behaviour, and the interesting ones carry a comment
 saying which bug they exist to prevent.
+
+- **A screenshot of an animating screen is not evidence until a second one agrees.**
+  `ChatScreen` paces the newest reply through `useReveal`, so a `screencap` taken right
+  after a tap catches it mid-typewriter — one shot showed a bubble containing the single
+  letter **"A"**, which reads exactly like a renderer truncating text. It is the same
+  reason `uiautomator dump` returns *could not get idle state* on this app: the reactor
+  never stops moving. Take two shots and compare before believing either.
+- **A briefing's title and body are joined with `\n`** (`notify.ts:521`), so a chat
+  bubble carrying one wraps at the break. *"...leave Home, sir Thunderstorms forecast"*
+  is the newline rendering correctly, not two fragments concatenated — check the
+  original string before filing a copy bug.
+- **The tab bar's hit areas move with the selected pill.** A held `input swipe` opened
+  Home; a double `input tap` opened Settings; the same swipe aimed at Settings from the
+  Chat tab failed twice. Read the pill's position out of a fresh screenshot before
+  aiming, and expect to retry rather than assuming the tap was refused.

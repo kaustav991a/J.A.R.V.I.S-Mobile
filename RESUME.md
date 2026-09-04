@@ -16,6 +16,42 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
+### Driven on the phone, 10:20 — and two false alarms of my own
+
+**Update `01a06ab7…`** on the Updates screen, runtime `5f318efe…`, channel production.
+Tasks 1 and 2 are on the device.
+
+**Crossings recorded, this morning's commute:** Left Barrackpore 8:40, Reached
+Barrackpore 8:29, Left Musalman Para 8:12, Left Laxminath Nagar 8:11, Reached Musalman
+Para 8:11, Reached Laxminath Nagar 8:11. *No bursts refused today.* **156 sightings
+held, reaching back 13 days** — up from 138 and 12.
+
+**Six crossings and not one imported row**, which is what Task 1's three `isCrossing`
+narrowings had to prove. And the overlapping-circles fix from 09-02 is visible in it:
+*Reached* and *Left* Laxminath Nagar inside the same minute, plus Musalman Para
+8:11→8:12, all correctly left alone because those circles are 150 m apart.
+
+**Both things I flagged as bugs were my own screenshots.**
+
+1. A bubble rendering as the single letter **"A"**. That is `useReveal` — the typewriter
+   pacing on the newest reply — caught one character in, because `screencap` fired about
+   200 ms after the tap. Re-shooting showed the whole line.
+2. The same line then read *"...leave Home, sir Thunderstorms forecast."* and looked
+   like two fragments joined without punctuation. It is a newline rendering correctly:
+   `notify.ts:521` joins a briefing's title and body with `
+`, and the wrap happens to
+   land where the break is.
+
+**The rule that follows from it:** a screenshot of an animating screen is not evidence
+until a second one agrees with it. This app paces every new reply and the reactor never
+stops moving — which is also why `uiautomator dump` returns *could not get idle state*
+here. Take two shots.
+
+**Driving the tab bar remains unreliable.** A held `input swipe` worked for Home and a
+double `input tap` worked for Settings; the same swipe on Settings failed twice from the
+Chat tab. The hit areas move with the pill, so read the pill's position out of a
+screenshot before aiming, and expect to retry.
+
 ### ✅ 2026-09-04, morning. Tasks 1 and 2 shipped, and a figure that had been drifting
 
 **Published as `ac6cf0a5` on runtime `5f318efe`** — unmoved, because both tasks are
@@ -29,9 +65,10 @@ where the library shipped over the air and only the native half waited for a bui
 
 **And the suite caught a figure that had been quietly wrong.** `calls.test.ts` was green
 on 09-03 and red on 09-04 with nothing changed: `callSummary` read `Date.now()` while
-the fixture pinned `NOW`, so *"reaching back 30 days"* became 31 overnight. **That drift
-was on the phone too**, not only in the test — the figure is the age of the oldest call
-and it was being measured from a moving now. `now` is a parameter now, the way it
+the fixture pinned `NOW`, so *"reaching back 30 days"* became 31 overnight. **Corrected the same day: that was
+only the test.** On the phone `oldest` is a real call timestamp and `now` is the real
+clock, so the figure was always right and grows legitimately as the oldest call ages.
+The commit message for `27f3f17` claims otherwise and is wrong. `now` is a parameter now, the way it
 already was on `lostTouch`.
 
 Worth noting how it was found. A time-dependent test is usually called flaky and pinned;
