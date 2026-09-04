@@ -16,7 +16,47 @@
 > before then say "§0b" meaning the status — that is now the ledger, and the dated entries
 > are left as written rather than rewritten.
 
-## 🛑 STOP POINT — 2026-09-03, end of day. **Start at "Tomorrow" below.** Supersedes the 16:15 point.
+### ✅ 2026-09-04, morning. Tasks 1 and 2 shipped, and a figure that had been drifting
+
+**Published as `ac6cf0a5` on runtime `5f318efe`** — unmoved, because both tasks are
+JavaScript. `27f3f17`. 1,511 tests, 103 suites, `tsc` clean.
+
+`src/lib/archive.ts` is the whole of the import's arithmetic and it is pure: a visit
+becomes an arrival and a departure when it lands inside a circle he named himself, and
+everything else becomes a question ranked by how often he went there. Nothing is
+reachable from the UI yet — this is the same split the geofence work used on 09-01,
+where the library shipped over the air and only the native half waited for a build.
+
+**And the suite caught a figure that had been quietly wrong.** `calls.test.ts` was green
+on 09-03 and red on 09-04 with nothing changed: `callSummary` read `Date.now()` while
+the fixture pinned `NOW`, so *"reaching back 30 days"* became 31 overnight. **That drift
+was on the phone too**, not only in the test — the figure is the age of the oldest call
+and it was being measured from a moving now. `now` is a parameter now, the way it
+already was on `lostTouch`.
+
+Worth noting how it was found. A time-dependent test is usually called flaky and pinned;
+this one was **correct to fail**, and treating it as noise would have left a number on
+the Journal card growing by one a day forever.
+
+### 🌅 Next: Task 3, and it is the APK
+
+Everything left in the import needs the build, and **three other things have been
+waiting for the same one**: the alarm intent and `expo-battery` from queue 23, and the
+real release keystore from queue 18, which **closes completion point 9 outright** — the
+only one of the ten that can close without the gateway.
+
+```bash
+cp android/app/debug.keystore "$HOME/jarvis-debug.keystore.bak"
+keytool -list -v -keystore android/app/debug.keystore -storepass android | grep SHA256
+```
+
+Expect `fac61745dc09…`. **Never `prebuild --clean`** — `android/` is gitignored and that
+is the only copy of the key that can update this phone. `modules/timeline-import` and
+`expo-document-picker` each move the fingerprint, so both land in one local
+`./gradlew assembleRelease`, run detached, installed with `adb install -r`. Bake the new
+hash into `strings.xml` by hand first.
+
+## 🛑 STOP POINT — 2026-09-03, end of day. Superseded by the 09-04 entry above.
 
 **`feat/mobile-hud` at `6adf351`. 1,495 tests, 102 suites, `tsc` clean,
 `build-status --check` up to date. 91 rows, 59 proved (65%).**
