@@ -673,7 +673,15 @@ Checked before the install rather than after: the APK carries the real hash and 
 
 **Not in this build, correcting earlier advice in this row.** Queue 18's real keystore is *not* free during a build that is happening anyway — a new key cannot update the installed app, so it costs the journal and the chat archive unless it is done as signing-scheme v3 rotation. The alarm intent needs its own design and tests. `expo-battery` is here for the fingerprint move only, so its feature JavaScript can now ship over the air without a second APK.
 
-**Tasks 4 and 5 need no build** and are the whole of what is left: the screen, and the naming flow.
+**Task 4 — built and published 2026-09-04 as `8e3de252`, runtime unmoved at `5a67da27`.** Settings → *Import your Timeline* picks the file with `copyToCacheDirectory: false`, so the 47 MB is read through the `content://` uri and never copied into the app. The preview names the file, the segment and visit counts, the date span, and a line per named place with **days as well as visits** — four visits across three days is three days of evidence, and a visit count reads as more history than there is. **Nothing is written until IMPORT.**
+
+Places → Crossings recorded gains an IMPORTED line with FORGET beside it, kept apart from the measured count on purpose: 529 days of imported history and thirteen days of crossings are different claims, and one total would let the bigger stand for both. FORGET does not confirm — the argument for offering an import at all is that refusing it afterwards is free.
+
+**The screen says which nothing it is.** Four different empty answers get four different sentences: a parser that threw (verbatim), a format Google changed (*"11,570 segments and no visits"*), a file whose visits are all outside any named circle, and a build without the native half. Those looked identical for as long as it took to ship one.
+
+**Still unproved: the parser has never run.** Nothing had called it until this screen existed, and the device check has not happened yet — the phone locked itself before the import could be driven. *The module loads* and *the export parses* are both open questions, and the honest reading of this row is that the plumbing is complete and untested end to end.
+
+**Task 5, the naming flow, is what remains.** The clusters are already computed and shown; what is missing is typing a name against one and re-running the match.
 
 **Task 3 — the APK, and it cannot be split.** A streaming Kotlin parser in `modules/timeline-import`, because `JSON.parse` on 47 MB takes the phone down and `android.util.JsonReader` walks it in constant memory — the file never crosses into JavaScript. A new `modules/` directory moves the fingerprint and so does `expo-document-picker`, so both land in one local `./gradlew assembleRelease` signed with `android/app/debug.keystore`, or the phone is stranded.
 
@@ -2751,7 +2759,15 @@ Checked before the install rather than after: the APK carries the real hash and 
 
 <strong>Not in this build, correcting earlier advice in this row.</strong> Queue 18's real keystore is *not* free during a build that is happening anyway — a new key cannot update the installed app, so it costs the journal and the chat archive unless it is done as signing-scheme v3 rotation. The alarm intent needs its own design and tests. <code>expo-battery</code> is here for the fingerprint move only, so its feature JavaScript can now ship over the air without a second APK.
 
-<strong>Tasks 4 and 5 need no build</strong> and are the whole of what is left: the screen, and the naming flow.
+<strong>Task 4 — built and published 2026-09-04 as <code>8e3de252</code>, runtime unmoved at <code>5a67da27</code>.</strong> Settings → *Import your Timeline* picks the file with <code>copyToCacheDirectory: false</code>, so the 47 MB is read through the <code>content://</code> uri and never copied into the app. The preview names the file, the segment and visit counts, the date span, and a line per named place with <strong>days as well as visits</strong> — four visits across three days is three days of evidence, and a visit count reads as more history than there is. <strong>Nothing is written until IMPORT.</strong>
+
+Places → Crossings recorded gains an IMPORTED line with FORGET beside it, kept apart from the measured count on purpose: 529 days of imported history and thirteen days of crossings are different claims, and one total would let the bigger stand for both. FORGET does not confirm — the argument for offering an import at all is that refusing it afterwards is free.
+
+<strong>The screen says which nothing it is.</strong> Four different empty answers get four different sentences: a parser that threw (verbatim), a format Google changed (*"11,570 segments and no visits"*), a file whose visits are all outside any named circle, and a build without the native half. Those looked identical for as long as it took to ship one.
+
+<strong>Still unproved: the parser has never run.</strong> Nothing had called it until this screen existed, and the device check has not happened yet — the phone locked itself before the import could be driven. *The module loads* and *the export parses* are both open questions, and the honest reading of this row is that the plumbing is complete and untested end to end.
+
+<strong>Task 5, the naming flow, is what remains.</strong> The clusters are already computed and shown; what is missing is typing a name against one and re-running the match.
 
 <strong>Task 3 — the APK, and it cannot be split.</strong> A streaming Kotlin parser in <code>modules/timeline-import</code>, because <code>JSON.parse</code> on 47 MB takes the phone down and <code>android.util.JsonReader</code> walks it in constant memory — the file never crosses into JavaScript. A new <code>modules/</code> directory moves the fingerprint and so does <code>expo-document-picker</code>, so both land in one local <code>./gradlew assembleRelease</code> signed with <code>android/app/debug.keystore</code>, or the phone is stranded.
 
