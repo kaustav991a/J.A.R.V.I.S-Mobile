@@ -382,3 +382,14 @@ saying which bug they exist to prevent.
   Home; a double `input tap` opened Settings; the same swipe aimed at Settings from the
   Chat tab failed twice. Read the pill's position out of a fresh screenshot before
   aiming, and expect to retry rather than assuming the tap was refused.
+- **`adb install --dry-run` is not supported on this device.** It fails with
+  `IllegalArgumentException: Unknown option --dry-run` and a Java stack trace, which
+  reads like a rejected APK rather than a rejected flag. The real safety gate is
+  `apksigner verify --print-certs` against the keystore's SHA-256 before installing; a
+  refused install is safe anyway, since Android leaves the installed app alone.
+- **Keep `asSeen`'s allowed `via` values in step with `Seen.via` by hand.** The mapper
+  in `seenStore.ts` whitelists what a stored `via` may be, and when `import-enter` and
+  `import-exit` were added to the type but not to the mapper, imported rows were
+  **written correctly and read back with no `via` at all**. The write worked and the
+  read threw the information away — no error, no warning, and every figure downstream
+  saw them as app-open sightings.

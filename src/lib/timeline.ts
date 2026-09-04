@@ -427,6 +427,25 @@ export async function forgetCrossing(at: number): Promise<void> {
 }
 
 /**
+ * Write many sightings at once, through the store this file owns.
+ *
+ * An importer that opened its own `openSeenStore()` wrote to a different database than
+ * everything else reads — which passes a typecheck, passes review, and produces an
+ * import that silently lands nowhere. The store holder is the single point of truth
+ * about which database is in use, and everything writing to it goes through here.
+ */
+export async function putSeen(rows: Seen[]): Promise<number> {
+  try {
+    const s = await theStore();
+    if (!s || !rows.length) return 0;
+    await s.putMany(rows);
+    return rows.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Take back everything a Timeline import wrote.
  *
  * One gesture, because an import is eight thousand rows of somebody else's arithmetic

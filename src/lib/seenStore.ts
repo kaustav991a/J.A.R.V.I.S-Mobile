@@ -72,9 +72,21 @@ export type SeenStore = {
   oldest: () => Promise<number | null>;
 };
 
+/**
+ * The four kinds a stored `via` may be.
+ *
+ * Enumerated rather than cast, because the column outlives the code that wrote it and
+ * a build from before 2026-09-04 knew nothing about imports. **Kept in step with
+ * `Seen.via` by hand, and the day it fell out of step it cost an afternoon:** the
+ * mapper allowed only `enter` and `exit`, so 8,000 imported rows were written
+ * correctly and then read back with no `via` at all. The write worked and the read
+ * threw the information away, which is the shape of nearly every bug in this project.
+ */
+const VIA = new Set(['enter', 'exit', 'import-enter', 'import-exit']);
+
 const asSeen = (r: Row): Seen =>
-  r.via === 'enter' || r.via === 'exit'
-    ? { place: r.place, at: r.at, via: r.via }
+  r.via !== null && VIA.has(r.via)
+    ? { place: r.place, at: r.at, via: r.via as Seen['via'] }
     : // the key is absent rather than undefined: `via` is tested for truthiness all
       // over this codebase, and an explicit undefined round-trips differently
       { place: r.place, at: r.at };
