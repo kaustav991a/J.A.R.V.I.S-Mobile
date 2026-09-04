@@ -137,13 +137,20 @@ export function missedToday(
  * identical from outside — which is the failure this project has now shipped five
  * times.
  */
-export function callSummary(calls: Call[]): { calls: number; people: number; days: number } {
+export function callSummary(
+  calls: Call[],
+  now: number = Date.now()
+): { calls: number; people: number; days: number } {
   if (!calls.length) return { calls: 0, people: 0, days: 0 };
   const people = new Set(calls.filter((c) => c.name).map((c) => c.who));
   const oldest = Math.min(...calls.map((c) => c.at));
   return {
     calls: calls.length,
     people: people.size,
-    days: Math.round((Date.now() - oldest) / DAY),
+    // `now` is a parameter for the same reason it is one on `lostTouch`: a function
+    // that reads the wall clock cannot be tested against a fixed fixture. This one
+    // did, and the suite went green on 09-03 and red on 09-04 with nothing changed —
+    // the figure was drifting by a day every day and only the test noticed
+    days: Math.round((now - oldest) / DAY),
   };
 }

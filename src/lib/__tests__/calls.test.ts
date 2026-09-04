@@ -108,14 +108,14 @@ describe('what it managed to read', () => {
    */
   it('counts the calls and the people behind them', () => {
     const calls = [call('Mousumi', 1), call('Mousumi', 3), call('Rahul', 2), call(null, 4)];
-    expect(callSummary(calls)).toMatchObject({ calls: 4, people: 2 });
+    expect(callSummary(calls, NOW)).toMatchObject({ calls: 4, people: 2 });
   });
 
   it('says how far back the reading goes, since that is what a habit is built from', () => {
-    expect(callSummary([call('Mousumi', 30), call('Mousumi', 1)]).days).toBe(30);
+    expect(callSummary([call('Mousumi', 30), call('Mousumi', 1)], NOW).days).toBe(30);
   });
 
   it('answers zero rather than nothing, so the row can say it read none', () => {
-    expect(callSummary([])).toEqual({ calls: 0, people: 0, days: 0 });
+    expect(callSummary([], NOW)).toEqual({ calls: 0, people: 0, days: 0 });
   });
 });
